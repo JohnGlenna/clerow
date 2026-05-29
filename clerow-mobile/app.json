@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Clerow",
+    "slug": "clerow",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/clerow-mascot.png",
+    "scheme": "clerow",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/clerow-mascot.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.clerow.app"
+    },
+    "android": {
+      "package": "com.clerow.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/clerow-mascot.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/clerow-mascot.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

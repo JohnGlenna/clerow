@@ -14,7 +14,8 @@ type NavKey =
   | "models"
   | "quests"
   | "leaderboard"
-  | "reports";
+  | "reports"
+  | "settings";
 
 const NAV: { i: Parameters<typeof Icon>[0]["name"]; l: string; k: NavKey; lock?: boolean }[] = [
   { i: "home",   l: "Overview",    k: "overview" },
@@ -36,7 +37,8 @@ export function AppShell({
   const router = useRouter();
   const { subscription, loading } = useSubscription();
   const subscribed = subscription?.subscribed ?? null;
-  const paid = page !== "overview";
+  // Overview and Settings are always reachable; every other page is gated.
+  const paid = page !== "overview" && page !== "settings";
   // Cover a paid page until we POSITIVELY confirm the user is subscribed. While
   // status is still loading we show a neutral blur cover (no paywall card) so a
   // paying user never sees the paywall flash; the full card appears only once we
@@ -82,10 +84,6 @@ function AppSidebar({
   onManageBilling: () => void;
   onSignOut: () => void;
 }) {
-  const bottom: { i: Parameters<typeof Icon>[0]["name"]; l: string }[] = [
-    { i: "bell",     l: "Notifications" },
-    { i: "settings", l: "Settings" },
-  ];
   return (
     <aside className="app-side">
       <a
@@ -137,14 +135,25 @@ function AppSidebar({
           </span>
           <span>{subscribed ? "Billing" : "Upgrade"}</span>
         </a>
-        {bottom.map((n) => (
-          <a key={n.l} href="#">
-            <span className="ico">
-              <Icon name={n.i} size={16} />
-            </span>
-            <span>{n.l}</span>
-          </a>
-        ))}
+        <a href="#" onClick={(e) => e.preventDefault()}>
+          <span className="ico">
+            <Icon name="bell" size={16} />
+          </span>
+          <span>Notifications</span>
+        </a>
+        <a
+          className={page === "settings" ? "on" : ""}
+          href="/dashboard/settings"
+          onClick={(e) => {
+            e.preventDefault();
+            onNavigate("settings");
+          }}
+        >
+          <span className="ico">
+            <Icon name="settings" size={16} />
+          </span>
+          <span>Settings</span>
+        </a>
         <a
           href="/"
           onClick={(e) => {

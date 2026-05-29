@@ -5,6 +5,26 @@ import { enrichFromUrl } from "@/lib/scan/enrich";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Return the signed-in user's brand profile for the settings page. Returns
+// brand:null when they haven't onboarded yet.
+export async function GET() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const { data: brand } = await supabase
+    .from("brands")
+    .select("company, url, industry, description, competitors")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return NextResponse.json({ brand: brand ?? null });
+}
+
 // Upsert the signed-in user's brand profile. One brand per user (their tracked
 // site). Single-step onboarding sends only the URL — for a new brand we derive
 // the rest of the profile from the site so the scan has a name to detect and a
@@ -28,11 +48,19 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   // Re-scan of an already-onboarded brand: keep the derived profile, just bump
-  // the URL/timestamp. (No step ever sends a richer profile anymore.)
+  // the URL/timestamp. Settings edits may also send a new company name, so
+  // accept that when present (otherwise leave the derived profile untouched).
   if (existing) {
+    const patch: { url: string; updated_at: string; company?: string } = {
+      url,
+      updated_at: new Date().toISOString(),
+    };
+    const company = String(body.company ?? "").trim();
+    if (company) patch.company = company;
+
     const { data, error } = await supabase
       .from("brands")
-      .update({ url, updated_at: new Date().toISOString() })
+      .update(patch)
       .eq("id", existing.id)
       .select("id")
       .single();
