@@ -1,9 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getEngine, enabledEngines, FREE_ENGINES, PAID_ENGINES, type EngineId } from "../engines";
+import { getEngine, enabledEngines, ENGINES, FREE_ENGINES, PAID_ENGINES, type EngineId } from "../engines";
 import { discoverPrompts } from "./discover";
 import { detectRanking } from "./detect";
-import type { BrandProfile, RunResponse } from "../types";
-import type { Database, BrandSentiment } from "../supabase/database.types";
+import type { BrandProfile, RankedBrand, RunResponse } from "../types";
+import type { Database, BrandSentiment, Citation } from "../supabase/database.types";
 
 type DB = SupabaseClient<Database>;
 type BrandRow = Database["public"]["Tables"]["brands"]["Row"];
@@ -147,6 +147,66 @@ export async function runFreeScan(db: DB, brandId: string): Promise<RunResponse>
       .eq("id", scan.id);
     throw err;
   }
+}
+
+// Reconstruct the primary prompt's latest stored ranking as a RunResponse,
+// without calling any engine. Lets the free reveal scan be served from data we
+// already paid for (e.g. on a repeat onboarding) instead of spending again.
+// Returns null when there's nothing completed to show.
+export async function loadLatestFreeResult(db: DB, brandId: string): Promise<RunResponse | null> {
+  const { data: primary } = await db
+    .from("prompts")
+    .select("id, text")
+    .eq("brand_id", brandId)
+    .eq("is_primary", true)
+    .limit(1)
+    .maybeSingle();
+  if (!primary) return null;
+
+  // The primary prompt's most recent result from any completed scan.
+  const { data: pr } = await db
+    .from("scan_results")
+    .select("id, engine, citations, scan_id, scans!inner(brand_id, status)")
+    .eq("scans.brand_id", brandId)
+    .eq("scans.status", "done")
+    .eq("prompt_id", primary.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!pr) return null;
+
+  const { data: brandRows } = await db
+    .from("result_brands")
+    .select("rank, name, is_you, visibility, sentiment, position")
+    .eq("scan_result_id", pr.id)
+    .order("rank", { ascending: true });
+
+  const brands: RankedBrand[] = (brandRows ?? []).map((b) => ({
+    rank: b.rank,
+    name: b.name,
+    isYou: b.is_you,
+    visibility: b.visibility,
+    sentiment: b.sentiment,
+    position: b.position,
+  }));
+
+  // `you` is derived from your row exactly as detectRanking builds it live.
+  const youRow = brands.find((b) => b.isYou);
+  const you = {
+    mentioned: youRow ? youRow.visibility > 0 || youRow.position != null : false,
+    visibility: youRow?.visibility ?? 0,
+    position: youRow?.position ?? null,
+    sentiment: (youRow?.sentiment ?? "warn") as BrandSentiment,
+  };
+
+  return {
+    scanId: pr.scan_id,
+    engine: ENGINES[pr.engine as EngineId]?.label ?? pr.engine,
+    prompt: primary.text,
+    brands,
+    you,
+    citations: (pr.citations as Citation[]) ?? [],
+  };
 }
 
 // Per-engine outcome of a multi-engine scan (paid). `error` is set when that one

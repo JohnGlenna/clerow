@@ -326,11 +326,8 @@ input, select, textarea { font-family: inherit; }
   transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   background: radial-gradient(
     circle at center,
-    transparent 0%,
-    rgba(28, 176, 246, 0.18) 30%,
-    rgba(124, 58, 237, 0.18) 60%,
-    rgba(225, 29, 72, 0.18) 90%,
-    transparent 100%
+    color-mix(in oklab, var(--accent) 16%, transparent) 0%,
+    transparent 70%
   );
 }
 .glow-menu:hover .glow-menu-bg { opacity: 1; }
@@ -1910,6 +1907,10 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   display: grid;
   grid-template-columns: 240px 1fr;
   background: var(--bg-soft);
+  /* Explicit color so themed text cascades to descendants in dark mode.
+     (Inherited color from <body> is computed outside the .app-shell scope,
+     so var(--ink) must be re-anchored here for the dark override to apply.) */
+  color: var(--ink);
 }
 .app-side {
   background: #fff;
@@ -2115,6 +2116,40 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .score-stat .bar { height: 8px; border-radius: 999px; background: var(--bg-soft-2); overflow: hidden; }
 .score-stat .bar > i { display: block; height: 100%; border-radius: 999px; }
 .score-stat .val { font-family: var(--font-mono); font-weight: 800; font-size: 13px; }
+
+/* Overview page-summary: a compact row of clickable cards that mirror the
+   headline stats from each workspace page (Quests / Prompts / Sources). Sits
+   directly under the (now half-height, full-width) visibility score card. */
+.app-card--score { margin-bottom: 16px; }
+.overview-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.summary-card {
+  text-align: left;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 16px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: #fff;
+  border: 2px solid var(--border);
+  box-shadow: 0 3px 0 var(--border);
+  transition: transform var(--t-fast), box-shadow var(--t-fast);
+}
+.summary-card:hover { transform: translateY(-2px); }
+.summary-card-head { display: flex; align-items: center; gap: 10px; }
+.summary-card-ico { display: inline-flex; color: var(--accent-2); }
+.summary-card-title { font-family: var(--font-display); font-weight: 900; font-size: 15px; letter-spacing: -0.01em; }
+.summary-card-link { margin-left: auto; font-size: 12.5px; font-weight: 800; color: var(--accent-2); }
+.summary-card-stats { display: flex; gap: 22px; }
+.summary-stat { display: flex; flex-direction: column; gap: 3px; }
+.summary-stat b { font-family: var(--font-display); font-weight: 900; font-size: 26px; line-height: 1; letter-spacing: -0.02em; color: var(--ink); }
+.summary-stat span { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+@media (max-width: 760px) {
+  .overview-summary { grid-template-columns: 1fr; }
+}
 
 /* Tasks */
 .task-list { display: flex; flex-direction: column; gap: 8px; }
@@ -3870,6 +3905,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .app-card,
 .app-hello,
 .page-stat,
+.summary-card,
 .page-tabs,
 .suggest-card,
 .model-card,
@@ -3884,6 +3920,8 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   border: none;
   box-shadow: var(--neu-out-md);
 }
+/* Summary cards lift on hover under the soft-UI theme. */
+.app-shell .summary-card:hover { box-shadow: var(--neu-out-lg, var(--neu-out-md)); }
 
 /* ---- page-stat colored variants: neu card + subtle inset accent ring ---- */
 .page-stat--success { box-shadow: var(--neu-out-md), inset 0 0 0 1.5px color-mix(in oklab, var(--success) 45%, transparent); }
@@ -3910,10 +3948,9 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .whitelabel-card { border: none; box-shadow: var(--neu-out-md); }
 
 /* ---- Large raised panels ---- */
-.paywall-card,
-.drawer { border: none; box-shadow: var(--neu-out-lg); }
-.paywall-card { background: var(--neu-raise); }
-.drawer { background: var(--neu-base); border-left: none; }
+.paywall-card { border: none; box-shadow: var(--neu-out-lg); background: var(--neu-raise); }
+/* Drawer uses a plain directional drop shadow (no neu light-glow halo). */
+.drawer { border: none; box-shadow: 0 24px 60px -20px rgba(20, 20, 20, 0.45); background: var(--neu-base); border-left: none; }
 .paywall { background: linear-gradient(180deg, color-mix(in oklab, var(--neu-base) 60%, transparent), var(--neu-base)); }
 .paywall-icon { box-shadow: var(--neu-out-sm); }
 

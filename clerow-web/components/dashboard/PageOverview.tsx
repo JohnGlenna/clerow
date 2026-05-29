@@ -14,6 +14,11 @@ import type {
   DashboardCompetitor,
   DashboardTask,
 } from "@/lib/types";
+import type { SourceRow } from "@/app/api/sources/route";
+
+// Compact source roll-up the Overview summary row shows. Mirrors the headline
+// stats on the Sources page so the dashboard reflects that page at a glance.
+type SourceSummary = { cited: number; yours: number; gaps: number };
 
 // "https://example.com/path" → "example.com" — the greeting uses the bare domain
 // so it matches the site the user connected, not the enriched/guessed company name.
@@ -28,6 +33,30 @@ export function PageOverview() {
   const navigate = (k: string) =>
     router.push(k === "overview" ? "/dashboard" : `/dashboard/${k}`);
   const { data, loading, error, refresh } = useDashboard();
+
+  // The Sources page derives its own data from /api/sources (citations across
+  // scans), so it isn't in the shared dashboard payload — pull a roll-up here
+  // for the summary row, once the brand has actually scanned.
+  const [sources, setSources] = React.useState<SourceSummary | null>(null);
+  const hasScan = data?.hasScan ?? false;
+  React.useEffect(() => {
+    if (!hasScan) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/sources", { cache: "no-store" });
+      const json = await res.json().catch(() => ({ sources: [] }));
+      if (cancelled) return;
+      const rows: SourceRow[] = json.sources ?? [];
+      setSources({
+        cited: rows.length,
+        yours: rows.filter((s) => s.isYours).length,
+        gaps: rows.filter((s) => !s.isYours && s.xp > 0).length,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasScan]);
 
   const sub = data?.brand
     ? `${data.brand.url}${data.hasScan ? ` · scanned via ${data.engine ?? "Perplexity"}` : " · not scanned yet"}`
@@ -65,15 +94,16 @@ export function PageOverview() {
       {!loading && data && data.hasScan && (
         <>
           <AppHello company={domainName(data.brand?.url) ?? "founder"} streak={data.streak?.current ?? 0} />
+          <ScoreCard score={data.score} trend={data.trend} />
+          <PageSummary data={data} sources={sources} onNavigate={navigate} />
           <div className="app-grid">
-            <ScoreCard score={data.score} trend={data.trend} />
             <TasksCard tasks={data.tasks ?? []} onNavigate={navigate} onChanged={refresh} />
+            <ModelsCard models={data.models ?? []} onNavigate={navigate} />
           </div>
           <div className="app-grid">
-            <ModelsCard models={data.models ?? []} onNavigate={navigate} />
             <CompetitorsCard competitors={data.competitors ?? []} onNavigate={navigate} />
+            <AchievementsCard />
           </div>
-          <AchievementsCard />
         </>
       )}
     </>
@@ -122,6 +152,100 @@ function AppHello({ company, streak }: { company: string; streak: number }) {
       </div>
       <div className="streak-mini"><GameIcon name="flame" size={16} color="#F59E0B" /> {streak}</div>
     </div>
+  );
+}
+
+// A compact row of clickable cards that mirror the headline numbers from each
+// workspace page (Quests / Prompts / Sources), so the Overview reflects "where
+// you stand" on every page without leaving it. Clicking a card opens that page.
+function PageSummary({
+  data,
+  sources,
+  onNavigate,
+}: {
+  data: DashboardData;
+  sources: SourceSummary | null;
+  onNavigate: (k: string) => void;
+}) {
+  const tasks = data.tasks ?? [];
+  const questsReady = tasks.filter((t) => !t.done).length;
+  const questsDone = tasks.filter((t) => t.done).length;
+  const streak = data.streak?.current ?? 0;
+
+  const prompts = data.prompts ?? [];
+  const tracked = prompts.length;
+  const scanned = prompts.filter((p) => p.scanned).length;
+
+  return (
+    <div className="overview-summary">
+      <SummaryCard
+        ico="swords"
+        title="Quests"
+        onNavigate={() => onNavigate("quests")}
+        stats={[
+          { v: String(questsReady), l: "Ready" },
+          { v: String(questsDone), l: "Done", c: "var(--success)" },
+          { v: String(streak), l: "Day streak", c: "var(--streak)" },
+        ]}
+      />
+      <SummaryCard
+        ico="target"
+        title="Prompts"
+        onNavigate={() => onNavigate("prompts")}
+        stats={[
+          { v: String(tracked), l: "Tracked" },
+          { v: String(scanned), l: "Scanned", c: "var(--success)" },
+        ]}
+      />
+      <SummaryCard
+        ico="world"
+        title="Sources"
+        onNavigate={() => onNavigate("sources")}
+        stats={
+          sources
+            ? [
+                { v: String(sources.cited), l: "Cited" },
+                { v: String(sources.yours), l: "You appear", c: sources.yours ? "var(--success)" : undefined },
+                { v: String(sources.gaps), l: "Gaps", c: sources.gaps ? "var(--danger)" : undefined },
+              ]
+            : [
+                { v: "…", l: "Cited" },
+                { v: "…", l: "You appear" },
+                { v: "…", l: "Gaps" },
+              ]
+        }
+      />
+    </div>
+  );
+}
+
+function SummaryCard({
+  ico,
+  title,
+  stats,
+  onNavigate,
+}: {
+  ico: GameIconName;
+  title: string;
+  stats: { v: string; l: string; c?: string }[];
+  onNavigate: () => void;
+}) {
+  return (
+    <button type="button" className="summary-card" onClick={onNavigate}>
+      <div className="summary-card-head">
+        <span className="summary-card-ico"><GameIcon name={ico} size={18} /></span>
+        <span className="summary-card-title">{title}</span>
+        <span className="summary-card-link">View →</span>
+      </div>
+      <div className="summary-card-stats">
+        {stats.map((s) => (
+          <div key={s.l} className="summary-stat">
+            <b style={s.c ? { color: s.c } : undefined}>{s.v}</b>
+            <span>{s.l}</span>
+          </div>
+        ))}
+      </div>
+    </button>
   );
 }
 

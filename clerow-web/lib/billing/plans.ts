@@ -13,12 +13,19 @@ export type Plan = {
   priceEnv: string;
   /** Enterprise is sales-led — no self-serve Checkout. */
   checkout: boolean;
+  /** How many AI models this plan may scan (prefix of PAID_ENGINES order). */
+  maxEngines: number;
+  /** Max prompt-scans per brand per rolling 24h — the per-plan cost ceiling. */
+  dailyScans: number;
 };
 
+// `maxEngines` / `dailyScans` are the cost ceiling per plan, enforced server-side
+// (see lib/billing/limits.ts). Tune as COGS/pricing demand — they are the guard
+// that stops paid AI calls from outrunning subscription revenue.
 export const PLANS: Record<PlanKey, Plan> = {
-  founder:    { key: "founder",    name: "Founder",        price: 29,  priceEnv: "STRIPE_PRICE_FOUNDER",    checkout: true },
-  team:       { key: "team",       name: "Marketing Team", price: 89,  priceEnv: "STRIPE_PRICE_TEAM",       checkout: true },
-  enterprise: { key: "enterprise", name: "Enterprise",     price: 249, priceEnv: "STRIPE_PRICE_ENTERPRISE", checkout: false },
+  founder:    { key: "founder",    name: "Founder",        price: 29,  priceEnv: "STRIPE_PRICE_FOUNDER",    checkout: true,  maxEngines: 3, dailyScans: 25 },
+  team:       { key: "team",       name: "Marketing Team", price: 89,  priceEnv: "STRIPE_PRICE_TEAM",       checkout: true,  maxEngines: 4, dailyScans: 100 },
+  enterprise: { key: "enterprise", name: "Enterprise",     price: 249, priceEnv: "STRIPE_PRICE_ENTERPRISE", checkout: false, maxEngines: 4, dailyScans: 1000 },
 };
 
 export function isPlanKey(value: unknown): value is PlanKey {

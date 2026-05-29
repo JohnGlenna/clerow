@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { runFreeScan } from "@/lib/scan/run";
+import { runFreeScan, loadLatestFreeResult } from "@/lib/scan/run";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +25,20 @@ export async function POST(req: Request) {
     .eq("id", brandId)
     .maybeSingle();
   if (!brand) return NextResponse.json({ error: "Brand not found" }, { status: 404 });
+
+  // The free reveal scan is once per brand: if a completed scan already exists,
+  // serve the stored ranking instead of spending another engine call. Re-running
+  // onboarding (or "Re-scan now") still shows the reveal, at zero extra API cost.
+  const { count: done } = await supabase
+    .from("scans")
+    .select("id", { count: "exact", head: true })
+    .eq("brand_id", brandId)
+    .eq("status", "done");
+  if (done && done > 0) {
+    const existing = await loadLatestFreeResult(supabase, brandId);
+    if (existing) return NextResponse.json(existing);
+    // Nothing reconstructable (rare) — fall through and run a fresh scan.
+  }
 
   try {
     const result = await runFreeScan(supabase, brandId);

@@ -46,8 +46,8 @@ const NAV_ITEMS: {
       "radial-gradient(circle, rgba(124,58,237,0.22) 0%, rgba(124,58,237,0.08) 50%, rgba(124,58,237,0) 100%)",
   },
   {
-    label: "Changelog",
-    href: "#changelog",
+    label: "FAQ",
+    href: "#faq",
     Icon: LuScrollText,
     color: "#E11D48",
     glow:
