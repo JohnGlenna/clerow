@@ -1,0 +1,4 @@
+# Reference/design folders are read-only context, not app code.
+# Exclude them from GitHub's language statistics (Linguist).
+_design_extract/** linguist-vendored
+_design/**         linguist-vendored
