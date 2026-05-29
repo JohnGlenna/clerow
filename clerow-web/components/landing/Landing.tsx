@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import type { IconType } from "react-icons";
+import { LuWorkflow, LuGem, LuScrollText } from "react-icons/lu";
 import { MascotClerow } from "../Mascot";
 import { GameIcon, type GameIconName } from "../GameIcon";
 import { useAuthModal } from "../AuthModalProvider";
@@ -20,6 +22,39 @@ export function Landing() {
   );
 }
 
+const NAV_ITEMS: {
+  label: string;
+  href: string;
+  Icon: IconType;
+  color: string;
+  glow: string;
+}[] = [
+  {
+    label: "How it works",
+    href: "#how",
+    Icon: LuWorkflow,
+    color: "#1CB0F6",
+    glow:
+      "radial-gradient(circle, rgba(28,176,246,0.22) 0%, rgba(28,176,246,0.08) 50%, rgba(28,176,246,0) 100%)",
+  },
+  {
+    label: "Pricing",
+    href: "#pricing",
+    Icon: LuGem,
+    color: "#7C3AED",
+    glow:
+      "radial-gradient(circle, rgba(124,58,237,0.22) 0%, rgba(124,58,237,0.08) 50%, rgba(124,58,237,0) 100%)",
+  },
+  {
+    label: "Changelog",
+    href: "#changelog",
+    Icon: LuScrollText,
+    color: "#E11D48",
+    glow:
+      "radial-gradient(circle, rgba(225,29,72,0.22) 0%, rgba(225,29,72,0.08) 50%, rgba(225,29,72,0) 100%)",
+  },
+];
+
 function LandingNav() {
   const { open } = useAuthModal();
   return (
@@ -31,10 +66,36 @@ function LandingNav() {
           </span>
           <span>Clerow</span>
         </a>
-        <nav className="nav-mid">
-          <a href="#how">How it works</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#changelog">Changelog</a>
+        <nav className="glow-menu" aria-label="Primary">
+          <span className="glow-menu-bg" aria-hidden="true" />
+          <ul className="glow-menu-list">
+            {NAV_ITEMS.map(({ label, href, Icon, color, glow }) => (
+              <li key={label} className="glow-menu-item">
+                <a
+                  className="glow-menu-link"
+                  href={href}
+                  style={{ ["--gm-color" as string]: color }}
+                >
+                  <span
+                    className="glow-menu-glow"
+                    aria-hidden="true"
+                    style={{ background: glow }}
+                  />
+                  <span className="glow-menu-face glow-menu-face--front">
+                    <Icon className="glow-menu-ico" />
+                    <span>{label}</span>
+                  </span>
+                  <span
+                    className="glow-menu-face glow-menu-face--back"
+                    aria-hidden="true"
+                  >
+                    <Icon className="glow-menu-ico" />
+                    <span>{label}</span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </nav>
         <div className="nav-actions">
           <button className="btn btn--quiet btn--sm" onClick={() => open("signin")}>

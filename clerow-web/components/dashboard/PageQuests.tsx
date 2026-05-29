@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PageHead, PageStat, GuideStrip } from "./AppShell";
 import { Icon } from "../Icon";
 import { GameIcon, type GameIconName } from "../GameIcon";
+import { ContentMaker } from "./ContentMaker";
 import { useDashboard } from "@/lib/useDashboard";
 import { playCheck } from "@/lib/sound";
 import type { DashboardData, DashboardTask } from "@/lib/types";
@@ -24,6 +25,7 @@ export function PageQuests() {
   const router = useRouter();
   const { data, loading, refresh } = useDashboard();
   const [local, setLocal] = React.useState<DashboardTask[]>([]);
+  const [selected, setSelected] = React.useState<DashboardTask | null>(null);
 
   React.useEffect(() => setLocal(data?.tasks ?? []), [data?.tasks]);
 
@@ -127,7 +129,7 @@ export function PageQuests() {
           ) : (
             <div className="quest-task-list">
               {todays.map((t) => (
-                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} />
+                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} onOpen={setSelected} />
               ))}
             </div>
           )}
@@ -146,7 +148,7 @@ export function PageQuests() {
           ) : (
             <div className="quest-task-list">
               {active.map((t) => (
-                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} />
+                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} onOpen={setSelected} />
               ))}
             </div>
           )}
@@ -165,13 +167,15 @@ export function PageQuests() {
               </h3>
               <div className="quest-task-list">
                 {completed.slice(0, 12).map((t) => (
-                  <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} />
+                  <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} onOpen={setSelected} />
                 ))}
               </div>
             </>
           )}
         </>
       )}
+
+      {selected && <QuestModal task={selected} onClose={() => setSelected(null)} />}
     </>
   );
 }
@@ -180,15 +184,24 @@ function QuestRow({
   task,
   onToggle,
   onArchive,
+  onOpen,
 }: {
   task: DashboardTask;
   onToggle: (id: string) => void;
   onArchive: (id: string) => void;
+  onOpen: (task: DashboardTask) => void;
 }) {
   const impact = (task.meta.match(/impact:\s*([a-z ]+)/i)?.[1] ?? "medium").trim();
+  // Clicking the row opens the quest (to generate content). The checkbox and
+  // Archive button stop propagation so they keep their own behavior.
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
   return (
-    <div className={`quest-row ${task.done ? "done" : ""}`}>
-      <span className="tickbox" onClick={() => onToggle(task.id)}>
+    <div
+      className={`quest-row quest-row--click ${task.done ? "done" : ""}`}
+      onClick={() => onOpen(task)}
+      title="Open to generate content"
+    >
+      <span className="tickbox" onClick={(e) => { stop(e); onToggle(task.id); }}>
         {task.done && <Icon name="check" size={12} />}
       </span>
       <div className="quest-row-main">
@@ -197,17 +210,65 @@ function QuestRow({
       </div>
       <span
         className="qd-impact"
-        style={{ background: `color-mix(in oklab, ${IMPACT_COLOR(impact)} 16%, white)`, color: IMPACT_COLOR(impact) }}
+        style={{ background: `color-mix(in oklab, ${IMPACT_COLOR(impact)} 16%, var(--surface))`, color: IMPACT_COLOR(impact) }}
       >
         {impact}
       </span>
       {task.done ? (
-        <button className="btn btn--ghost btn--sm task-archive" onClick={() => onArchive(task.id)} title="Clear from your quest list">
+        <button className="btn btn--ghost btn--sm task-archive" onClick={(e) => { stop(e); onArchive(task.id); }} title="Clear from your quest list">
           Archive
         </button>
       ) : (
         <span className="xp">+{task.xp} XP</span>
       )}
+    </div>
+  );
+}
+
+// Centered modal for one quest: generate the copy-ready content for that exact
+// fix and copy it. Mirrors the prompt playbook's "Make content" experience.
+function QuestModal({ task, onClose }: { task: DashboardTask; onClose: () => void }) {
+  const impact = (task.meta.match(/impact:\s*([a-z ]+)/i)?.[1] ?? "medium").trim();
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="drawer-backdrop" onClick={onClose}>
+      <aside className="drawer" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <button className="drawer-close" onClick={onClose} aria-label="Close">
+          <Icon name="x" size={16} />
+        </button>
+
+        <div className="drawer-head">
+          <div className="drawer-tags">
+            <span
+              className="qd-impact"
+              style={{ background: `color-mix(in oklab, ${IMPACT_COLOR(impact)} 16%, var(--surface))`, color: IMPACT_COLOR(impact) }}
+            >
+              {impact} impact
+            </span>
+            <span className="drawer-step-xp">+{task.xp} XP</span>
+          </div>
+          <h2 className="drawer-prompt">{task.title}</h2>
+          <p className="drawer-sub">
+            One concrete fix — we write it, you ship it, then check it off to keep your streak.
+          </p>
+        </div>
+
+        <section className="drawer-section drawer-playbook">
+          <h3 className="drawer-h3">
+            <GameIcon name="sparkles" size={16} /> Make the content for this quest
+          </h3>
+          <p className="drawer-playbook-lead">
+            Generate copy-paste-ready content tailored to your brand, then copy it straight into your site.
+          </p>
+          <ContentMaker endpoint={`/api/tasks/${task.id}/content`} />
+        </section>
+      </aside>
     </div>
   );
 }

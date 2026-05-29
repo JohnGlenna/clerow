@@ -116,7 +116,7 @@ export function PageSources() {
                     <span
                       className="src-type"
                       style={{
-                        background: `color-mix(in oklab, ${TYPE_COLOR(s.type)} 14%, white)`,
+                        background: `color-mix(in oklab, ${TYPE_COLOR(s.type)} 14%, var(--surface))`,
                         color: TYPE_COLOR(s.type),
                         border: `1px solid color-mix(in oklab, ${TYPE_COLOR(s.type)} 30%, transparent)`,
                       }}

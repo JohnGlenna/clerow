@@ -57,6 +57,24 @@
 
   --t-fast: 120ms cubic-bezier(.2,.7,.2,1);
   --t-base: 180ms cubic-bezier(.2,.7,.2,1);
+
+  /* ---- Neumorphism (soft-UI) shadow tokens ------------------------------
+     Surface == base color; depth comes from a dual shadow: dark (--neu-lo)
+     bottom-right + light (--neu-hi) top-left. The base/ink/border values are
+     scoped to .app-shell (below) so only the dashboard is re-skinned — the
+     marketing site keeps its white theme. --surface is the unified base used
+     in inline color-mix() so tinted pills read in both light and dark. */
+  --surface: #FFFFFF;
+  --neu-base:  #E6E7EB;
+  --neu-raise: #ECEDF1;
+  --neu-lo: #C4C6CE;
+  --neu-hi: #FFFFFF;
+  --neu-out-sm: 4px 4px 8px var(--neu-lo),  -4px -4px 8px var(--neu-hi);
+  --neu-out-md: 6px 6px 14px var(--neu-lo), -6px -6px 14px var(--neu-hi);
+  --neu-out-lg: 12px 12px 28px var(--neu-lo), -12px -12px 28px var(--neu-hi);
+  --neu-in-sm: inset 3px 3px 6px var(--neu-lo),  inset -3px -3px 6px var(--neu-hi);
+  --neu-in-md: inset 6px 6px 12px var(--neu-lo), inset -6px -6px 12px var(--neu-hi);
+  --neu-in-lg: inset 8px 8px 16px var(--neu-lo), inset -8px -8px 16px var(--neu-hi);
 }
 
 [data-accent="indigo"] {
@@ -82,6 +100,37 @@
 }
 
 * { box-sizing: border-box; }
+
+/* ===== Neumorphism theme — scoped to the dashboard only =================
+   Repoint the surface/ink/border tokens onto the unified neu base inside
+   .app-shell so the soft-UI look applies to the dashboard (sidebar + pages
+   + drawer + paywall) while the marketing site keeps its white theme.
+   --surface is set here too so descendant inline color-mix() resolves to
+   the right base in each theme. */
+.app-shell {
+  --surface: var(--neu-base);
+  --bg: var(--neu-base);
+  --bg-soft: var(--neu-base);
+  --bg-soft-2: #DCDDE2;
+  --border: #D2D4DB;
+  --border-soft: #DCDDE2;
+}
+[data-theme="dark"] .app-shell {
+  --neu-base: #2B2D31;
+  --neu-raise: #303338;
+  --neu-lo: #1A1B1E;
+  --neu-hi: #3B3E44;
+  --surface: #2B2D31;
+  --bg: #2B2D31;
+  --bg-soft: #2B2D31;
+  --bg-soft-2: #303338;
+  --border: #3B3E44;
+  --border-soft: #34373C;
+  --ink: #E8E8EA;
+  --ink-2: #B5B6BC;
+  --ink-3: #85868C;
+  --ink-4: #55565C;
+}
 
 html, body {
   margin: 0; padding: 0;
@@ -253,17 +302,133 @@ input, select, textarea { font-family: inherit; }
   width: 36px; height: 36px;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.nav-mid {
-  display: flex; gap: 4px;
-  font-size: 14px; font-weight: 700;
-}
-.nav-mid a {
-  padding: 8px 14px;
-  border-radius: 10px;
-  color: var(--ink-2);
-}
-.nav-mid a:hover { background: var(--bg-soft); color: var(--ink); }
 .nav-actions { display: inline-flex; align-items: center; gap: 10px; }
+
+/* ---- Glow menu (center nav) ---- */
+.glow-menu {
+  position: relative;
+  padding: 6px;
+  border-radius: 16px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.85), rgba(255,255,255,0.45));
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 10px 28px -16px rgba(16, 24, 40, 0.4);
+  overflow: hidden;
+}
+.glow-menu-bg {
+  position: absolute;
+  inset: -8px;
+  z-index: 0;
+  border-radius: 24px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  background: radial-gradient(
+    circle at center,
+    transparent 0%,
+    rgba(28, 176, 246, 0.18) 30%,
+    rgba(124, 58, 237, 0.18) 60%,
+    rgba(225, 29, 72, 0.18) 90%,
+    transparent 100%
+  );
+}
+.glow-menu:hover .glow-menu-bg { opacity: 1; }
+.glow-menu-list {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.glow-menu-item { position: relative; }
+.glow-menu-link {
+  position: relative;
+  display: block;
+  border-radius: 12px;
+  perspective: 600px;
+}
+.glow-menu-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 16px;
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+  transition:
+    opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.glow-menu-link:hover .glow-menu-glow,
+.glow-menu-link:focus-visible .glow-menu-glow {
+  opacity: 1;
+  transform: scale(2);
+}
+.glow-menu-face {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-2);
+  border-radius: 12px;
+  white-space: nowrap;
+  transform-style: preserve-3d;
+  transition:
+    transform 0.5s cubic-bezier(0.34, 1.2, 0.64, 1),
+    opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.3s ease;
+}
+.glow-menu-face--front {
+  position: relative;
+  z-index: 1;
+  transform-origin: center bottom;
+}
+.glow-menu-face--back {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  transform: rotateX(90deg);
+  transform-origin: center top;
+}
+.glow-menu-link:hover .glow-menu-face--front,
+.glow-menu-link:focus-visible .glow-menu-face--front {
+  transform: rotateX(-90deg);
+  opacity: 0;
+}
+.glow-menu-link:hover .glow-menu-face--back,
+.glow-menu-link:focus-visible .glow-menu-face--back {
+  transform: rotateX(0deg);
+  opacity: 1;
+}
+.glow-menu-link:hover .glow-menu-face,
+.glow-menu-link:focus-visible .glow-menu-face { color: var(--ink); }
+.glow-menu-ico {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--ink-3);
+  transition: color 0.3s ease;
+}
+.glow-menu-link:hover .glow-menu-ico,
+.glow-menu-link:focus-visible .glow-menu-ico { color: var(--gm-color); }
+@media (prefers-reduced-motion: reduce) {
+  .glow-menu-face,
+  .glow-menu-glow,
+  .glow-menu-bg { transition: opacity 0.2s ease, color 0.2s ease; }
+  .glow-menu-link:hover .glow-menu-face--front,
+  .glow-menu-link:focus-visible .glow-menu-face--front { transform: none; opacity: 0; }
+  .glow-menu-link:hover .glow-menu-face--back,
+  .glow-menu-link:focus-visible .glow-menu-face--back { transform: none; }
+  .glow-menu-link:hover .glow-menu-glow,
+  .glow-menu-link:focus-visible .glow-menu-glow { transform: scale(1.4); }
+}
 
 /* ============ Hero ============ */
 .hero {
@@ -512,10 +677,10 @@ input, select, textarea { font-family: inherit; }
   padding: 3px 8px;
   border-radius: 5px;
 }
-.dsc-vol.vol--high   { background: color-mix(in oklab, var(--success) 16%, white); color: var(--success); }
-.dsc-vol.vol--medium { background: color-mix(in oklab, var(--info) 16%, white); color: var(--info); }
+.dsc-vol.vol--high   { background: color-mix(in oklab, var(--success) 16%, var(--surface)); color: var(--success); }
+.dsc-vol.vol--medium { background: color-mix(in oklab, var(--info) 16%, var(--surface)); color: var(--info); }
 .dsc-vol.vol--low    { background: #fff; color: var(--ink-3); }
-.dsc-vol.vol--rising { background: color-mix(in oklab, var(--accent) 18%, white); color: var(--accent-2); }
+.dsc-vol.vol--rising { background: color-mix(in oklab, var(--accent) 18%, var(--surface)); color: var(--accent-2); }
 
 .dsc-chip--more {
   background: transparent;
@@ -762,7 +927,7 @@ input, select, textarea { font-family: inherit; }
   font-size: 12.5px;
 }
 .ex-row--me {
-  background: color-mix(in oklab, var(--accent) 12%, white);
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
   border: 1.5px solid var(--accent);
   border-radius: 12px;
   padding: 10px;
@@ -2053,7 +2218,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .comp-row .delta.up { color: var(--success); }
 .comp-row .delta.down { color: var(--danger); }
 .comp-row.is-me {
-  background: color-mix(in oklab, var(--accent) 12%, white);
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
   border: 1.5px solid var(--accent);
   border-radius: 10px;
   padding: 9px 10px;
@@ -2278,7 +2443,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .dt-row--losing { background: color-mix(in oklab, var(--streak) 6%, transparent); }
 .dt-row--losing:hover { background: color-mix(in oklab, var(--streak) 12%, transparent); }
 .dt-row--me {
-  background: color-mix(in oklab, var(--accent) 10%, white) !important;
+  background: color-mix(in oklab, var(--accent) 10%, var(--surface)) !important;
   border-left: 4px solid var(--accent);
 }
 .dt-prompt { font-weight: 600; color: var(--ink); }
@@ -2404,10 +2569,10 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   padding: 3px 8px;
   border-radius: 5px;
 }
-.vol--high  { background: color-mix(in oklab, var(--success) 16%, white); color: var(--success); }
-.vol--medium{ background: color-mix(in oklab, var(--info) 16%, white); color: var(--info); }
+.vol--high  { background: color-mix(in oklab, var(--success) 16%, var(--surface)); color: var(--success); }
+.vol--medium{ background: color-mix(in oklab, var(--info) 16%, var(--surface)); color: var(--info); }
 .vol--low   { background: var(--bg-soft); color: var(--ink-3); }
-.vol--rising{ background: color-mix(in oklab, var(--accent) 18%, white); color: var(--accent-2); }
+.vol--rising{ background: color-mix(in oklab, var(--accent) 18%, var(--surface)); color: var(--accent-2); }
 .suggest-prompt {
   font-family: var(--font-display);
   font-weight: 800;
@@ -2897,8 +3062,8 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   margin: 0;
   line-height: 1.5;
 }
-.report-block--win  { background: color-mix(in oklab, var(--success) 8%, white); border-color: color-mix(in oklab, var(--success) 30%, var(--border)); }
-.report-block--opp  { background: color-mix(in oklab, var(--accent) 8%, white); border-color: color-mix(in oklab, var(--accent) 30%, var(--border)); }
+.report-block--win  { background: color-mix(in oklab, var(--success) 8%, var(--surface)); border-color: color-mix(in oklab, var(--success) 30%, var(--border)); }
+.report-block--opp  { background: color-mix(in oklab, var(--accent) 8%, var(--surface)); border-color: color-mix(in oklab, var(--accent) 30%, var(--border)); }
 .report-block b { color: var(--ink); font-weight: 800; }
 
 .report-positions {
@@ -3004,7 +3169,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   font-size: 11px;
   color: var(--ink-2);
   font-weight: 700;
-  border-top: 1px dashed color-mix(in oklab, var(--accent) 50%, white);
+  border-top: 1px dashed color-mix(in oklab, var(--accent) 50%, var(--surface));
   padding-top: 12px;
 }
 .share-actions {
@@ -3262,7 +3427,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 }
 
 @media (max-width: 980px) {
-  .nav-mid { display: none; }
+  .glow-menu { display: none; }
   .hero-inner { grid-template-columns: 1fr; gap: 32px; text-align: center; }
   .hero-art { order: -1; min-height: 280px; }
   .hero-meta { justify-content: center; }
@@ -3440,6 +3605,8 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   border-radius: 12px;
   border: 1px solid var(--border);
 }
+.quest-row--click { cursor: pointer; transition: border-color .12s ease, box-shadow .12s ease; }
+.quest-row--click:hover { border-color: color-mix(in oklab, var(--accent-2) 45%, var(--border)); box-shadow: 0 2px 0 var(--border); }
 .quest-row .tickbox {
   width: 22px; height: 22px;
   border-radius: 6px;
@@ -3493,7 +3660,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 }
 .drawer {
   width: 100%;
-  max-width: 640px;
+  max-width: 960px;
   max-height: 90vh;
   background: #fff;
   border: 1px solid var(--border);
@@ -3560,7 +3727,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .drawer-rival {
   padding: 6px 12px;
   border-radius: 999px;
-  background: color-mix(in oklab, var(--danger) 10%, white);
+  background: color-mix(in oklab, var(--danger) 10%, var(--surface));
   border: 1px solid color-mix(in oklab, var(--danger) 28%, transparent);
   color: var(--danger);
   font-weight: 700; font-size: 12.5px;
@@ -3580,7 +3747,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 /* The playbook — promoted as the headline "punch list" of the modal. */
 .drawer-playbook {
   border: 1px solid color-mix(in oklab, var(--accent-2) 22%, var(--border));
-  background: color-mix(in oklab, var(--accent-2) 4%, white);
+  background: color-mix(in oklab, var(--accent-2) 4%, var(--surface));
   border-radius: 18px;
   padding: 18px;
 }
@@ -3605,6 +3772,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .drawer-step-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 .drawer-step-actions .btn { white-space: nowrap; }
 .drawer-step-error { color: var(--danger); font-size: 12px; font-weight: 700; margin-top: 10px; }
+.drawer-step-maker { margin-top: 12px; }
 
 .drawer-step-content {
   margin-top: 12px;
@@ -3641,3 +3809,165 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   .drawer-step-row { flex-direction: column; }
   .drawer-step-actions { flex-direction: row; }
 }
+
+/* =====================================================================
+   NEUMORPHISM SURFACE OVERRIDES (dashboard)
+   Appended last so equal-specificity rules win over the originals above.
+   Surfaces drop hard 2px borders + "0 Npx 0" offset shadows in favour of
+   soft dual shadows on the unified --neu-base. Gamification colors
+   (xp / streak / success / accent) are preserved as fills and accents.
+   Selectors ALSO used on the marketing site (.btn*) are scoped under
+   .app-shell so only the dashboard changes.
+   ===================================================================== */
+
+/* ---- Sidebar ---- */
+.app-side {
+  background: var(--neu-base);
+  border-right: none;
+  border-radius: 24px;
+  box-shadow: var(--neu-out-lg);
+  margin: 16px 0 16px 16px;
+  top: 16px;
+  height: calc(100vh - 32px);
+}
+.app-side-head { display: flex; align-items: center; gap: 8px; }
+.app-nav a {
+  border-radius: 12px;
+  transition: box-shadow var(--t-fast), color var(--t-fast);
+}
+.app-nav a:hover { background: transparent; box-shadow: var(--neu-out-sm); color: var(--ink); }
+.app-nav a.on { background: transparent; box-shadow: var(--neu-in-md); color: var(--accent-2); }
+.app-side-bottom {
+  border: none;
+  border-radius: 16px;
+  box-shadow: var(--neu-out-md);
+  /* always an amber card — pin dark ink so text reads in dark mode */
+  color: #2A2300;
+  --ink: #2A2300;
+  --ink-2: #6B5600;
+}
+
+/* ---- Theme-toggle button ---- */
+.theme-toggle {
+  margin-left: auto;
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  border: none;
+  border-radius: 999px;
+  background: var(--neu-base);
+  color: var(--ink-2);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  box-shadow: var(--neu-out-sm);
+  transition: box-shadow var(--t-fast), color var(--t-fast);
+}
+.theme-toggle:hover { color: var(--accent-2); }
+.theme-toggle:active { box-shadow: var(--neu-in-sm); }
+
+/* ---- Raised neutral cards ---- */
+.app-card,
+.app-hello,
+.page-stat,
+.page-tabs,
+.suggest-card,
+.model-card,
+.report-card,
+.report-block,
+.quest-daily,
+.quest-active,
+.quest-row,
+.share-actions,
+.app-shell .callout {
+  background: var(--neu-raise);
+  border: none;
+  box-shadow: var(--neu-out-md);
+}
+
+/* ---- page-stat colored variants: neu card + subtle inset accent ring ---- */
+.page-stat--success { box-shadow: var(--neu-out-md), inset 0 0 0 1.5px color-mix(in oklab, var(--success) 45%, transparent); }
+.page-stat--warn    { box-shadow: var(--neu-out-md), inset 0 0 0 1.5px color-mix(in oklab, var(--streak)  45%, transparent); }
+.page-stat--danger  { box-shadow: var(--neu-out-md), inset 0 0 0 1.5px color-mix(in oklab, var(--danger)  45%, transparent); }
+.page-stat--accent  { box-shadow: var(--neu-out-md), inset 0 0 0 1.5px color-mix(in oklab, var(--accent)  45%, transparent); }
+
+/* ---- Amber / accent-tinted cards keep their gradient fill, lose the border.
+        Pin dark ink locally so body text stays readable in dark mode. ---- */
+.guide-strip,
+.milestone,
+.report-score-tile,
+.share-card {
+  border: none;
+  box-shadow: var(--neu-out-md);
+  --ink: #2A2300;
+  --ink-2: #6B5600;
+  color: #2A2300;
+}
+.guide-strip { box-shadow: var(--neu-out-sm); }
+
+/* ---- Solid accent / dark cards keep fill, soften shadow ---- */
+.upgrade-card,
+.whitelabel-card { border: none; box-shadow: var(--neu-out-md); }
+
+/* ---- Large raised panels ---- */
+.paywall-card,
+.drawer { border: none; box-shadow: var(--neu-out-lg); }
+.paywall-card { background: var(--neu-raise); }
+.drawer { background: var(--neu-base); border-left: none; }
+.paywall { background: linear-gradient(180deg, color-mix(in oklab, var(--neu-base) 60%, transparent), var(--neu-base)); }
+.paywall-icon { box-shadow: var(--neu-out-sm); }
+
+/* ---- Pricing plans inside the paywall ---- */
+.pw-plan { background: var(--neu-raise); border: none; box-shadow: var(--neu-out-sm); }
+.pw-plan--featured { background: var(--neu-raise); box-shadow: var(--neu-out-md), inset 0 0 0 1.5px color-mix(in oklab, var(--accent) 50%, transparent); }
+
+/* ---- Tabs: bar is raised (above); active tab is pressed-in ---- */
+.page-tabs button.on { background: var(--accent); color: var(--accent-ink); box-shadow: var(--neu-in-sm); }
+
+/* ---- Inset wells: tickboxes (unchecked), drawer rows/chips, code blocks ---- */
+.task .tickbox,
+.quest-row .tickbox,
+.qa-tick,
+.drawer-engine,
+.drawer-step,
+.drawer-step-content,
+.drawer-source {
+  border: none;
+  background: var(--neu-base);
+  box-shadow: var(--neu-in-sm);
+}
+.task.done .tickbox,
+.quest-row.done .tickbox,
+.qa-steps li.done .qa-tick { background: var(--success); box-shadow: none; color: #fff; }
+
+/* ---- Drawer tinted chips/sections (use --surface so they read in dark) ---- */
+.drawer-rival {
+  border: none;
+  background: color-mix(in oklab, var(--danger) 14%, var(--surface));
+}
+.drawer-playbook {
+  border: none;
+  background: color-mix(in oklab, var(--accent-2) 6%, var(--surface));
+  box-shadow: var(--neu-out-sm);
+}
+
+/* ---- Table "my row" tints via --surface so they read in both themes ---- */
+.dt-row--me { background: color-mix(in oklab, var(--accent) 12%, var(--surface)) !important; }
+.comp-row.is-me { background: color-mix(in oklab, var(--accent) 12%, var(--surface)); }
+
+/* ---- Buttons (scoped: marketing keeps its hard-press style) ---- */
+.app-shell .btn--primary,
+.app-shell .btn--success,
+.app-shell .btn--dark { box-shadow: var(--neu-out-sm); }
+.app-shell .btn--primary:active,
+.app-shell .btn--success:active,
+.app-shell .btn--dark:active { transform: none; box-shadow: var(--neu-in-sm); }
+.app-shell .btn--ghost {
+  background: var(--neu-base);
+  border: none;
+  color: var(--ink);
+  box-shadow: var(--neu-out-sm);
+}
+.app-shell .btn--ghost:active { transform: none; box-shadow: var(--neu-in-sm); }
+.app-shell .btn--quiet { background: transparent; box-shadow: none; }
+.app-shell .btn--quiet:hover { background: var(--neu-base); box-shadow: var(--neu-in-sm); }

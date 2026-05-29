@@ -187,7 +187,7 @@ function PromptsTracked({
                 <span
                   className="intent-tag"
                   style={{
-                    background: `color-mix(in oklab, ${intent.c} 14%, white)`,
+                    background: `color-mix(in oklab, ${intent.c} 14%, var(--surface))`,
                     color: intent.c,
                     border: `1px solid color-mix(in oklab, ${intent.c} 30%, transparent)`,
                   }}
@@ -274,7 +274,7 @@ function PromptsSuggested({
                 <span
                   className="intent-tag"
                   style={{
-                    background: `color-mix(in oklab, ${it.c} 14%, white)`,
+                    background: `color-mix(in oklab, ${it.c} 14%, var(--surface))`,
                     color: it.c,
                     border: `1px solid color-mix(in oklab, ${it.c} 30%, transparent)`,
                   }}

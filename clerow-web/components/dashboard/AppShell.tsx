@@ -7,6 +7,7 @@ import { GameIcon, type GameIconName } from "../GameIcon";
 import { MascotClerow } from "../Mascot";
 import { useSubscription, startCheckout, openBillingPortal } from "@/lib/useSubscription";
 import { DashboardProvider, useDashboard } from "@/lib/useDashboard";
+import { useTheme } from "@/lib/useTheme";
 
 type NavKey =
   | "overview"
@@ -90,21 +91,33 @@ function AppSidebar({
   onSignOut: () => void;
 }) {
   const { data } = useDashboard();
+  const { mode, toggle } = useTheme();
   const streak = data?.streak;
   const xp = data?.xp;
   return (
     <aside className="app-side">
-      <a
-        className="app-brand"
-        href="/dashboard"
-        onClick={(e) => {
-          e.preventDefault();
-          onNavigate("overview");
-        }}
-      >
-        <MascotClerow size={30} />
-        Clerow
-      </a>
+      <div className="app-side-head">
+        <a
+          className="app-brand"
+          href="/dashboard"
+          onClick={(e) => {
+            e.preventDefault();
+            onNavigate("overview");
+          }}
+        >
+          <MascotClerow size={30} />
+          Clerow
+        </a>
+        <button
+          type="button"
+          className="theme-toggle"
+          aria-label={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={mode === "dark" ? "Light mode" : "Dark mode"}
+          onClick={toggle}
+        >
+          {mode === "dark" ? "☀️" : "🌙"}
+        </button>
+      </div>
 
       <div className="app-nav">
         <div className="app-side-label">Workspace</div>

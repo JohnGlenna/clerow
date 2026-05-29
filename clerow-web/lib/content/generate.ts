@@ -23,6 +23,18 @@ export type ContentContext = {
   competitorsAhead: string[];
 };
 
+// Generic "write the content for one fix" input. The prompt context is optional
+// so this works equally for a prompt's playbook step (full context) or a bare
+// quest/task (just a title + detail).
+export type FixContentInput = {
+  brand: BrandProfile;
+  title: string;
+  detail: string;
+  promptText?: string;
+  intent?: PromptIntent;
+  competitorsAhead?: string[];
+};
+
 const SYSTEM =
   "You are a senior AEO/GEO (Answer Engine Optimization) content writer for a SaaS company. " +
   "Your job is to produce FINISHED, copy-paste-ready content that helps a brand get recommended by " +
@@ -44,8 +56,8 @@ function apiKey(): string {
   return key;
 }
 
-function buildUserPrompt(ctx: ContentContext): string {
-  const { brand, prompt, step, competitorsAhead } = ctx;
+function buildUserPrompt(input: FixContentInput): string {
+  const { brand, title, detail, promptText, intent, competitorsAhead } = input;
   const lines = [
     `BRAND: ${brand.company}`,
     `WEBSITE: ${brand.url}`,
@@ -53,22 +65,21 @@ function buildUserPrompt(ctx: ContentContext): string {
     brand.description ? `WHAT THEY DO: ${brand.description}` : "",
     brand.differentiators?.length ? `DIFFERENTIATORS: ${brand.differentiators.join("; ")}` : "",
     brand.competitors?.length ? `COMPETITORS: ${brand.competitors.join(", ")}` : "",
-    competitorsAhead.length ? `CURRENTLY RANKED ABOVE THEM FOR THIS QUERY: ${competitorsAhead.join(", ")}` : "",
+    competitorsAhead?.length ? `CURRENTLY RANKED ABOVE THEM FOR THIS QUERY: ${competitorsAhead.join(", ")}` : "",
     "",
-    `BUYER'S QUESTION TO AI: "${prompt.text}"`,
-    `QUESTION INTENT: ${prompt.intent}`,
-    "",
-    `THE FIX TO WRITE: ${step.title}`,
-    `FIX DETAILS: ${step.detail}`,
+    promptText ? `BUYER'S QUESTION TO AI: "${promptText}"` : "",
+    intent ? `QUESTION INTENT: ${intent}` : "",
+    `THE FIX TO WRITE: ${title}`,
+    detail ? `FIX DETAILS: ${detail}` : "",
     "",
     "Write the finished content for this fix now.",
   ];
-  return lines.filter(Boolean).join("\n");
+  return lines.filter((l) => l !== "").join("\n");
 }
 
-// Generate the copy-ready content for one playbook step. Throws on API/key
-// failure (the caller maps it to an HTTP error).
-export async function generateStepContent(ctx: ContentContext): Promise<{ content: string }> {
+// Generate copy-ready content for one fix (a playbook step or a quest). Throws
+// on API/key failure (the caller maps it to an HTTP error).
+export async function generateFixContent(input: FixContentInput): Promise<{ content: string }> {
   const res = await fetch(API_URL, {
     method: "POST",
     headers: {
@@ -80,7 +91,7 @@ export async function generateStepContent(ctx: ContentContext): Promise<{ conten
       model: MODEL,
       max_tokens: 2048,
       system: SYSTEM,
-      messages: [{ role: "user", content: buildUserPrompt(ctx) }],
+      messages: [{ role: "user", content: buildUserPrompt(input) }],
     }),
   });
 
@@ -98,4 +109,16 @@ export async function generateStepContent(ctx: ContentContext): Promise<{ conten
 
   if (!content) throw new Error("No content was generated. Try again.");
   return { content };
+}
+
+// Thin wrapper for a prompt's playbook step — keeps the richer context shape.
+export async function generateStepContent(ctx: ContentContext): Promise<{ content: string }> {
+  return generateFixContent({
+    brand: ctx.brand,
+    title: ctx.step.title,
+    detail: ctx.step.detail,
+    promptText: ctx.prompt.text,
+    intent: ctx.prompt.intent,
+    competitorsAhead: ctx.competitorsAhead,
+  });
 }

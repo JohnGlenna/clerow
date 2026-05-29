@@ -3,6 +3,7 @@
 import React from "react";
 import { Icon } from "../Icon";
 import { GameIcon } from "../GameIcon";
+import { ContentMaker } from "./ContentMaker";
 import { stepMeta, type GeoStep } from "@/lib/geoSteps";
 import type { EngineId } from "@/lib/engines";
 import type { PromptDetail, PromptEngineResult } from "@/lib/types";
@@ -130,7 +131,7 @@ export function PromptDrawer({
                 <span
                   className="intent-tag"
                   style={{
-                    background: `color-mix(in oklab, ${intent.c} 14%, white)`,
+                    background: `color-mix(in oklab, ${intent.c} 14%, var(--surface))`,
                     color: intent.c,
                     border: `1px solid color-mix(in oklab, ${intent.c} 30%, transparent)`,
                   }}
@@ -262,41 +263,6 @@ function PlaybookStep({
   added: boolean;
   onAddQuest: () => void;
 }) {
-  const [generating, setGenerating] = React.useState(false);
-  const [content, setContent] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [copied, setCopied] = React.useState(false);
-
-  const makeContent = async () => {
-    setGenerating(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/prompts/${promptId}/content`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ stepId: step.id }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error ?? "Couldn't generate content");
-      setContent(json.content);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't generate content");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const copy = async () => {
-    if (!content) return;
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      /* clipboard blocked — no-op */
-    }
-  };
-
   return (
     <div className="drawer-step">
       <div className="drawer-step-row">
@@ -307,7 +273,7 @@ function PlaybookStep({
             <span
               className="qd-impact"
               style={{
-                background: `color-mix(in oklab, ${IMPACT_COLOR[step.impact]} 18%, white)`,
+                background: `color-mix(in oklab, ${IMPACT_COLOR[step.impact]} 18%, var(--surface))`,
                 color: IMPACT_COLOR[step.impact],
               }}
             >
@@ -316,41 +282,21 @@ function PlaybookStep({
             <span className="drawer-step-xp">+{step.xp} XP</span>
           </div>
         </div>
-        <div className="drawer-step-actions">
-          {isContentStep(step) && (
-            <button
-              className="btn btn--primary btn--sm"
-              onClick={makeContent}
-              disabled={generating}
-            >
-              <GameIcon name="sparkles" size={13} />
-              {generating ? "Writing…" : content ? "Regenerate" : "Make content"}
-            </button>
-          )}
-          <button
-            className={`btn btn--sm ${added ? "btn--ghost" : "btn--quiet"}`}
-            onClick={onAddQuest}
-            disabled={added}
-          >
-            {added ? "Added ✓" : "Add as quest"}
-          </button>
-        </div>
+        <button
+          className={`btn btn--sm ${added ? "btn--ghost" : "btn--quiet"}`}
+          onClick={onAddQuest}
+          disabled={added}
+        >
+          {added ? "Added ✓" : "Add as quest"}
+        </button>
       </div>
 
-      {error && <div className="drawer-step-error">{error}</div>}
-
-      {content && (
-        <div className="drawer-step-content">
-          <div className="drawer-step-content-bar">
-            <span className="drawer-step-content-label">
-              <GameIcon name="sparkles" size={12} /> Generated — copy &amp; ship it
-            </span>
-            <button className="btn btn--quiet btn--sm" onClick={copy}>
-              {copied ? "Copied ✓" : "Copy"}
-            </button>
-          </div>
-          <pre>{content}</pre>
-        </div>
+      {isContentStep(step) && (
+        <ContentMaker
+          endpoint={`/api/prompts/${promptId}/content`}
+          body={{ stepId: step.id }}
+          className="drawer-step-maker"
+        />
       )}
     </div>
   );
