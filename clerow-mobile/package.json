@@ -1,0 +1,12 @@
+{
+  "name": "clerow-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  },
+  "//": "PLACEHOLDER. Replace by running `npx create-expo-app@latest .` inside this folder on your machine, then merging the generated package.json. Hand-written package.json files for Expo apps go stale fast — let the CLI generate the real one."
+}
