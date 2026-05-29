@@ -1,5 +1,6 @@
 // Shared app-level types passed between the scan pipeline, API routes, and UI.
-import type { PromptIntent, PromptVolume, BrandSentiment } from "./supabase/database.types";
+import type { PromptIntent, PromptVolume, BrandSentiment, Citation } from "./supabase/database.types";
+import type { GeoStep } from "./geoSteps";
 
 // The brand profile the scan reasons about (subset of the `brands` row).
 export type BrandProfile = {
@@ -91,7 +92,55 @@ export type DashboardPrompt = {
   scanned: boolean;
 };
 
-export type DashboardTask = { id: string; title: string; meta: string; xp: number; done: boolean };
+export type DashboardTask = {
+  id: string;
+  title: string;
+  meta: string;
+  xp: number;
+  done: boolean;
+  forDate?: string | null;
+  completedAt?: string | null;
+};
+
+// Duolingo-style streak surfaced everywhere the fake level bar used to be.
+export type DashboardStreak = {
+  current: number;
+  longest: number;
+  freezes: number;
+  activeToday: boolean;
+};
+
+// ---- Prompt detail (GET/POST /api/prompts/[id]) ----
+// One engine's latest result for a single prompt.
+export type PromptEngineResult = {
+  engine: string;
+  label: string;
+  swatch: string;
+  letter: string;
+  enabled: boolean; // engine has an API key configured
+  scannedAt: string | null; // null = never scanned on this engine
+  yourPosition: number | null;
+  yourVisibility: number;
+  yourSentiment: number | null;
+  brands: DashboardCompetitor[];
+  citations: Citation[];
+};
+
+// Everything the prompt slide-out renders: per-engine ranking + the derived,
+// specific GEO action steps. Also the shape the future Clerow MCP would expose.
+export type PromptDetail = {
+  id: string;
+  text: string;
+  intent: PromptIntent;
+  volume: PromptVolume;
+  isPrimary: boolean;
+  isTracked: boolean;
+  scanned: boolean;
+  engines: PromptEngineResult[];
+  competitorsAhead: string[];
+  citedDomains: string[];
+  steps: GeoStep[];
+};
 
 export type DashboardData = {
   hasScan: boolean;
@@ -104,5 +153,6 @@ export type DashboardData = {
   competitors?: DashboardCompetitor[];
   prompts?: DashboardPrompt[];
   tasks?: DashboardTask[];
+  streak?: DashboardStreak;
   citations?: { url: string; title: string }[];
 };

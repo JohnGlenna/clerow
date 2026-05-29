@@ -18,6 +18,94 @@ export type Database = {
   }
   public: {
     Tables: {
+      brand_snapshots: {
+        Row: {
+          brand_id: string
+          captured_on: string
+          competitors: number
+          created_at: string
+          engines: number
+          id: string
+          overall: number
+          position: number | null
+          sentiment: number | null
+          visibility: number
+          your_rank: number | null
+        }
+        Insert: {
+          brand_id: string
+          captured_on: string
+          competitors?: number
+          created_at?: string
+          engines?: number
+          id?: string
+          overall?: number
+          position?: number | null
+          sentiment?: number | null
+          visibility?: number
+          your_rank?: number | null
+        }
+        Update: {
+          brand_id?: string
+          captured_on?: string
+          competitors?: number
+          created_at?: string
+          engines?: number
+          id?: string
+          overall?: number
+          position?: number | null
+          sentiment?: number | null
+          visibility?: number
+          your_rank?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_snapshots_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_streak: {
+        Row: {
+          brand_id: string
+          current_streak: number
+          freezes: number
+          frozen_dates: string[]
+          last_evaluated_date: string | null
+          longest_streak: number
+          updated_at: string
+        }
+        Insert: {
+          brand_id: string
+          current_streak?: number
+          freezes?: number
+          frozen_dates?: string[]
+          last_evaluated_date?: string | null
+          longest_streak?: number
+          updated_at?: string
+        }
+        Update: {
+          brand_id?: string
+          current_streak?: number
+          freezes?: number
+          frozen_dates?: string[]
+          last_evaluated_date?: string | null
+          longest_streak?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_streak_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: true
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           audience: string[]
@@ -32,6 +120,7 @@ export type Database = {
           industry: string
           location: string
           size: string
+          timezone: string
           updated_at: string
           url: string
           user_id: string
@@ -49,6 +138,7 @@ export type Database = {
           industry?: string
           location?: string
           size?: string
+          timezone?: string
           updated_at?: string
           url: string
           user_id: string
@@ -66,6 +156,7 @@ export type Database = {
           industry?: string
           location?: string
           size?: string
+          timezone?: string
           updated_at?: string
           url?: string
           user_id?: string
@@ -252,6 +343,38 @@ export type Database = {
           },
         ]
       }
+      share_links: {
+        Row: {
+          brand_id: string
+          created_at: string
+          id: string
+          revoked_at: string | null
+          token: string
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          id?: string
+          revoked_at?: string | null
+          token: string
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          id?: string
+          revoked_at?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_links_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean
@@ -294,8 +417,10 @@ export type Database = {
       tasks: {
         Row: {
           brand_id: string
+          completed_at: string | null
           created_at: string
           done: boolean
+          for_date: string | null
           id: string
           impact: string
           meta: string
@@ -305,8 +430,10 @@ export type Database = {
         }
         Insert: {
           brand_id: string
+          completed_at?: string | null
           created_at?: string
           done?: boolean
+          for_date?: string | null
           id?: string
           impact?: string
           meta?: string
@@ -316,8 +443,10 @@ export type Database = {
         }
         Update: {
           brand_id?: string
+          completed_at?: string | null
           created_at?: string
           done?: boolean
+          for_date?: string | null
           id?: string
           impact?: string
           meta?: string
@@ -365,3 +494,6 @@ export type ScanStatus = Database["public"]["Enums"]["scan_status"]
 export type BrandSentiment = Database["public"]["Enums"]["brand_sentiment"]
 export type Citation = { url: string; title: string }
 export type SubscriptionRow = Database["public"]["Tables"]["subscriptions"]["Row"]
+export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"]
+export type BrandStreakRow = Database["public"]["Tables"]["brand_streak"]["Row"]
+export type BrandSnapshotRow = Database["public"]["Tables"]["brand_snapshots"]["Row"]

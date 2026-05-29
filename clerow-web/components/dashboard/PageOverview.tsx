@@ -26,7 +26,7 @@ export function PageOverview() {
   const router = useRouter();
   const navigate = (k: string) =>
     router.push(k === "overview" ? "/dashboard" : `/dashboard/${k}`);
-  const { data, loading, error } = useDashboard();
+  const { data, loading, error, refresh } = useDashboard();
 
   const sub = data?.brand
     ? `${data.brand.url}${data.hasScan ? ` · scanned via ${data.engine ?? "Perplexity"}` : " · not scanned yet"}`
@@ -63,10 +63,10 @@ export function PageOverview() {
 
       {!loading && data && data.hasScan && (
         <>
-          <AppHello company={domainName(data.brand?.url) ?? "founder"} />
+          <AppHello company={domainName(data.brand?.url) ?? "founder"} streak={data.streak?.current ?? 0} />
           <div className="app-grid">
             <ScoreCard score={data.score} />
-            <TasksCard tasks={data.tasks ?? []} onNavigate={navigate} />
+            <TasksCard tasks={data.tasks ?? []} onNavigate={navigate} onChanged={refresh} />
           </div>
           <div className="app-grid">
             <ModelsCard models={data.models ?? []} onNavigate={navigate} />
@@ -98,7 +98,7 @@ function NoScan({ onScan, brand }: { onScan: () => void; brand: DashboardData["b
   );
 }
 
-function AppHello({ company }: { company: string }) {
+function AppHello({ company, streak }: { company: string; streak: number }) {
   return (
     <div className="app-hello">
       <div
@@ -119,7 +119,7 @@ function AppHello({ company }: { company: string }) {
         Welcome back, {company}.
         <small>Here&apos;s where you stand in AI search today. Let&apos;s climb. ✨</small>
       </div>
-      <div className="streak-mini"><GameIcon name="flame" size={16} color="#F59E0B" /> 1</div>
+      <div className="streak-mini"><GameIcon name="flame" size={16} color="#F59E0B" /> {streak}</div>
     </div>
   );
 }
@@ -217,10 +217,37 @@ function ScoreStat({
   );
 }
 
-function TasksCard({ tasks, onNavigate }: { tasks: DashboardTask[]; onNavigate: (k: string) => void }) {
+function TasksCard({
+  tasks,
+  onNavigate,
+  onChanged,
+}: {
+  tasks: DashboardTask[];
+  onNavigate: (k: string) => void;
+  onChanged?: () => void;
+}) {
   const [local, setLocal] = React.useState(tasks);
   React.useEffect(() => setLocal(tasks), [tasks]);
-  const toggle = (i: number) => setLocal(local.map((t, j) => (j === i ? { ...t, done: !t.done } : t)));
+
+  // Persist the toggle (stamps completed_at → feeds the streak). Optimistic, with
+  // a revert on failure; refresh pulls the recomputed streak into the sidebar.
+  const toggle = async (i: number) => {
+    const task = local[i];
+    const next = !task.done;
+    setLocal((prev) => prev.map((t, j) => (j === i ? { ...t, done: next } : t)));
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: task.id, done: next }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      onChanged?.();
+    } catch {
+      setLocal((prev) => prev.map((t, j) => (j === i ? { ...t, done: task.done } : t)));
+    }
+  };
+
   const doneCount = local.filter((t) => t.done).length;
   const totalXP = local.filter((t) => t.done).reduce((sum, t) => sum + t.xp, 0);
 

@@ -297,25 +297,6 @@ export function StreakBanner({ days, onDays }: { days: string[]; onDays: number 
   );
 }
 
-/* ======================= Level bar ========================= */
-export function LevelBar({ level, pct, xp, weekly, next }: { level: string; pct: number; xp: string; weekly: string; next: string }) {
-  return (
-    <View style={s.level}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <Text style={{ fontFamily: font.black, fontSize: 17, color: '#fff' }}>{level}</Text>
-        <Text style={{ fontFamily: mono, fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>{xp}</Text>
-      </View>
-      <View style={s.levelBar}>
-        <LinearGradient colors={['#FFE266', colors.xp]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ height: '100%', borderRadius: radius.pill, width: `${pct}%` }} />
-      </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-        <Text style={{ fontFamily: font.bold, fontSize: 11.5, color: 'rgba(255,255,255,0.85)' }}>{weekly}</Text>
-        <Text style={{ fontFamily: font.bold, fontSize: 11.5, color: 'rgba(255,255,255,0.85)' }}>{next}</Text>
-      </View>
-    </View>
-  );
-}
-
 /* ========================= Divider ========================= */
 export function Divider({ label }: { label: string }) {
   return (
@@ -374,9 +355,6 @@ export const s = StyleSheet.create({
   streakFlame: { width: 48, height: 48, borderRadius: 14, backgroundColor: colors.streak, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: colors.streakDeep },
   streakDay: { width: 22, height: 26, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.6)', alignItems: 'center', justifyContent: 'center' },
   streakDayOn: { backgroundColor: colors.streak },
-
-  level: { backgroundColor: colors.navy, borderRadius: 20, padding: 18, paddingVertical: 16, marginBottom: 12 },
-  levelBar: { height: 12, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.18)', overflow: 'hidden' },
 
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 16 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.line },

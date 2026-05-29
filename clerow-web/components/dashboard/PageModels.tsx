@@ -5,207 +5,164 @@ import { useRouter } from "next/navigation";
 import { Icon } from "../Icon";
 import { GameIcon } from "../GameIcon";
 import { PageHead, PageStat } from "./AppShell";
+import { useDashboard } from "@/lib/useDashboard";
+import type { DashboardModel } from "@/lib/types";
 
-type Model = {
-  name: string;
-  letter: string;
-  color: string;
-  maker: string;
-  vis: number;
-  pos: number | string;
-  sent: number | string;
-  delta: string;
-  trend: number[];
-  tracked: boolean;
-  tier: "Founder" | "Team";
-  sources: string;
-  tip: string;
+// Curated, accurate guidance for how each engine sources its answers and what
+// moves you there. This is real AEO advice (not fake metrics) — the "pointer
+// with meaning" for each model.
+const COPY: Record<string, { maker: string; sources: string; tip: string }> = {
+  chatgpt: {
+    maker: "OpenAI",
+    sources:
+      "Training data + a live web_search tool (Bing-backed). Leans on G2, Wikipedia, and Reddit threads, with a strong recency bias on news.",
+    tip: "Wins here come from comparison pages and review-site listings (G2, Capterra).",
+  },
+  claude: {
+    maker: "Anthropic",
+    sources:
+      "Training data + a server-side web search tool. Higher trust threshold than ChatGPT — cites primary sources and documentation more often.",
+    tip: "Add depth to your docs, changelog, and a clear 'who it's for' page. Claude rewards substance.",
+  },
+  perplexity: {
+    maker: "Perplexity",
+    sources:
+      "Real-time web search on every query. Heavy on Reddit, Hacker News, Wikipedia, and recent blog posts — the most live-web-driven model.",
+    tip: "Reddit and YouTube presence move you here faster than schema does.",
+  },
+  gemini: {
+    maker: "Google",
+    sources:
+      "Google Search grounding + the Knowledge Graph. Strong overlap with classic SEO — if you rank in Google, you tend to rank here.",
+    tip: "Classic SEO still applies: site speed, FAQ schema, and fresh, structured content.",
+  },
 };
 
 export function PageModels() {
   const router = useRouter();
   const navigate = (k: string) => router.push(`/dashboard/${k}`);
+  const { data, loading } = useDashboard();
 
-  const models: Model[] = [
-    {
-      name: "ChatGPT", letter: "C", color: "#10A37F", maker: "OpenAI",
-      vis: 62, pos: 2.1, sent: 92, delta: "+0.8", trend: [12, 18, 24, 30, 38, 45, 52, 62],
-      tracked: true, tier: "Founder",
-      sources: "Training data + Bing web index + live browsing. Loves G2, Wikipedia, and Reddit threads. Strong recency bias on news.",
-      tip: "Wins here come from comparison pages and review-site listings.",
-    },
-    {
-      name: "Claude", letter: "A", color: "#D97706", maker: "Anthropic",
-      vis: 54, pos: 3.4, sent: 88, delta: "+0.4", trend: [22, 26, 28, 30, 38, 42, 48, 54],
-      tracked: true, tier: "Founder",
-      sources: "Training data + Anthropic's Brave-powered web search. Higher trust threshold than ChatGPT — cites primary sources more often.",
-      tip: "Add depth to your docs and changelog. Claude rewards substance.",
-    },
-    {
-      name: "Perplexity", letter: "P", color: "#1CB0F6", maker: "Perplexity",
-      vis: 41, pos: 3.9, sent: 71, delta: "−0.2", trend: [38, 40, 42, 44, 46, 44, 42, 41],
-      tracked: true, tier: "Founder",
-      sources: "Real-time web. Heavy on Reddit, HN, Wikipedia, and recent blog posts. The most live-web-driven model.",
-      tip: "Reddit and YouTube wins move you here faster than schema does.",
-    },
-    {
-      name: "Gemini", letter: "G", color: "#4285F4", maker: "Google",
-      vis: 33, pos: 5.0, sent: 65, delta: "+0.1", trend: [28, 30, 30, 32, 32, 33, 32, 33],
-      tracked: false, tier: "Team",
-      sources: "Google's web index + Knowledge Graph. Strong overlap with traditional SEO. If you rank in Google, you'll rank here.",
-      tip: "Classic SEO basics still apply: site speed, schema, fresh content.",
-    },
-    {
-      name: "Google AI Overviews", letter: "AI", color: "#34A853", maker: "Google",
-      vis: 0, pos: "—", sent: "—", delta: "—", trend: [0, 0, 0, 0, 0, 0, 0, 0],
-      tracked: false, tier: "Team",
-      sources: "Pulls top Google results + Featured Snippets. Citations are explicit and clickable — high traffic potential.",
-      tip: "Optimise for FAQ schema and direct-answer paragraphs in your top blog posts.",
-    },
-  ];
+  const models = data?.models ?? [];
+  const scanned = models.filter((m) => !m.locked && m.visibility != null);
+  const tracked = models.filter((m) => !m.locked).length;
+  const lockedCount = models.filter((m) => m.locked).length;
+  const best = scanned.length
+    ? scanned.reduce((a, b) => ((b.visibility ?? 0) > (a.visibility ?? 0) ? b : a))
+    : null;
+  const worst = scanned.length
+    ? scanned.reduce((a, b) => ((b.visibility ?? 0) < (a.visibility ?? 0) ? b : a))
+    : null;
 
   return (
     <>
       <PageHead
         title="AI Models"
-        sub="Each model cites differently. Here's how to win each one."
+        sub={
+          data?.primaryPrompt
+            ? `Where you stand on “${data.primaryPrompt}”, by model — and how to win each one.`
+            : "Each model cites differently. Here's how to win each one."
+        }
         actions={
-          <button className="btn btn--primary btn--sm">
+          <button className="btn btn--primary btn--sm" onClick={() => router.push("/onboarding")}>
             <Icon name="bolt" size={14} />
-            Re-scan all models
+            Re-scan
           </button>
         }
       />
 
       <div className="page-stats">
-        <PageStat label="Models tracked"  value="3"       sub="of 5 available" />
-        <PageStat label="Best in"         value="ChatGPT" sub="position #2 · 62% vis" hi="success" />
-        <PageStat label="Worst in"        value="Gemini"  sub="position #5 · 33% vis" hi="warn" />
-        <PageStat label="Upgrade unlocks" value="2"       sub="Gemini + AI Overviews" hi="accent" />
+        <PageStat label="Models tracked" value={String(tracked)} sub={`of ${models.length} available`} />
+        <PageStat
+          label="Best in"
+          value={best?.label ?? "—"}
+          sub={best ? `${best.visibility}% visibility` : "scan to see"}
+          hi="success"
+        />
+        <PageStat
+          label="Needs work in"
+          value={worst?.label ?? "—"}
+          sub={worst ? `${worst.visibility}% visibility` : "scan to see"}
+          hi="warn"
+        />
+        <PageStat label="Locked models" value={String(lockedCount)} sub="add an API key" hi="accent" />
       </div>
 
-      <div className="models-grid">
-        {models.map((m, i) => (
-          <ModelCard key={i} m={m} onNavigate={navigate} />
-        ))}
-        <UpgradeCard />
-      </div>
+      {loading ? (
+        <div className="app-card" style={{ padding: 24 }}>Loading models…</div>
+      ) : (
+        <div className="models-grid">
+          {models.map((m) => (
+            <ModelCard key={m.id} m={m} onNavigate={navigate} />
+          ))}
+          <UpgradeCard />
+        </div>
+      )}
     </>
   );
 }
 
-function ModelCard({ m, onNavigate }: { m: Model; onNavigate: (k: string) => void }) {
-  const locked = m.tier === "Team" && !m.tracked;
+function ModelCard({ m, onNavigate }: { m: DashboardModel; onNavigate: (k: string) => void }) {
+  const copy = COPY[m.id] ?? { maker: "", sources: "", tip: "" };
+  const scanned = !m.locked && m.visibility != null;
   return (
-    <div className={`model-card ${locked ? "model-card--locked" : ""}`}>
+    <div className={`model-card ${m.locked ? "model-card--locked" : ""}`}>
       <div className="model-card-head">
         <div className="model-card-id">
-          <span className="model-card-ico" style={{ background: m.color }}>
+          <span className="model-card-ico" style={{ background: m.swatch }}>
             {m.letter}
           </span>
           <div>
-            <div className="name">{m.name}</div>
-            <div className="maker">by {m.maker}</div>
+            <div className="name">{m.label}</div>
+            <div className="maker">by {copy.maker || "—"}</div>
           </div>
         </div>
-        {locked ? (
-          <span className="tier-lock"><GameIcon name="locked" size={13} /> Team plan</span>
-        ) : (
-          <label className="switch">
-            <input type="checkbox" defaultChecked={m.tracked} />
-            <span />
-          </label>
+        {m.locked && (
+          <span className="tier-lock"><GameIcon name="locked" size={13} /> No API key</span>
         )}
       </div>
 
       <div className="model-stats">
         <div className="model-stat">
           <div className="label">Visibility</div>
-          <div className="val">{m.vis}%</div>
-          {!locked && (
-            <div
-              className="del"
-              style={{
-                color: m.delta.startsWith("+")
-                  ? "var(--success)"
-                  : m.delta.startsWith("−")
-                    ? "var(--danger)"
-                    : "var(--ink-3)",
-              }}
-            >
-              {m.delta}
-            </div>
-          )}
+          <div className="val">{scanned ? `${m.visibility}%` : "—"}</div>
         </div>
         <div className="model-stat">
-          <div className="label">Avg pos.</div>
-          <div className="val">{m.pos}</div>
+          <div className="label">Position</div>
+          <div className="val">{m.position != null ? `#${m.position}` : "—"}</div>
         </div>
         <div className="model-stat">
           <div className="label">Sentiment</div>
-          <div className="val">{m.sent}</div>
+          <div className="val">{m.sentiment != null ? m.sentiment : "—"}</div>
         </div>
       </div>
 
-      <Sparkline points={m.trend} color={m.color} locked={locked} />
+      {!scanned && !m.locked && (
+        <div className="model-empty">Not scanned on this model yet — open a prompt and run a scan.</div>
+      )}
 
       <div className="model-source">
-        <div className="src-label"><GameIcon name="book" size={15} /> How {m.name} sources answers</div>
-        <p>{m.sources}</p>
+        <div className="src-label"><GameIcon name="book" size={15} /> How {m.label} sources answers</div>
+        <p>{copy.sources}</p>
       </div>
 
       <div className="model-tip">
         <span className="tip-ico"><GameIcon name="idea" size={16} color="#F59E0B" /></span>
-        <span>{m.tip}</span>
+        <span>{copy.tip}</span>
       </div>
 
       <div className="model-card-foot">
-        {locked ? (
-          <button className="btn btn--primary btn--sm btn--full">Upgrade to Team</button>
+        {m.locked ? (
+          <span className="model-empty" style={{ margin: 0 }}>
+            Add this engine&apos;s API key to start tracking it.
+          </span>
         ) : (
-          <button className="btn btn--ghost btn--sm" onClick={() => onNavigate("quests")}>
-            See quests for {m.name} →
+          <button className="btn btn--ghost btn--sm" onClick={() => onNavigate("prompts")}>
+            See prompts &amp; fixes for {m.label} →
           </button>
         )}
       </div>
     </div>
-  );
-}
-
-function Sparkline({
-  points,
-  color,
-  locked,
-}: {
-  points: number[];
-  color: string;
-  locked: boolean;
-}) {
-  const max = Math.max(...points, 1);
-  const w = 220;
-  const h = 48;
-  const step = w / (points.length - 1);
-  const d = points.map((v, i) => `${i === 0 ? "M" : "L"} ${i * step} ${h - (v / max) * h}`).join(" ");
-  const gradId = `sp-${color.replace("#", "")}`;
-  return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="spark">
-      <defs>
-        <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={locked ? 0.05 : 0.2} />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={`${d} L ${w} ${h} L 0 ${h} Z`} fill={`url(#${gradId})`} />
-      <path
-        d={d}
-        fill="none"
-        stroke={locked ? "var(--ink-4)" : color}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity={locked ? 0.4 : 1}
-      />
-    </svg>
   );
 }
 
@@ -214,21 +171,15 @@ function UpgradeCard() {
     <div className="upgrade-card">
       <div className="upgrade-head">
         <GameIcon name="rocket" size={36} />
-        <h3>Unlock all 5 models</h3>
+        <h3>Track every prompt, daily</h3>
       </div>
       <p>
-        Founder plan tracks 3 models. Team plan adds Gemini + Google AI Overviews — together they cover 40% of all AI search traffic.
+        Your plan scans your primary prompt across all configured models. Upgrade to scan every tracked prompt across every model, automatically, every day.
       </p>
       <ul>
-        <li>
-          <Icon name="check" size={12} /> Daily scans across all 5 models
-        </li>
-        <li>
-          <Icon name="check" size={12} /> Cross-model competitor diff
-        </li>
-        <li>
-          <Icon name="check" size={12} /> Per-model quest suggestions
-        </li>
+        <li><Icon name="check" size={12} /> Daily scans across all your prompts</li>
+        <li><Icon name="check" size={12} /> Cross-model competitor diff</li>
+        <li><Icon name="check" size={12} /> Per-model quest suggestions</li>
       </ul>
       <button className="btn btn--primary btn--lg btn--full">Upgrade to Team — $89/mo</button>
     </div>

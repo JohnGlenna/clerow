@@ -31,7 +31,7 @@ app/
     _layout.tsx        Floating glass tab bar
     home.tsx           Streak, score ring, today's quests, model snapshot
     prompts.tsx        Discovered prompts + invisible-row quests
-    quests.tsx         XP/level, daily quests, active quest, milestone
+    quests.tsx         Streak, daily quests, active quest, milestone
     rank.tsx           Category leaderboard
     you.tsx            Profile, achievements, settings (links to sub-pages)
   sources.tsx          Citation-source gaps

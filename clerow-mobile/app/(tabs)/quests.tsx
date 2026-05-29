@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Header } from '../../components/Header';
 import { QuestRow } from '../../components/QuestRow';
 import { Screen } from '../../components/Screen';
-import { Card, LevelBar, SectionHeader } from '../../components/ui';
+import { Card, SectionHeader, StreakBanner } from '../../components/ui';
 import { colors, font, mono } from '../../theme/tokens';
 
 const DAILY = [
@@ -25,7 +25,7 @@ export default function Quests() {
         }
       />
 
-      <LevelBar level="⚡ Level 7 · SEO Apprentice" pct={74} xp="740 / 1000" weekly="+120 this week" next="→ SEO Mage" />
+      <StreakBanner onDays={12} days={['M', 'T', 'W', 'T', 'F', 'S', 'S']} />
 
       <SectionHeader title="Today's quests" hint="refreshes 9:00" />
       {DAILY.map((q) => (

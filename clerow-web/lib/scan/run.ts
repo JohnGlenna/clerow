@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getEngine, FREE_ENGINES } from "../engines";
+import { getEngine, enabledEngines, FREE_ENGINES, PAID_ENGINES, type EngineId } from "../engines";
 import { discoverPrompts } from "./discover";
 import { detectRanking } from "./detect";
 import type { BrandProfile, RunResponse } from "../types";
@@ -7,6 +7,7 @@ import type { Database, BrandSentiment } from "../supabase/database.types";
 
 type DB = SupabaseClient<Database>;
 type BrandRow = Database["public"]["Tables"]["brands"]["Row"];
+type PromptRow = Database["public"]["Tables"]["prompts"]["Row"];
 
 function toProfile(b: BrandRow): BrandProfile {
   return {
@@ -49,11 +50,58 @@ export async function ensurePrompts(db: DB, brandId: string) {
   return { brand, prompts: inserted };
 }
 
+// Query one engine for one prompt, detect the ranking, and persist the
+// scan_result + result_brands rows. Returns the engine's detection so the caller
+// can summarize. Throws on engine/DB failure (the caller decides whether one
+// engine failing should fail the whole scan).
+async function persistEngineResult(
+  db: DB,
+  scanId: string,
+  profile: BrandProfile,
+  prompt: PromptRow,
+  engineId: EngineId,
+  signal?: AbortSignal,
+) {
+  const engine = getEngine(engineId);
+  const answer = await engine.query(prompt.text, signal);
+  const detection = await detectRanking(answer.text, profile, signal);
+
+  const { data: result, error: re } = await db
+    .from("scan_results")
+    .insert({
+      scan_id: scanId,
+      prompt_id: prompt.id,
+      engine: engineId,
+      raw_answer: answer.text,
+      citations: answer.citations,
+      your_position: detection.you.position,
+      your_visibility: detection.you.visibility,
+      your_sentiment: SENTIMENT_SCORE[detection.you.sentiment],
+    })
+    .select()
+    .single();
+  if (re || !result) throw new Error(`Failed to save scan result: ${re?.message}`);
+
+  const brandRows = detection.brands.map((b) => ({
+    scan_result_id: result.id,
+    rank: b.rank,
+    name: b.name,
+    is_you: b.isYou,
+    visibility: b.visibility,
+    sentiment: b.sentiment,
+    position: b.position,
+  }));
+  const { error: rbe } = await db.from("result_brands").insert(brandRows);
+  if (rbe) throw new Error(`Failed to save result brands: ${rbe.message}`);
+
+  return { engine: engineId, label: engine.label, detection, citations: answer.citations };
+}
+
 // Run the free scan: pick the primary prompt, query one engine, detect the
 // ranking, persist everything. Fails loudly — on any error the scan row is
 // marked 'error' and no half-written success is left behind.
 export async function runFreeScan(db: DB, brandId: string): Promise<RunResponse> {
-  const engine = getEngine(FREE_ENGINES[0]);
+  const engineId = FREE_ENGINES[0];
 
   const { brand, prompts } = await ensurePrompts(db, brandId);
   const primary = prompts.find((p) => p.is_primary) ?? prompts[0];
@@ -61,43 +109,20 @@ export async function runFreeScan(db: DB, brandId: string): Promise<RunResponse>
 
   const { data: scan, error: se } = await db
     .from("scans")
-    .insert({ brand_id: brandId, tier: "free", status: "running", engines: [engine.id] })
+    .insert({ brand_id: brandId, tier: "free", status: "running", engines: [engineId] })
     .select()
     .single();
   if (se || !scan) throw new Error(`Failed to create scan: ${se?.message}`);
 
   try {
     const profile = toProfile(brand);
-    const answer = await engine.query(primary.text);
-    const detection = await detectRanking(answer.text, profile);
-
-    const { data: result, error: re } = await db
-      .from("scan_results")
-      .insert({
-        scan_id: scan.id,
-        prompt_id: primary.id,
-        engine: engine.id,
-        raw_answer: answer.text,
-        citations: answer.citations,
-        your_position: detection.you.position,
-        your_visibility: detection.you.visibility,
-        your_sentiment: SENTIMENT_SCORE[detection.you.sentiment],
-      })
-      .select()
-      .single();
-    if (re || !result) throw new Error(`Failed to save scan result: ${re?.message}`);
-
-    const brandRows = detection.brands.map((b) => ({
-      scan_result_id: result.id,
-      rank: b.rank,
-      name: b.name,
-      is_you: b.isYou,
-      visibility: b.visibility,
-      sentiment: b.sentiment,
-      position: b.position,
-    }));
-    const { error: rbe } = await db.from("result_brands").insert(brandRows);
-    if (rbe) throw new Error(`Failed to save result brands: ${rbe.message}`);
+    const { detection, label, citations } = await persistEngineResult(
+      db,
+      scan.id,
+      profile,
+      primary,
+      engineId,
+    );
 
     await seedTeaserTasks(db, brandId, profile, primary.text, detection.you.mentioned);
 
@@ -108,11 +133,11 @@ export async function runFreeScan(db: DB, brandId: string): Promise<RunResponse>
 
     return {
       scanId: scan.id,
-      engine: engine.label,
+      engine: label,
       prompt: primary.text,
       brands: detection.brands,
       you: detection.you,
-      citations: answer.citations,
+      citations,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -122,6 +147,90 @@ export async function runFreeScan(db: DB, brandId: string): Promise<RunResponse>
       .eq("id", scan.id);
     throw err;
   }
+}
+
+// Per-engine outcome of a multi-engine scan (paid). `error` is set when that one
+// engine failed; the scan as a whole still succeeds as long as one engine ran.
+export type EngineRunOutcome =
+  | { engine: EngineId; label: string; ok: true; position: number | null; visibility: number }
+  | { engine: EngineId; label: string; ok: false; error: string };
+
+export type PromptScanResult = {
+  scanId: string;
+  promptId: string;
+  prompt: string;
+  outcomes: EngineRunOutcome[];
+};
+
+// Scan a single prompt across several engines (the paid, on-demand "scan this
+// prompt" action). Engines run concurrently and independently: one engine being
+// down or unconfigured never fails the others. The scan is marked 'done' if at
+// least one engine produced a result, otherwise 'error'.
+export async function runPromptScan(
+  db: DB,
+  brandId: string,
+  promptId: string,
+  engineIds: EngineId[] = PAID_ENGINES,
+): Promise<PromptScanResult> {
+  const engines = enabledEngines(engineIds);
+  if (engines.length === 0) {
+    throw new Error("No AI engines are configured. Add at least one engine API key.");
+  }
+
+  const { data: brand, error: be } = await db.from("brands").select("*").eq("id", brandId).single();
+  if (be || !brand) throw new Error(`Brand not found: ${be?.message ?? brandId}`);
+
+  const { data: prompt, error: pe } = await db
+    .from("prompts")
+    .select("*")
+    .eq("id", promptId)
+    .eq("brand_id", brandId)
+    .single();
+  if (pe || !prompt) throw new Error(`Prompt not found: ${pe?.message ?? promptId}`);
+
+  const { data: scan, error: se } = await db
+    .from("scans")
+    .insert({ brand_id: brandId, tier: "full", status: "running", engines })
+    .select()
+    .single();
+  if (se || !scan) throw new Error(`Failed to create scan: ${se?.message}`);
+
+  const profile = toProfile(brand);
+  const settled = await Promise.allSettled(
+    engines.map((id) => persistEngineResult(db, scan.id, profile, prompt, id)),
+  );
+
+  const outcomes: EngineRunOutcome[] = settled.map((s, i) => {
+    const engine = getEngine(engines[i]);
+    if (s.status === "fulfilled") {
+      return {
+        engine: engines[i],
+        label: engine.label,
+        ok: true,
+        position: s.value.detection.you.position,
+        visibility: s.value.detection.you.visibility,
+      };
+    }
+    const message = s.reason instanceof Error ? s.reason.message : String(s.reason);
+    return { engine: engines[i], label: engine.label, ok: false, error: message };
+  });
+
+  const anyOk = outcomes.some((o) => o.ok);
+  await db
+    .from("scans")
+    .update({
+      status: anyOk ? "done" : "error",
+      error: anyOk ? null : "All engines failed",
+      finished_at: new Date().toISOString(),
+    })
+    .eq("id", scan.id);
+
+  if (!anyOk) {
+    const firstErr = outcomes.find((o) => !o.ok) as Extract<EngineRunOutcome, { ok: false }>;
+    throw new Error(firstErr?.error ?? "Scan failed");
+  }
+
+  return { scanId: scan.id, promptId, prompt: prompt.text, outcomes };
 }
 
 // Seed 1–2 concrete teaser tasks off the free scan so the dashboard isn't empty.

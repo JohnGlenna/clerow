@@ -1,12 +1,13 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
 import { Icon } from "../Icon";
 import { GameIcon } from "../GameIcon";
 import { PageHead, PageStat } from "./AppShell";
+import { PromptDrawer } from "./PromptDrawer";
 import { useDashboard } from "@/lib/useDashboard";
 import type { DashboardPrompt } from "@/lib/types";
+import type { SuggestedPrompt } from "@/app/api/prompts/suggest/route";
 
 const INTENTS: Record<string, { l: string; c: string }> = {
   problem: { l: "Problem-aware", c: "#7C3AED" },
@@ -15,40 +16,83 @@ const INTENTS: Record<string, { l: string; c: string }> = {
   compare: { l: "Comparison", c: "#E11D48" },
 };
 
+// Engine letters/colors shown as the "Models" column dots. Matches ENGINE_META.
+const MODEL_DOTS = [
+  { k: "C", bg: "#10A37F" },
+  { k: "A", bg: "#D97706" },
+  { k: "P", bg: "#1CB0F6" },
+  { k: "G", bg: "#4285F4" },
+];
+
 export function PagePrompts() {
-  const router = useRouter();
   const [tab, setTab] = React.useState<"tracked" | "suggested">("tracked");
-  const navigate = (k: string) => router.push(`/dashboard/${k}`);
-  const { data, loading } = useDashboard();
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [suggestions, setSuggestions] = React.useState<SuggestedPrompt[] | null>(null);
+  const { data, loading, refresh } = useDashboard();
 
   const prompts = data?.prompts ?? [];
   const scanned = prompts.filter((p) => p.scanned).length;
   const position = data?.score?.position ?? null;
 
+  // Load suggestions once (used by the stat tile and the suggested tab).
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/prompts/suggest", { cache: "no-store" });
+      const json = await res.json().catch(() => ({ suggestions: [] }));
+      if (!cancelled) setSuggestions(json.suggestions ?? []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const exportCsv = () => {
+    const rows = [
+      ["Prompt", "Intent", "Volume", "Primary", "Scanned"],
+      ...prompts.map((p) => [p.text, p.intent, p.volume, p.isPrimary ? "yes" : "no", p.scanned ? "yes" : "no"]),
+    ];
+    const csv = rows
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "clerow-prompts.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       <PageHead
         title="Prompts"
-        sub="The queries we run against AI models to see how you show up."
+        sub="The real questions buyers ask AI. Click any prompt to see where you rank and exactly how to win it."
         actions={
           <>
-            <button className="btn btn--ghost btn--sm">
+            <button className="btn btn--ghost btn--sm" onClick={exportCsv} disabled={!prompts.length}>
               <Icon name="download" size={14} />
               Export CSV
-            </button>
-            <button className="btn btn--primary btn--sm" onClick={() => router.push("/onboarding")}>
-              <Icon name="bolt" size={14} />
-              Re-scan
             </button>
           </>
         }
       />
 
       <div className="page-stats">
-        <PageStat label="Discovered" value={String(prompts.length)} sub="prompts" />
-        <PageStat label="Scanned (free)" value={String(scanned)} sub="primary prompt" hi="success" />
-        <PageStat label="Your position" value={position != null ? `#${position}` : "—"} sub="in scanned prompt" hi={position != null && position <= 3 ? "success" : "warn"} />
-        <PageStat label="Locked" value={String(Math.max(0, prompts.length - scanned))} sub="upgrade to scan all" hi="danger" />
+        <PageStat label="Tracked prompts" value={String(prompts.length)} sub="discovered for you" />
+        <PageStat label="Scanned" value={String(scanned)} sub="have live results" hi="success" />
+        <PageStat
+          label="Your best position"
+          value={position != null ? `#${position}` : "—"}
+          sub="on your primary prompt"
+          hi={position != null && position <= 3 ? "success" : "warn"}
+        />
+        <PageStat
+          label="New ideas"
+          value={suggestions == null ? "…" : String(suggestions.length)}
+          sub="prompts to add"
+          hi="accent"
+        />
       </div>
 
       <div className="page-tabs">
@@ -56,14 +100,25 @@ export function PagePrompts() {
           Tracked <span className="cnt">{prompts.length}</span>
         </button>
         <button className={tab === "suggested" ? "on" : ""} onClick={() => setTab("suggested")}>
-          AI-suggested <span className="cnt">8</span>
+          AI-suggested <span className="cnt">{suggestions?.length ?? 0}</span>
         </button>
       </div>
 
       {tab === "tracked" ? (
-        <PromptsTracked prompts={prompts} loading={loading} onNavigate={navigate} />
+        <PromptsTracked prompts={prompts} loading={loading} onOpen={setSelectedId} />
       ) : (
-        <PromptsSuggested />
+        <PromptsSuggested
+          suggestions={suggestions}
+          onTracked={() => {
+            setSuggestions((s) => s); // no-op; refresh below repopulates tracked list
+            refresh();
+          }}
+          onRemove={(text) => setSuggestions((s) => (s ?? []).filter((x) => x.text !== text))}
+        />
+      )}
+
+      {selectedId && (
+        <PromptDrawer promptId={selectedId} onClose={() => setSelectedId(null)} onChanged={refresh} />
       )}
     </>
   );
@@ -80,11 +135,11 @@ function ModelDot({ lit, bg, k }: { lit: boolean; bg: string; k: string }) {
 function PromptsTracked({
   prompts,
   loading,
-  onNavigate,
+  onOpen,
 }: {
   prompts: DashboardPrompt[];
   loading: boolean;
-  onNavigate: (k: string) => void;
+  onOpen: (id: string) => void;
 }) {
   if (loading) {
     return <div className="app-card" style={{ padding: 24 }}>Loading prompts…</div>;
@@ -104,13 +159,17 @@ function PromptsTracked({
           <span style={{ flex: 2.5 }}>Prompt</span>
           <span style={{ flex: 0.9 }}>Intent</span>
           <span style={{ flex: 1.1, justifyContent: "center", display: "flex" }}>Models</span>
-          <span style={{ flex: 0.4, textAlign: "center" }}>Pos.</span>
+          <span style={{ flex: 0.4, textAlign: "center" }}>Scan</span>
           <span style={{ flex: 1.0, textAlign: "right" }}>Action</span>
         </div>
         {prompts.map((r) => {
           const intent = INTENTS[r.intent] ?? INTENTS.solution;
           return (
-            <div key={r.id} className={`dt-row ${r.scanned ? "" : "dt-row--invisible"}`}>
+            <div
+              key={r.id}
+              className={`dt-row dt-row--click ${r.scanned ? "" : "dt-row--invisible"}`}
+              onClick={() => onOpen(r.id)}
+            >
               <span style={{ flex: 2.5 }} className="dt-prompt">
                 {r.text}
                 {r.isPrimary && <span className="ex-you" style={{ marginLeft: 8 }}>PRIMARY</span>}
@@ -128,23 +187,17 @@ function PromptsTracked({
                 </span>
               </span>
               <span style={{ flex: 1.1, display: "flex", justifyContent: "center", gap: 4 }}>
-                {/* Free scan runs Perplexity only on the primary prompt. */}
-                <ModelDot lit={false} bg="#10A37F" k="C" />
-                <ModelDot lit={false} bg="#D97706" k="A" />
-                <ModelDot lit={r.scanned} bg="#1CB0F6" k="P" />
-                <ModelDot lit={false} bg="#4285F4" k="G" />
+                {MODEL_DOTS.map((m) => (
+                  <ModelDot key={m.k} lit={r.scanned} bg={m.bg} k={m.k} />
+                ))}
               </span>
               <span style={{ flex: 0.4, textAlign: "center" }} className="dt-pos">
                 {r.scanned ? "✓" : "—"}
               </span>
               <span style={{ flex: 1.0, textAlign: "right" }}>
-                {r.scanned ? (
-                  <span className="dt-winning">Scanned ✓</span>
-                ) : (
-                  <button className="btn-quest" onClick={() => onNavigate("models")}>
-                    Unlock <b>↑</b>
-                  </button>
-                )}
+                <button className="btn-quest" onClick={(e) => { e.stopPropagation(); onOpen(r.id); }}>
+                  {r.scanned ? "View" : "Unlock"} <b>↗</b>
+                </button>
               </span>
             </div>
           );
@@ -154,29 +207,60 @@ function PromptsTracked({
   );
 }
 
-function PromptsSuggested() {
-  const suggested = [
-    { p: "best AI-friendly project tools 2026", intent: "solution", vol: "high", why: "Buyers compare AEO-ready tools here.", xp: 60 },
-    { p: "issue tracker for remote teams", intent: "solution", vol: "high", why: "High-intent buyer query in your niche.", xp: 60 },
-    { p: "alternatives to your top competitor", intent: "compare", vol: "high", why: "You don't appear here yet.", xp: 80 },
-    { p: "how to choose the right tool", intent: "problem", vol: "medium", why: "Educational content gap.", xp: 40 },
-  ];
+function PromptsSuggested({
+  suggestions,
+  onTracked,
+  onRemove,
+}: {
+  suggestions: SuggestedPrompt[] | null;
+  onTracked: () => void;
+  onRemove: (text: string) => void;
+}) {
+  const [busy, setBusy] = React.useState<string | null>(null);
+
+  const track = async (s: SuggestedPrompt) => {
+    setBusy(s.text);
+    try {
+      const res = await fetch("/api/prompts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: s.text, intent: s.intent, volume: s.volume }),
+      });
+      if (res.ok) {
+        onRemove(s.text);
+        onTracked();
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (suggestions == null) {
+    return <div className="app-card" style={{ padding: 24 }}>Finding new prompts to track…</div>;
+  }
+  if (suggestions.length === 0) {
+    return (
+      <div className="app-card" style={{ padding: 24, textAlign: "center" }}>
+        You&apos;re already tracking every prompt we&apos;d suggest. Re-scan to discover more.
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="callout">
         <span className="callout-ico"><GameIcon name="sparkles" size={20} color="#F59E0B" /></span>
         <div>
-          <b>Expand your tracked prompts.</b>
-          <span> Upgrade to run every discovered prompt across all four AI models, every day.</span>
+          <b>Expand your coverage.</b>
+          <span> These are real buyer queries in your category you aren&apos;t tracking yet. Add one to scan it.</span>
         </div>
-        <button className="btn btn--primary btn--sm">Upgrade</button>
       </div>
 
       <div className="suggest-grid">
-        {suggested.map((s, i) => {
+        {suggestions.map((s) => {
           const it = INTENTS[s.intent] ?? INTENTS.solution;
           return (
-            <div key={i} className="suggest-card">
+            <div key={s.text} className="suggest-card">
               <div className="suggest-head">
                 <span
                   className="intent-tag"
@@ -188,13 +272,19 @@ function PromptsSuggested() {
                 >
                   {it.l}
                 </span>
-                <span className={`vol vol--${s.vol}`}>{s.vol}</span>
+                <span className={`vol vol--${s.volume}`}>{s.volume}</span>
               </div>
-              <div className="suggest-prompt">&ldquo;{s.p}&rdquo;</div>
+              <div className="suggest-prompt">&ldquo;{s.text}&rdquo;</div>
               <div className="suggest-why">{s.why}</div>
               <div className="suggest-foot">
                 <span className="suggest-xp">+{s.xp} XP on track</span>
-                <button className="btn btn--ghost btn--sm">Track</button>
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => track(s)}
+                  disabled={busy === s.text}
+                >
+                  {busy === s.text ? "Adding…" : "Track"}
+                </button>
               </div>
             </div>
           );

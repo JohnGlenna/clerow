@@ -6,6 +6,7 @@ import { Icon } from "../Icon";
 import { GameIcon, type GameIconName } from "../GameIcon";
 import { MascotClerow } from "../Mascot";
 import { useSubscription, startCheckout, openBillingPortal } from "@/lib/useSubscription";
+import { DashboardProvider, useDashboard } from "@/lib/useDashboard";
 
 type NavKey =
   | "overview"
@@ -13,6 +14,7 @@ type NavKey =
   | "sources"
   | "models"
   | "quests"
+  | "archive"
   | "leaderboard"
   | "reports"
   | "settings";
@@ -23,6 +25,7 @@ const NAV: { i: Parameters<typeof Icon>[0]["name"]; l: string; k: NavKey; lock?:
   { i: "globe",  l: "Sources",     k: "sources",     lock: true },
   { i: "ai",     l: "AI Models",   k: "models",      lock: true },
   { i: "trophy", l: "Quests",      k: "quests",      lock: true },
+  { i: "check",  l: "Archive",     k: "archive",     lock: true },
   { i: "users",  l: "Leaderboard", k: "leaderboard", lock: true },
   { i: "bar",    l: "Reports",     k: "reports",     lock: true },
 ];
@@ -55,19 +58,21 @@ export function AppShell({
   };
 
   return (
-    <div className="app-shell">
-      <AppSidebar
-        page={page}
-        subscribed={subscribed === true}
-        onNavigate={navigate}
-        onManageBilling={manageBilling}
-        onSignOut={() => router.push("/")}
-      />
-      <main className="app-main" style={{ position: "relative" }}>
-        {children}
-        {showCover && <PaywallOverlay page={page} loading={loading} onNavigate={navigate} />}
-      </main>
-    </div>
+    <DashboardProvider>
+      <div className="app-shell">
+        <AppSidebar
+          page={page}
+          subscribed={subscribed === true}
+          onNavigate={navigate}
+          onManageBilling={manageBilling}
+          onSignOut={() => router.push("/")}
+        />
+        <main className="app-main" style={{ position: "relative" }}>
+          {children}
+          {showCover && <PaywallOverlay page={page} loading={loading} onNavigate={navigate} />}
+        </main>
+      </div>
+    </DashboardProvider>
   );
 }
 
@@ -84,6 +89,8 @@ function AppSidebar({
   onManageBilling: () => void;
   onSignOut: () => void;
 }) {
+  const { data } = useDashboard();
+  const streak = data?.streak;
   return (
     <aside className="app-side">
       <a
@@ -171,18 +178,18 @@ function AppSidebar({
 
       <div className="app-side-bottom">
         <div className="row">
-          <span className="lvl"><GameIcon name="bolt" size={14} color="#F59E0B" /> Level 7</span>
-          <span className="xp">740 / 1000</span>
+          <span className="lvl">
+            <GameIcon name="flame" size={15} color="#F59E0B" /> {streak?.current ?? 0} day streak
+          </span>
+          {(streak?.freezes ?? 0) > 0 && (
+            <span className="xp" title="Streak freezes — each protects one missed day">
+              ❄️ {streak?.freezes}
+            </span>
+          )}
         </div>
-        <div className="bar">
-          <i style={{ width: "74%" }} />
-        </div>
-        <div
-          className="row"
-          style={{ fontSize: 11, color: "var(--ink-2)", fontWeight: 600 }}
-        >
-          <span>SEO Apprentice</span>
-          <span>→ SEO Mage</span>
+        <div className="row" style={{ fontSize: 11, color: "var(--ink-2)", fontWeight: 600 }}>
+          <span>Longest {streak?.longest ?? 0}d</span>
+          <span>{streak?.activeToday ? "Kept today ✅" : "Do a task to keep it"}</span>
         </div>
       </div>
     </aside>
@@ -208,6 +215,7 @@ function PaywallOverlay({
     sources:     { title: "Unlock Sources",     desc: "See which Reddit threads, G2 listings, and YouTube channels AI cites — and which ones your rivals own.", icon: "world" },
     models:      { title: "Unlock AI Models",   desc: "Track ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews — and learn how each one sources answers.", icon: "brain" },
     quests:      { title: "Unlock Quests",      desc: "Your daily playbook to climb. Concrete steps with XP, streaks, and one-click 'how to' instructions.", icon: "swords" },
+    archive:     { title: "Unlock Archive",     desc: "Every quest you complete, kept as a permanent record — your track record of work that moved your AI visibility.", icon: "scroll" },
     leaderboard: { title: "Unlock Leaderboard", desc: "Race your category — and 3,140 other Clerow founders. Track gap-to-next, defenders, and weekly climbers.", icon: "trophy" },
     reports:     { title: "Unlock Reports",     desc: "Auto-generated weekly summaries. Clerow Wrapped share cards for X. White-label client reports on Team.", icon: "chart" },
   };

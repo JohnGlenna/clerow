@@ -65,12 +65,9 @@ export default function You() {
           <View style={styles.avatar}>
             <Text style={{ color: '#fff', fontFamily: font.black, fontSize: 30 }}>J</Text>
           </View>
-          <View style={styles.lvBadge}>
-            <Text style={{ color: '#fff', fontFamily: font.black, fontSize: 11 }}>Lv 7</Text>
-          </View>
         </View>
         <Text style={{ fontFamily: font.black, fontSize: 20, color: colors.ink }}>John Solbakken</Text>
-        <Text style={{ fontFamily: font.semibold, fontSize: 13, color: colors.ink2 }}>warbls.com · SEO Apprentice</Text>
+        <Text style={{ fontFamily: font.semibold, fontSize: 13, color: colors.ink2 }}>warbls.com</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 26, marginTop: 16 }}>
           <Pstat n="7,402" l="XP" />
           <Pstat n="🔥 12" l="Streak" />
@@ -108,7 +105,6 @@ export default function You() {
 
 const styles = StyleSheet.create({
   avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center' },
-  lvBadge: { position: 'absolute', bottom: -2, right: -2, backgroundColor: colors.navy, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 8, borderWidth: 2, borderColor: '#fff' },
   medal: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
   medalName: { fontFamily: font.extrabold, fontSize: 10, color: colors.ink2 },
   prefRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16 },
