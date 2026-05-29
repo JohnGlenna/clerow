@@ -91,6 +91,7 @@ function AppSidebar({
 }) {
   const { data } = useDashboard();
   const streak = data?.streak;
+  const xp = data?.xp;
   return (
     <aside className="app-side">
       <a
@@ -190,6 +191,18 @@ function AppSidebar({
         <div className="row" style={{ fontSize: 11, color: "var(--ink-2)", fontWeight: 600 }}>
           <span>Longest {streak?.longest ?? 0}d</span>
           <span>{streak?.activeToday ? "Kept today ✅" : "Do a task to keep it"}</span>
+        </div>
+        <div className="side-level" title={`${xp?.total ?? 0} XP all-time`}>
+          <div className="side-level-row">
+            <span className="lvl">
+              <GameIcon name="star" size={13} color="#1CB0F6" /> Lv {xp?.level ?? 1}
+              {xp?.title ? ` · ${xp.title}` : ""}
+            </span>
+            <span>{xp ? `${xp.intoLevel}/${xp.span} XP` : "0 XP"}</span>
+          </div>
+          <div className="side-level-bar">
+            <i style={{ width: `${xp?.pct ?? 0}%` }} />
+          </div>
         </div>
       </div>
     </aside>

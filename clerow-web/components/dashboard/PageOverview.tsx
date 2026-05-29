@@ -7,6 +7,7 @@ import { GameIcon, type GameIconName } from "../GameIcon";
 import { MascotClerow } from "../Mascot";
 import { PageHead } from "./AppShell";
 import { useDashboard } from "@/lib/useDashboard";
+import { playCheck } from "@/lib/sound";
 import type {
   DashboardData,
   DashboardModel,
@@ -65,7 +66,7 @@ export function PageOverview() {
         <>
           <AppHello company={domainName(data.brand?.url) ?? "founder"} streak={data.streak?.current ?? 0} />
           <div className="app-grid">
-            <ScoreCard score={data.score} />
+            <ScoreCard score={data.score} trend={data.trend} />
             <TasksCard tasks={data.tasks ?? []} onNavigate={navigate} onChanged={refresh} />
           </div>
           <div className="app-grid">
@@ -124,13 +125,13 @@ function AppHello({ company, streak }: { company: string; streak: number }) {
   );
 }
 
-function ScoreCard({ score }: { score?: DashboardData["score"] }) {
+function ScoreCard({ score, trend }: { score?: DashboardData["score"]; trend?: DashboardData["trend"] }) {
   const overall = score?.overall ?? 0;
   const visibility = score?.visibility ?? 0;
   const position = score?.position ?? null;
   const sentiment = score?.sentiment ?? 0;
   return (
-    <div className="app-card">
+    <div className="app-card app-card--score">
       <div className="app-card-head">
         <h4>Your AI visibility score</h4>
         <span className="sub">from your latest scan</span>
@@ -149,12 +150,53 @@ function ScoreCard({ score }: { score?: DashboardData["score"] }) {
           />
           <ScoreStat label="Sentiment" icon="smile" value={sentiment ? `${sentiment}` : "—"} pct={sentiment} color="#58CC02" />
         </div>
+        <TrendBlock trend={trend} />
       </div>
     </div>
   );
 }
 
-function ScoreRing({ value, size = 156 }: { value: number; size?: number }) {
+// "Since last scan" delta + a tiny sparkline of recent overall scores. Hides
+// until there are at least two snapshots to compare (delta != null).
+function TrendBlock({ trend }: { trend?: DashboardData["trend"] }) {
+  if (!trend || trend.delta == null) return null;
+  const up = trend.delta > 0;
+  const flat = trend.delta === 0;
+  const color = flat ? "#A8A8A8" : up ? "#58CC02" : "#E11D48";
+  const arrow = flat ? "–" : up ? "▲" : "▼";
+  return (
+    <div className="score-trend">
+      <span className="score-trend-delta" style={{ color }}>
+        {arrow} {flat ? "0" : `${up ? "+" : ""}${trend.delta}`}
+      </span>
+      <span className="score-trend-label">vs previous scan</span>
+      <Sparkline values={trend.sparkline} color={color} />
+    </div>
+  );
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  if (values.length < 2) return null;
+  const w = 96;
+  const h = 28;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const pts = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - min) / span) * h;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg className="score-spark" width={w} height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ScoreRing({ value, size = 104 }: { value: number; size?: number }) {
   const r = size / 2 - 14;
   const c = 2 * Math.PI * r;
   const dash = (value / 100) * c;
@@ -234,6 +276,7 @@ function TasksCard({
   const toggle = async (i: number) => {
     const task = local[i];
     const next = !task.done;
+    if (next) playCheck(); // satisfying chime only when completing
     setLocal((prev) => prev.map((t, j) => (j === i ? { ...t, done: next } : t)));
     try {
       const res = await fetch("/api/tasks", {
@@ -245,6 +288,28 @@ function TasksCard({
       onChanged?.();
     } catch {
       setLocal((prev) => prev.map((t, j) => (j === i ? { ...t, done: task.done } : t)));
+    }
+  };
+
+  // Clear a completed quest from the active list (it stays done, so streak + XP
+  // are untouched). Optimistically remove it; revert on failure.
+  const archive = async (i: number) => {
+    const task = local[i];
+    setLocal((prev) => prev.filter((_, j) => j !== i));
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: task.id, archived: true }),
+      });
+      if (!res.ok) throw new Error("archive failed");
+      onChanged?.();
+    } catch {
+      setLocal((prev) => {
+        const copy = [...prev];
+        copy.splice(i, 0, task);
+        return copy;
+      });
     }
   };
 
@@ -272,7 +337,13 @@ function TasksCard({
               <div className="title">{task.title}</div>
               <div className="meta">{task.meta}</div>
             </div>
-            <span className="xp">+{task.xp} XP</span>
+            {task.done ? (
+              <button className="btn btn--ghost btn--sm task-archive" onClick={() => archive(i)} title="Clear from today's quests">
+                Archive
+              </button>
+            ) : (
+              <span className="xp">+{task.xp} XP</span>
+            )}
           </div>
         ))}
       </div>

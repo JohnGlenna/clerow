@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.clerow.app"
+      "bundleIdentifier": "com.clerow.app",
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.clerow.app",
@@ -30,6 +31,8 @@
     },
     "plugins": [
       "expo-router",
+      "expo-web-browser",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {
@@ -42,6 +45,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "supabaseUrl": "https://bglhkaltbcifughqxafl.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnbGhrYWx0YmNpZnVnaHF4YWZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzQzMDcsImV4cCI6MjA5NTU1MDMwN30.ESGaeSOawqQtgwLZHzAoh-w9RosatKCHPVPBYko6xQ4",
+      "apiBaseUrl": "https://REPLACE-WITH-YOUR-VERCEL-URL.vercel.app"
     }
   }
 }

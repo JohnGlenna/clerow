@@ -416,6 +416,8 @@ export type Database = {
       }
       tasks: {
         Row: {
+          archived: boolean
+          archived_at: string | null
           brand_id: string
           completed_at: string | null
           created_at: string
@@ -429,6 +431,8 @@ export type Database = {
           xp: number
         }
         Insert: {
+          archived?: boolean
+          archived_at?: string | null
           brand_id: string
           completed_at?: string | null
           created_at?: string
@@ -442,6 +446,8 @@ export type Database = {
           xp?: number
         }
         Update: {
+          archived?: boolean
+          archived_at?: string | null
           brand_id?: string
           completed_at?: string | null
           created_at?: string

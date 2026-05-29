@@ -13,16 +13,23 @@ export function QuestRow({
   xp,
   emoji,
   initialDone = false,
+  onToggle,
 }: {
   title: string;
   meta: string;
   xp: number;
   emoji?: string;
   initialDone?: boolean;
+  onToggle?: (next: boolean) => void;
 }) {
   const [done, setDone] = useState(initialDone);
+  const toggle = () => {
+    const next = !done;
+    setDone(next);
+    onToggle?.(next);
+  };
   return (
-    <Pressable style={[styles.quest, done && styles.questDone]} onPress={() => setDone((d) => !d)}>
+    <Pressable style={[styles.quest, done && styles.questDone]} onPress={toggle}>
       {emoji ? (
         <View style={styles.icoBox}>
           <Text style={{ fontSize: 22 }}>{emoji}</Text>

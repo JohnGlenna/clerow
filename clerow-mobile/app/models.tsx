@@ -1,17 +1,19 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Header } from '../components/Header';
 import { Icon } from '../components/icons';
 import { Screen } from '../components/Screen';
-import { Card, Delta } from '../components/ui';
+import { Card } from '../components/ui';
+import { useDashboard } from '../lib/useApi';
 import { colors, font } from '../theme/tokens';
 
-const MODELS = [
-  { name: 'ChatGPT', l: 'C', sw: '#10A37F', v: 62, pos: '2.1', d: '+0.8', up: true, tracked: true, note: 'Loves G2, Wikipedia & Reddit. Win it with comparison pages.' },
-  { name: 'Claude', l: 'A', sw: '#D97706', v: 54, pos: '3.4', d: '+0.4', up: true, tracked: true, note: 'Cites primary sources. Rewards depth in your docs.' },
-  { name: 'Perplexity', l: 'P', sw: '#1CB0F6', v: 41, pos: '3.9', d: '−0.2', up: false, tracked: true, note: 'Most live-web driven. Reddit + YouTube move you fast.' },
-  { name: 'Gemini', l: 'G', sw: '#4285F4', v: 0, pos: '—', d: '', up: true, tracked: false, note: 'Overlaps Google SEO. Unlock on the Marketing plan.' },
-];
+// Editorial "how to win" copy per engine (not data the API returns).
+const NOTES: Record<string, string> = {
+  chatgpt: 'Loves G2, Wikipedia & Reddit. Win it with comparison pages.',
+  claude: 'Cites primary sources. Rewards depth in your docs.',
+  perplexity: 'Most live-web driven. Reddit + YouTube move you fast.',
+  gemini: 'Overlaps Google SEO. Strong technical pages help.',
+};
 
 function Mstat({ l, v }: { l: string; v: string }) {
   return (
@@ -24,10 +26,14 @@ function Mstat({ l, v }: { l: string; v: string }) {
 
 export default function Models() {
   const router = useRouter();
+  const { data, loading } = useDashboard();
+  const models = data?.models ?? [];
+  const tracked = models.filter((m) => !m.locked).length;
+
   return (
     <Screen>
       <Header
-        eyebrow="3 of 5 tracked"
+        eyebrow={`${tracked} of ${models.length || 4} tracked`}
         title="AI Models"
         left={
           <Pressable onPress={() => router.back()} hitSlop={10}>
@@ -36,39 +42,43 @@ export default function Models() {
         }
       />
 
-      {MODELS.map((m) => (
-        <Card key={m.name} style={!m.tracked && { opacity: 0.85 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <View style={[styles.sw, { backgroundColor: m.sw }]}>
-              <Text style={{ color: '#fff', fontFamily: font.black, fontSize: 15 }}>{m.l}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: font.black, fontSize: 16, color: colors.ink }}>{m.name}</Text>
-              <Text style={{ fontFamily: font.semibold, fontSize: 12, color: colors.ink2 }}>{m.tracked ? 'Tracking daily' : 'Locked'}</Text>
-            </View>
-            {m.tracked ? (
-              <Delta value={m.d} up={m.up} />
-            ) : (
-              <View style={styles.lockBadge}>
-                <Icon name="lock" size={12} color={colors.ink2} />
-                <Text style={styles.lockText}>Marketing</Text>
+      {loading && !data ? (
+        <View style={{ paddingTop: 40, alignItems: 'center' }}>
+          <ActivityIndicator color={colors.navy} />
+        </View>
+      ) : (
+        models.map((m) => (
+          <Card key={m.id} style={m.locked ? { opacity: 0.85 } : undefined}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <View style={[styles.sw, { backgroundColor: m.swatch }]}>
+                <Text style={{ color: '#fff', fontFamily: font.black, fontSize: 15 }}>{m.letter}</Text>
               </View>
-            )}
-          </View>
-          {m.tracked ? (
-            <View style={{ flexDirection: 'row', gap: 28, marginBottom: 12 }}>
-              <Mstat l="Visibility" v={`${m.v}%`} />
-              <Mstat l="Avg pos." v={m.pos} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: font.black, fontSize: 16, color: colors.ink }}>{m.label}</Text>
+                <Text style={{ fontFamily: font.semibold, fontSize: 12, color: colors.ink2 }}>{m.locked ? 'Locked' : 'Tracking daily'}</Text>
+              </View>
+              {m.locked ? (
+                <View style={styles.lockBadge}>
+                  <Icon name="lock" size={12} color={colors.ink2} />
+                  <Text style={styles.lockText}>Upgrade</Text>
+                </View>
+              ) : null}
             </View>
-          ) : null}
-          <View style={styles.note}>
-            <Text style={styles.noteText}>
-              <Text style={{ fontFamily: font.extrabold, color: colors.ink }}>📚 </Text>
-              {m.note}
-            </Text>
-          </View>
-        </Card>
-      ))}
+            {!m.locked ? (
+              <View style={{ flexDirection: 'row', gap: 28, marginBottom: 12 }}>
+                <Mstat l="Visibility" v={m.visibility != null ? `${m.visibility}%` : '—'} />
+                <Mstat l="Position" v={m.position != null ? `#${m.position}` : '—'} />
+              </View>
+            ) : null}
+            <View style={styles.note}>
+              <Text style={styles.noteText}>
+                <Text style={{ fontFamily: font.extrabold, color: colors.ink }}>📚 </Text>
+                {NOTES[m.id] ?? 'Tracked across your prompts.'}
+              </Text>
+            </View>
+          </Card>
+        ))
+      )}
     </Screen>
   );
 }

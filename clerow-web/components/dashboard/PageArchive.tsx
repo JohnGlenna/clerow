@@ -68,14 +68,15 @@ export function PageArchive() {
     load();
   }, [load]);
 
-  // Reopen an archived quest → moves it back to active on the Quests page.
+  // Reopen an archived quest → un-archives it and clears its done state, so it
+  // returns to the Quests page as an open quest ready to work again.
   const reopen = async (id: string) => {
     setTasks((prev) => (prev ?? []).filter((t) => t.id !== id)); // optimistic
     try {
       const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, done: false }),
+        body: JSON.stringify({ id, archived: false, done: false }),
       });
       if (!res.ok) throw new Error();
     } catch {
@@ -91,7 +92,7 @@ export function PageArchive() {
     <>
       <PageHead
         title="Archive"
-        sub="Every quest you've completed — your track record of work that improved your AI visibility."
+        sub="Quests you've cleared away — your track record of work that improved your AI visibility."
         actions={
           <button className="btn btn--ghost btn--sm" onClick={() => router.push("/dashboard/quests")}>
             <Icon name="trophy" size={14} />
@@ -101,8 +102,8 @@ export function PageArchive() {
       />
 
       <div className="page-stats">
-        <PageStat label="Quests completed" value={String(total)} sub="all-time" hi="success" />
-        <PageStat label="XP earned" value={String(totalXp)} sub="from completed work" hi="accent" />
+        <PageStat label="Quests archived" value={String(total)} sub="all-time" hi="success" />
+        <PageStat label="XP earned" value={String(totalXp)} sub="from archived work" hi="accent" />
         <PageStat label="Active days" value={String(days.filter((d) => d.day !== "Earlier").length)} sub="days you shipped" />
       </div>
 
@@ -115,7 +116,7 @@ export function PageArchive() {
           </div>
           <h4 style={{ fontSize: 18, marginBottom: 6 }}>Nothing archived yet.</h4>
           <p style={{ color: "var(--ink-2)", maxWidth: 420, margin: "0 auto 16px", fontWeight: 500 }}>
-            Complete a quest and it lands here — a permanent record of the work you did to climb in AI search.
+            Complete a quest, then hit <b>Archive</b> to clear it from your list — it lands here as a record of the work you did to climb in AI search.
           </p>
           <button className="btn btn--primary btn--sm" onClick={() => router.push("/dashboard/quests")}>
             Go to quests →

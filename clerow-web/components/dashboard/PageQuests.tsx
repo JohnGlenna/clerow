@@ -6,6 +6,7 @@ import { PageHead, PageStat } from "./AppShell";
 import { Icon } from "../Icon";
 import { GameIcon, type GameIconName } from "../GameIcon";
 import { useDashboard } from "@/lib/useDashboard";
+import { playCheck } from "@/lib/sound";
 import type { DashboardData, DashboardTask } from "@/lib/types";
 
 const IMPACT_COLOR = (k: string) =>
@@ -30,6 +31,7 @@ export function PageQuests() {
     const task = local.find((t) => t.id === id);
     if (!task) return;
     const next = !task.done;
+    if (next) playCheck(); // satisfying chime only when completing
     setLocal((prev) => prev.map((t) => (t.id === id ? { ...t, done: next } : t)));
     try {
       const res = await fetch("/api/tasks", {
@@ -44,14 +46,32 @@ export function PageQuests() {
     }
   };
 
+  // Clear a completed quest from the active lists (stays done → streak + XP kept).
+  const archive = async (id: string) => {
+    const task = local.find((t) => t.id === id);
+    if (!task) return;
+    setLocal((prev) => prev.filter((t) => t.id !== id)); // optimistic
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, archived: true }),
+      });
+      if (!res.ok) throw new Error();
+      refresh();
+    } catch {
+      setLocal((prev) => [...prev, task]);
+    }
+  };
+
   const today = todayKey();
   const todays = local.filter((t) => t.forDate === today);
   const active = local.filter((t) => t.forDate !== today && !t.done);
   const completed = local.filter((t) => t.forDate !== today && t.done);
 
   const xpToday = local.filter((t) => t.done && t.completedAt && t.completedAt.slice(0, 10) === today).reduce((s, t) => s + t.xp, 0);
-  const xpTotal = local.filter((t) => t.done).reduce((s, t) => s + t.xp, 0);
   const streak = data?.streak;
+  const xp = data?.xp;
 
   return (
     <>
@@ -69,7 +89,12 @@ export function PageQuests() {
         <PageStat label="XP today" value={`+${xpToday}`} sub="earned so far" hi="success" />
         <PageStat label="Streak" value={String(streak?.current ?? 0)} sub={`longest ${streak?.longest ?? 0}`} hi="warn" />
         <PageStat label="Open quests" value={String(todays.length + active.length)} sub={`${completed.length} done`} />
-        <PageStat label="Total XP" value={String(xpTotal)} sub="all-time earned" hi="accent" />
+        <PageStat
+          label="Level"
+          value={`Lv ${xp?.level ?? 1}`}
+          sub={xp ? `${xp.intoLevel}/${xp.span} to next · ${xp.total} XP` : "0 XP all-time"}
+          hi="accent"
+        />
       </div>
 
       {loading ? (
@@ -89,7 +114,7 @@ export function PageQuests() {
           ) : (
             <div className="quest-task-list">
               {todays.map((t) => (
-                <QuestRow key={t.id} task={t} onToggle={toggle} />
+                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} />
               ))}
             </div>
           )}
@@ -108,7 +133,7 @@ export function PageQuests() {
           ) : (
             <div className="quest-task-list">
               {active.map((t) => (
-                <QuestRow key={t.id} task={t} onToggle={toggle} />
+                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} />
               ))}
             </div>
           )}
@@ -127,7 +152,7 @@ export function PageQuests() {
               </h3>
               <div className="quest-task-list">
                 {completed.slice(0, 12).map((t) => (
-                  <QuestRow key={t.id} task={t} onToggle={toggle} />
+                  <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} />
                 ))}
               </div>
             </>
@@ -138,7 +163,15 @@ export function PageQuests() {
   );
 }
 
-function QuestRow({ task, onToggle }: { task: DashboardTask; onToggle: (id: string) => void }) {
+function QuestRow({
+  task,
+  onToggle,
+  onArchive,
+}: {
+  task: DashboardTask;
+  onToggle: (id: string) => void;
+  onArchive: (id: string) => void;
+}) {
   const impact = (task.meta.match(/impact:\s*([a-z ]+)/i)?.[1] ?? "medium").trim();
   return (
     <div className={`quest-row ${task.done ? "done" : ""}`}>
@@ -155,7 +188,13 @@ function QuestRow({ task, onToggle }: { task: DashboardTask; onToggle: (id: stri
       >
         {impact}
       </span>
-      <span className="xp">+{task.xp} XP</span>
+      {task.done ? (
+        <button className="btn btn--ghost btn--sm task-archive" onClick={() => onArchive(task.id)} title="Clear from your quest list">
+          Archive
+        </button>
+      ) : (
+        <span className="xp">+{task.xp} XP</span>
+      )}
     </div>
   );
 }

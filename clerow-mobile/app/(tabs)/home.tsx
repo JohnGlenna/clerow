@@ -1,61 +1,115 @@
-import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Header } from '../../components/Header';
 import { Mascot } from '../../components/Mascot';
 import { QuestRow } from '../../components/QuestRow';
 import { Screen } from '../../components/Screen';
-import { Card, CardHeader, Delta, MiniChart, ScoreRing, SectionHeader, Sstat, StreakBanner, Swatch } from '../../components/ui';
+import { Card, CardHeader, ScoreRing, SectionHeader, Sstat, StreakBanner, Swatch } from '../../components/ui';
+import { api } from '../../lib/api';
+import { useDashboard } from '../../lib/useApi';
 import { colors, font, mono } from '../../theme/tokens';
 
-const MODELS = [
-  { l: 'C', name: 'ChatGPT', sw: '#10A37F', pos: '#2', v: '62%', up: true, d: '+0.8' },
-  { l: 'A', name: 'Claude', sw: '#D97706', pos: '#3', v: '54%', up: true, d: '+0.4' },
-  { l: 'P', name: 'Perplexity', sw: '#1CB0F6', pos: '#4', v: '41%', up: false, d: '−0.2' },
-  { l: 'G', name: 'Gemini', sw: '#4285F4', pos: '#5', v: '33%', up: true, d: '+0.1' },
-];
+const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+function domainName(url?: string): string {
+  if (!url) return 'your site';
+  return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0] || 'your site';
+}
+
+function positionPct(pos: number | null): number {
+  return pos != null ? Math.max(0, 100 - (pos - 1) * 15) : 0;
+}
 
 export default function Home() {
-  const router = useRouter();
+  const { data, loading, error, refresh } = useDashboard();
+
+  if (loading && !data) {
+    return (
+      <Screen tabbed>
+        <View style={{ paddingTop: 80, alignItems: 'center' }}>
+          <ActivityIndicator color={colors.navy} />
+        </View>
+      </Screen>
+    );
+  }
+
+  const streak = data?.streak;
+  const score = data?.score;
+  const tasks = data?.tasks ?? [];
+  const models = data?.models ?? [];
+
+  const toggleTask = async (id: string, done: boolean) => {
+    try {
+      await api.patch('/api/tasks', { id, done });
+      refresh();
+    } catch {
+      /* keep optimistic row state; refresh on next load */
+    }
+  };
+
   return (
     <Screen tabbed>
-      <Header left={<Mascot size={42} />} sub="Welcome back" title="John" titleSize={23} rightIcon="bell" />
+      <Header
+        left={<Mascot size={42} />}
+        sub="Welcome back"
+        title={domainName(data?.brand?.url)}
+        titleSize={23}
+        rightIcon="bell"
+      />
 
-      <StreakBanner onDays={12} days={['M', 'T', 'W', 'T', 'F', 'S', 'S']} />
+      {error && !data ? (
+        <Card>
+          <Text style={styles.errorText}>{error}</Text>
+        </Card>
+      ) : null}
+
+      <StreakBanner onDays={streak?.current ?? 0} days={DAY_LABELS} />
 
       <Card>
         <CardHeader title="AI visibility score" />
-        <View style={{ position: 'absolute', top: 18, right: 18 }}>
-          <Delta value="+12 ↑" up />
-        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
-          <ScoreRing value={68} size={116} />
+          <ScoreRing value={score?.overall ?? 0} size={116} />
           <View style={{ flex: 1, gap: 10 }}>
-            <Sstat label="Visibility" value="66%" pct={66} color={colors.navy} />
-            <Sstat label="Position" value="#2" pct={84} color="#1CB0F6" />
-            <Sstat label="Sentiment" value="92" pct={92} color={colors.success} />
+            <Sstat label="Visibility" value={`${score?.visibility ?? 0}%`} pct={score?.visibility ?? 0} color={colors.navy} />
+            <Sstat
+              label="Position"
+              value={score?.position != null ? `#${score.position}` : '—'}
+              pct={positionPct(score?.position ?? null)}
+              color="#1CB0F6"
+            />
+            <Sstat label="Sentiment" value={score?.sentiment != null ? `${score.sentiment}` : '—'} pct={score?.sentiment ?? 0} color={colors.success} />
           </View>
         </View>
-        <MiniChart data={[18, 22, 24, 28, 30, 34, 38, 42, 50, 68]} />
       </Card>
 
-      <SectionHeader title="Today's quests" hint="+185 XP today" />
-      <QuestRow title="Add FAQ schema to homepage" meta="≈ 10 min · done" xp={50} initialDone />
-      <QuestRow title="Reply to 3 Reddit threads" meta="≈ 10 min · impact: high" xp={90} />
-      <QuestRow title="Write /compare/suno page" meta="≈ 45 min · very high" xp={200} />
+      <SectionHeader title="Today's quests" hint={`${tasks.filter((t) => !t.done).length} to go`} />
+      {tasks.length === 0 ? (
+        <Card>
+          <Text style={styles.muted}>No quests yet — run a scan to generate fixes.</Text>
+        </Card>
+      ) : (
+        tasks.map((t) => (
+          <QuestRow key={t.id} title={t.title} meta={t.meta} xp={t.xp} initialDone={t.done} onToggle={(next) => toggleTask(t.id, next)} />
+        ))
+      )}
 
-      <SectionHeader title="How AI sees you" hint="4 models" />
+      <SectionHeader title="How AI sees you" hint={`${models.length} models`} />
       <Card pad0>
-        {MODELS.map((m, i) => (
-          <View key={m.name} style={[styles.row, i < MODELS.length - 1 && styles.rowBorder]}>
-            <Swatch char={m.l} color={m.sw} />
-            <Text style={styles.modelName}>{m.name}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={styles.posBadge}>
-                <Text style={{ color: '#fff', fontSize: 12, fontFamily: font.extrabold }}>{m.pos}</Text>
+        {models.map((m, i) => (
+          <View key={m.id} style={[styles.row, i < models.length - 1 && styles.rowBorder]}>
+            <Swatch char={m.letter} color={m.swatch} />
+            <Text style={styles.modelName}>{m.label}</Text>
+            {m.locked ? (
+              <Text style={styles.locked}>🔒 Upgrade</Text>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.posBadge}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontFamily: font.extrabold }}>
+                    {m.position != null ? `#${m.position}` : '—'}
+                  </Text>
+                </View>
+                <Text style={styles.mono}>{m.visibility != null ? `${m.visibility}%` : '—'}</Text>
               </View>
-              <Text style={styles.mono}>{m.v}</Text>
-              <Delta value={m.d} up={m.up} />
-            </View>
+            )}
           </View>
         ))}
       </Card>
@@ -69,4 +123,7 @@ const styles = StyleSheet.create({
   modelName: { flex: 1, fontFamily: font.bold, fontSize: 14, color: colors.ink },
   posBadge: { backgroundColor: colors.ink, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 7 },
   mono: { fontFamily: mono, fontWeight: '800', fontSize: 13, color: colors.ink },
+  locked: { fontFamily: font.extrabold, fontSize: 13, color: colors.ink3 },
+  muted: { fontFamily: font.semibold, fontSize: 14, color: colors.ink2 },
+  errorText: { fontFamily: font.semibold, fontSize: 14, color: colors.danger },
 });

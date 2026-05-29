@@ -6,6 +6,8 @@ import { Header } from '../../components/Header';
 import { Icon } from '../../components/icons';
 import { Screen } from '../../components/Screen';
 import { Card, SectionHeader } from '../../components/ui';
+import { useAuth } from '../../lib/auth';
+import { useDashboard } from '../../lib/useApi';
 import { colors, font } from '../../theme/tokens';
 
 type MedalType = 'gold' | 'silver' | 'bronze' | 'locked';
@@ -54,8 +56,27 @@ function PrefRow({ ico, t, detail, danger, last, onPress }: { ico: ReactNode; t:
   );
 }
 
+function domainName(url?: string): string {
+  if (!url) return '';
+  return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0] || '';
+}
+
 export default function You() {
   const router = useRouter();
+  const { signOut } = useAuth();
+  const { data } = useDashboard();
+
+  const company = data?.brand?.company?.trim();
+  const domain = domainName(data?.brand?.url);
+  const name = company || domain || 'Your brand';
+  const streak = data?.streak;
+  const doneCount = (data?.tasks ?? []).filter((t) => t.done).length;
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace('/');
+  };
+
   return (
     <Screen tabbed>
       <Header title="You" rightIcon="settings" />
@@ -63,41 +84,40 @@ export default function You() {
       <Card style={{ alignItems: 'center' }}>
         <View style={{ position: 'relative', marginBottom: 10 }}>
           <View style={styles.avatar}>
-            <Text style={{ color: '#fff', fontFamily: font.black, fontSize: 30 }}>J</Text>
+            <Text style={{ color: '#fff', fontFamily: font.black, fontSize: 30 }}>{name[0]?.toUpperCase() ?? '?'}</Text>
           </View>
         </View>
-        <Text style={{ fontFamily: font.black, fontSize: 20, color: colors.ink }}>John Solbakken</Text>
-        <Text style={{ fontFamily: font.semibold, fontSize: 13, color: colors.ink2 }}>warbls.com</Text>
+        <Text style={{ fontFamily: font.black, fontSize: 20, color: colors.ink }}>{name}</Text>
+        {domain ? <Text style={{ fontFamily: font.semibold, fontSize: 13, color: colors.ink2 }}>{domain}</Text> : null}
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 26, marginTop: 16 }}>
-          <Pstat n="7,402" l="XP" />
-          <Pstat n="🔥 12" l="Streak" />
-          <Pstat n="5" l="Badges" />
+          <Pstat n={`🔥 ${streak?.current ?? 0}`} l="Streak" />
+          <Pstat n={`${doneCount}`} l="Done" />
+          <Pstat n={`❄️ ${streak?.freezes ?? 0}`} l="Freezes" />
         </View>
       </Card>
 
-      <SectionHeader title="Achievements" hint="5 of 24" />
+      <SectionHeader title="Achievements" hint="coming soon" />
       <Card>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Medal t="gold" ico="🏆" nm="First cite" />
-          <Medal t="silver" ico="📜" nm="Schema" />
-          <Medal t="bronze" ico="⚡" nm="Quick fix" />
-          <Medal t="gold" ico="📈" nm="Trending" />
+          <Medal t={(streak?.current ?? 0) >= 1 ? 'gold' : 'locked'} ico={(streak?.current ?? 0) >= 1 ? '🔥' : '🔒'} nm="Streak" />
+          <Medal t={doneCount >= 1 ? 'silver' : 'locked'} ico={doneCount >= 1 ? '✅' : '🔒'} nm="First fix" />
+          <Medal t={data?.hasScan ? 'bronze' : 'locked'} ico={data?.hasScan ? '🔎' : '🔒'} nm="Scanned" />
+          <Medal t="locked" ico="🔒" nm="Top 3" />
           <Medal t="locked" ico="🔒" nm="30 days" />
         </View>
       </Card>
 
       <SectionHeader title="More insights" />
       <Card pad0>
-        <PrefRow ico={<Text style={{ fontSize: 18 }}>🔎</Text>} t="Sources" detail="12 tracked" onPress={() => router.push('/sources')} />
-        <PrefRow ico={<Text style={{ fontSize: 18 }}>🤖</Text>} t="AI Models" detail="3 of 5" onPress={() => router.push('/models')} />
-        <PrefRow ico={<Text style={{ fontSize: 18 }}>📊</Text>} t="Reports" detail="Weekly" last onPress={() => router.push('/reports')} />
+        <PrefRow ico={<Text style={{ fontSize: 18 }}>🔎</Text>} t="Sources" onPress={() => router.push('/sources')} />
+        <PrefRow ico={<Text style={{ fontSize: 18 }}>🤖</Text>} t="AI Models" onPress={() => router.push('/models')} />
+        <PrefRow ico={<Text style={{ fontSize: 18 }}>📊</Text>} t="Reports" last onPress={() => router.push('/reports')} />
       </Card>
 
       <Card pad0>
-        <PrefRow ico={<Text style={{ fontSize: 18 }}>💎</Text>} t="Your plan" detail="Founder" onPress={() => router.push('/paywall')} />
-        <PrefRow ico={<Text style={{ fontSize: 18 }}>🔔</Text>} t="Notifications" detail="On" />
-        <PrefRow ico={<Text style={{ fontSize: 18 }}>🌐</Text>} t="Domain" detail="warbls.com" />
-        <PrefRow ico={<Text style={{ fontSize: 18 }}>↩︎</Text>} t="Sign out" danger last onPress={() => router.replace('/auth')} />
+        <PrefRow ico={<Text style={{ fontSize: 18 }}>💎</Text>} t="Your plan" onPress={() => router.push('/paywall')} />
+        <PrefRow ico={<Text style={{ fontSize: 18 }}>🌐</Text>} t="Domain" detail={domain} />
+        <PrefRow ico={<Text style={{ fontSize: 18 }}>↩︎</Text>} t="Sign out" danger last onPress={handleSignOut} />
       </Card>
     </Screen>
   );

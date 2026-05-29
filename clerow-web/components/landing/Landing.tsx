@@ -54,11 +54,6 @@ function LandingHero() {
   return (
     <section className="hero-c">
       <div className="shell">
-        <div className="hero-c-pill">
-          <span className="dot" />
-          Building in public from Kristiansand <span className="flag">🇳🇴</span>
-        </div>
-
         <div className="hero-c-headline">
           <h1 className="h1 hero-c-h1">
             When AI gets asked about your market, <em>does it name you?</em>

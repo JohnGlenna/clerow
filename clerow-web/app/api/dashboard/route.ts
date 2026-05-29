@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ENGINES, type EngineId } from "@/lib/engines";
-import { loadBrandSnapshot, captureDailySnapshot } from "@/lib/scan/snapshot";
+import { loadBrandSnapshot, captureDailySnapshot, loadSnapshotHistory } from "@/lib/scan/snapshot";
 import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/streak";
 import { ensureDailyQuests, type DailySignals } from "@/lib/dailyTasks";
+import { levelFromXp } from "@/lib/xp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,10 +97,12 @@ export async function GET(req: Request) {
 
   if (!scan) {
     const streak = await evalAndPersistStreak(tasks ?? []);
+    const xp = levelFromXp((tasks ?? []).reduce((sum, t) => sum + (t.done ? t.xp : 0), 0));
     return NextResponse.json({
       hasScan: false,
       brand: brandHead,
       streak,
+      xp,
       prompts: (prompts ?? []).map((p) => ({
         id: p.id,
         text: p.text,
@@ -152,12 +155,27 @@ export async function GET(req: Request) {
 
   const streak = await evalAndPersistStreak(allTasks);
 
-  // "Today's quests" first (most recent daily quests up top), then the rest.
-  const orderedTasks = [...allTasks].sort((a, b) => {
-    const ad = a.for_date === today ? 0 : 1;
-    const bd = b.for_date === today ? 0 : 1;
-    return ad - bd;
-  });
+  // Lifetime XP = every completed quest's XP, including archived ones (archiving
+  // clears a quest from the active lists but must never cost the user XP). The
+  // always-up counter that pairs with the resettable streak.
+  const totalXp = allTasks.reduce((sum, t) => sum + (t.done ? t.xp : 0), 0);
+  const xp = levelFromXp(totalXp);
+
+  // Score movement vs the previous daily snapshot, for the Overview score card.
+  const history = await loadSnapshotHistory(supabase, brand.id, 7);
+  const trend = {
+    delta: history.length >= 2 ? history[history.length - 1].overall - history[history.length - 2].overall : null,
+    sparkline: history.map((h) => h.overall),
+  };
+
+  // Active lists exclude archived quests; "Today's quests" first, then the rest.
+  const orderedTasks = allTasks
+    .filter((t) => !t.archived)
+    .sort((a, b) => {
+      const ad = a.for_date === today ? 0 : 1;
+      const bd = b.for_date === today ? 0 : 1;
+      return ad - bd;
+    });
 
   return NextResponse.json({
     hasScan: true,
@@ -167,6 +185,8 @@ export async function GET(req: Request) {
     primaryPrompt: snapshot.primaryPromptText,
     score: snapshot.score,
     streak,
+    xp,
+    trend,
     models: snapshot.engines.map((m) => ({
       id: m.id,
       label: m.label,

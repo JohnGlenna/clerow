@@ -1,17 +1,19 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { Mascot } from '../../components/Mascot';
 import { Screen } from '../../components/Screen';
+import { Button } from '../../components/ui';
+import { api } from '../../lib/api';
+import type { DiscoverResponse, RunResponse } from '../../lib/types';
 import { colors, font } from '../../theme/tokens';
 
-type TaskState = 'done' | 'active' | 'pending';
-const TASKS: { l: string; s: TaskState }[] = [
-  { l: 'Reading warbls.com', s: 'done' },
-  { l: 'Discovering buyer prompts', s: 'done' },
-  { l: 'Querying ChatGPT, Claude, Perplexity', s: 'active' },
-  { l: 'Mapping competitors', s: 'pending' },
-  { l: 'Scoring your visibility', s: 'pending' },
+const STEPS = [
+  'Reading your site',
+  'Discovering buyer prompts',
+  'Querying the AI engines',
+  'Mapping competitors',
+  'Scoring your visibility',
 ];
 
 function useSpin(durationMs: number, reverse = false) {
@@ -26,16 +28,38 @@ function useSpin(durationMs: number, reverse = false) {
 
 export default function Scanning() {
   const router = useRouter();
+  const { brandId } = useLocalSearchParams<{ brandId: string }>();
   const spin1 = useSpin(8000);
   const spin2 = useSpin(5000, true);
 
-  // The only wait in the flow — auto-advance to the free results.
-  useFocusEffect(
-    useCallback(() => {
-      const t = setTimeout(() => router.replace('/scan/results'), 3600);
-      return () => clearTimeout(t);
-    }, [router]),
-  );
+  const [progress, setProgress] = useState(0); // index of the active step
+  const [error, setError] = useState<string | null>(null);
+  const started = useRef(false);
+
+  const run = async () => {
+    if (!brandId) {
+      setError('Missing brand — go back and try again.');
+      return;
+    }
+    setError(null);
+    try {
+      setProgress(1);
+      await api.post<DiscoverResponse>('/api/scan/discover', { brandId });
+      setProgress(2);
+      await api.post<RunResponse>('/api/scan/run', { brandId });
+      setProgress(STEPS.length);
+      router.replace('/scan/results');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The scan failed. Try again.');
+    }
+  };
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Screen variant="white" scroll={false} topPad={64}>
@@ -47,27 +71,44 @@ export default function Scanning() {
           <Mascot size={64} />
         </View>
       </View>
-      <Text style={styles.h1}>Scanning the AI…</Text>
-      <Text style={styles.body}>This is the only time you'll wait. Future scans run in the background.</Text>
-      <View>
-        {TASKS.map((t, i) => (
-          <View key={i} style={[styles.task, t.s === 'pending' && { opacity: 0.55 }]}>
-            <View
-              style={[
-                styles.tick,
-                t.s === 'done' && { backgroundColor: colors.success },
-                t.s === 'active' && { backgroundColor: colors.navy },
-                t.s === 'pending' && { backgroundColor: colors.line },
-              ]}
-            >
-              <Text style={{ color: '#fff', fontSize: 12, fontFamily: font.bold }}>
-                {t.s === 'done' ? '✓' : t.s === 'active' ? '•' : ''}
-              </Text>
-            </View>
-            <Text style={[styles.taskLabel, t.s === 'pending' && { color: colors.ink3 }]}>{t.l}</Text>
+
+      {error ? (
+        <>
+          <Text style={styles.h1}>Scan failed</Text>
+          <Text style={styles.body}>{error}</Text>
+          <View style={{ gap: 10, marginTop: 8 }}>
+            <Button title="Try again" size="lg" onPress={() => { started.current = true; run(); }} />
+            <Button title="Back" variant="ghost" size="lg" onPress={() => router.back()} />
           </View>
-        ))}
-      </View>
+        </>
+      ) : (
+        <>
+          <Text style={styles.h1}>Scanning the AI…</Text>
+          <Text style={styles.body}>This is the only time you&apos;ll wait. Future scans run in the background.</Text>
+          <View>
+            {STEPS.map((label, i) => {
+              const state = i < progress ? 'done' : i === progress ? 'active' : 'pending';
+              return (
+                <View key={i} style={[styles.task, state === 'pending' && { opacity: 0.55 }]}>
+                  <View
+                    style={[
+                      styles.tick,
+                      state === 'done' && { backgroundColor: colors.success },
+                      state === 'active' && { backgroundColor: colors.navy },
+                      state === 'pending' && { backgroundColor: colors.line },
+                    ]}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 12, fontFamily: font.bold }}>
+                      {state === 'done' ? '✓' : state === 'active' ? '•' : ''}
+                    </Text>
+                  </View>
+                  <Text style={[styles.taskLabel, state === 'pending' && { color: colors.ink3 }]}>{label}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
     </Screen>
   );
 }

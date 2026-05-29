@@ -98,6 +98,7 @@ export type DashboardTask = {
   meta: string;
   xp: number;
   done: boolean;
+  archived?: boolean;
   forDate?: string | null;
   completedAt?: string | null;
 };
@@ -108,6 +109,23 @@ export type DashboardStreak = {
   longest: number;
   freezes: number;
   activeToday: boolean;
+};
+
+// Lifetime XP → level, derived server-side from completed quests. The always-up
+// accumulation counter that pairs with the (resettable) streak. See lib/xp.ts.
+export type DashboardXp = {
+  total: number;
+  level: number;
+  intoLevel: number; // XP within the current level
+  span: number; // XP the current level spans
+  pct: number; // 0–100 progress to the next level
+  title: string;
+};
+
+// Score movement vs the previous daily snapshot, for the Overview score card.
+export type DashboardTrend = {
+  delta: number | null; // overall-score change vs the prior snapshot (null if <2 points)
+  sparkline: number[]; // recent overall scores, oldest → newest
 };
 
 // ---- Prompt detail (GET/POST /api/prompts/[id]) ----
@@ -154,5 +172,7 @@ export type DashboardData = {
   prompts?: DashboardPrompt[];
   tasks?: DashboardTask[];
   streak?: DashboardStreak;
+  xp?: DashboardXp;
+  trend?: DashboardTrend;
   citations?: { url: string; title: string }[];
 };

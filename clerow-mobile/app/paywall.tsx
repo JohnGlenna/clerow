@@ -2,20 +2,41 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as WebBrowser from 'expo-web-browser';
 import { MascotStatic } from '../components/Mascot';
 import { Button } from '../components/ui';
+import { api } from '../lib/api';
 import { colors, font } from '../theme/tokens';
 
+// `plan` values match clerow-web's billing checkout (founder | team | enterprise).
 const PLANS = [
-  { name: 'Founder', desc: 'For solo founders', price: 29 },
-  { name: 'Marketing', desc: 'Teams up to 5 seats', price: 89, tag: 'Popular' },
-  { name: 'Enterprise', desc: 'Unlimited seats', price: 249 },
+  { name: 'Founder', plan: 'founder', desc: 'For solo founders', price: 29 },
+  { name: 'Marketing', plan: 'team', desc: 'Teams up to 5 seats', price: 89, tag: 'Popular' },
+  { name: 'Enterprise', plan: 'enterprise', desc: 'Unlimited seats', price: 249 },
 ];
 
 export default function Paywall() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Stripe Checkout is a hosted web page — open it in an in-app browser.
+  const checkout = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { url } = await api.post<{ url: string }>('/api/billing/checkout', { plan: PLANS[selected].plan });
+      await WebBrowser.openBrowserAsync(url);
+      router.back();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start checkout.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -53,8 +74,9 @@ export default function Paywall() {
         })}
 
         <View style={{ marginTop: 8 }}>
-          <Button title={`Get ${PLANS[selected].name} plan`} size="lg" onPress={() => router.back()} />
+          <Button title={busy ? 'Opening checkout…' : `Get ${PLANS[selected].name} plan`} size="lg" onPress={checkout} />
         </View>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
         <Text style={styles.legal}>Cancel anytime · billed monthly</Text>
       </View>
     </View>
@@ -79,5 +101,6 @@ const styles = StyleSheet.create({
   planDesc: { fontFamily: font.semibold, fontSize: 12, color: colors.ink2 },
   planPrice: { fontFamily: font.black, fontSize: 18, color: colors.ink },
   planPer: { fontFamily: font.bold, fontSize: 11, color: colors.ink3 },
+  error: { fontSize: 12, color: colors.danger, textAlign: 'center', fontFamily: font.semibold, marginTop: 10 },
   legal: { fontSize: 11, color: colors.ink3, textAlign: 'center', fontFamily: font.semibold, marginTop: 14 },
 });
