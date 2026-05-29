@@ -77,12 +77,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const engineIds = engine ? [engine] : allowed;
 
   // Cost guards. (1) Don't let a second scan start while one is in flight —
-  // stops double-clicks and concurrent spam.
+  // stops double-clicks and concurrent spam. Only count *recent* running scans
+  // (this prompt-scan caps at maxDuration=120s) so a row left stuck on a function
+  // timeout can't lock the brand out forever.
+  const inFlightSince = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const { count: running } = await supabase
     .from("scans")
     .select("id", { count: "exact", head: true })
     .eq("brand_id", brandId)
-    .eq("status", "running");
+    .eq("status", "running")
+    .gte("started_at", inFlightSince);
   if (running && running > 0) {
     return NextResponse.json({ error: "A scan is already running — give it a moment." }, { status: 429 });
   }
