@@ -14,6 +14,14 @@ import type {
   DashboardTask,
 } from "@/lib/types";
 
+// "https://example.com/path" → "example.com" — the greeting uses the bare domain
+// so it matches the site the user connected, not the enriched/guessed company name.
+function domainName(url?: string): string | undefined {
+  if (!url) return undefined;
+  const host = url.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].trim();
+  return host || undefined;
+}
+
 export function PageOverview() {
   const router = useRouter();
   const navigate = (k: string) =>
@@ -55,7 +63,7 @@ export function PageOverview() {
 
       {!loading && data && data.hasScan && (
         <>
-          <AppHello company={data.brand?.company ?? "founder"} />
+          <AppHello company={domainName(data.brand?.url) ?? "founder"} />
           <div className="app-grid">
             <ScoreCard score={data.score} />
             <TasksCard tasks={data.tasks ?? []} onNavigate={navigate} />

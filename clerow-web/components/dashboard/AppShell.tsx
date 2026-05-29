@@ -34,11 +34,15 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { subscription } = useSubscription();
+  const { subscription, loading } = useSubscription();
   const subscribed = subscription?.subscribed ?? null;
-  // Lock paid pages only once we know the user is NOT subscribed — avoids
-  // flashing the paywall to a paying user while their status is still loading.
-  const isLocked = page !== "overview" && subscribed === false;
+  const paid = page !== "overview";
+  // Cover a paid page until we POSITIVELY confirm the user is subscribed. While
+  // status is still loading we show a neutral blur cover (no paywall card) so a
+  // paying user never sees the paywall flash; the full card appears only once we
+  // know they're unsubscribed. This also stops the paid content from flashing
+  // unblurred for ~0.2s before the paywall mounts.
+  const showCover = paid && subscribed !== true;
 
   const navigate = (k: NavKey) =>
     router.push(k === "overview" ? "/dashboard" : `/dashboard/${k}`);
@@ -59,7 +63,7 @@ export function AppShell({
       />
       <main className="app-main" style={{ position: "relative" }}>
         {children}
-        {isLocked && <PaywallOverlay page={page} onNavigate={navigate} />}
+        {showCover && <PaywallOverlay page={page} loading={loading} onNavigate={navigate} />}
       </main>
     </div>
   );
@@ -178,11 +182,18 @@ function AppSidebar({
 
 function PaywallOverlay({
   page,
+  loading,
   onNavigate,
 }: {
   page: NavKey;
+  loading?: boolean;
   onNavigate: (k: NavKey) => void;
 }) {
+  // While billing status is still loading, render the blur cover only — no card.
+  // This hides the paid content immediately without flashing the paywall at a
+  // user who may turn out to be subscribed.
+  if (loading) return <div className="paywall" aria-hidden />;
+
   const pages: Record<string, { title: string; desc: string; icon: GameIconName }> = {
     prompts:     { title: "Unlock Prompts",     desc: "See all 42 prompts your customers ask AI — every model, every position, with quest hooks to start winning.", icon: "target" },
     sources:     { title: "Unlock Sources",     desc: "See which Reddit threads, G2 listings, and YouTube channels AI cites — and which ones your rivals own.", icon: "world" },
