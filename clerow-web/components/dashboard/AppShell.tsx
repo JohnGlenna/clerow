@@ -1,9 +1,11 @@
 "use client";
 
 import React from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Icon } from "../Icon";
+import { GameIcon, type GameIconName } from "../GameIcon";
 import { MascotClerow } from "../Mascot";
+import { useSubscription, startCheckout, openBillingPortal } from "@/lib/useSubscription";
 
 type NavKey =
   | "overview"
@@ -24,8 +26,6 @@ const NAV: { i: Parameters<typeof Icon>[0]["name"]; l: string; k: NavKey; lock?:
   { i: "bar",    l: "Reports",     k: "reports",     lock: true },
 ];
 
-const FREEMIUM = true;
-
 export function AppShell({
   page,
   children,
@@ -34,14 +34,29 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const isLocked = FREEMIUM && page !== "overview";
+  const { subscription } = useSubscription();
+  const subscribed = subscription?.subscribed ?? null;
+  // Lock paid pages only once we know the user is NOT subscribed — avoids
+  // flashing the paywall to a paying user while their status is still loading.
+  const isLocked = page !== "overview" && subscribed === false;
 
   const navigate = (k: NavKey) =>
     router.push(k === "overview" ? "/dashboard" : `/dashboard/${k}`);
 
+  const manageBilling = async () => {
+    const opened = await openBillingPortal();
+    if (!opened) navigate("prompts"); // no billing account yet → surface the paywall
+  };
+
   return (
     <div className="app-shell">
-      <AppSidebar page={page} onNavigate={navigate} onSignOut={() => router.push("/")} />
+      <AppSidebar
+        page={page}
+        subscribed={subscribed === true}
+        onNavigate={navigate}
+        onManageBilling={manageBilling}
+        onSignOut={() => router.push("/")}
+      />
       <main className="app-main" style={{ position: "relative" }}>
         {children}
         {isLocked && <PaywallOverlay page={page} onNavigate={navigate} />}
@@ -52,11 +67,15 @@ export function AppShell({
 
 function AppSidebar({
   page,
+  subscribed,
   onNavigate,
+  onManageBilling,
   onSignOut,
 }: {
   page: NavKey;
+  subscribed: boolean;
   onNavigate: (k: NavKey) => void;
+  onManageBilling: () => void;
   onSignOut: () => void;
 }) {
   const bottom: { i: Parameters<typeof Icon>[0]["name"]; l: string }[] = [
@@ -93,13 +112,27 @@ function AppSidebar({
               <Icon name={n.i} size={16} />
             </span>
             <span style={{ flex: 1 }}>{n.l}</span>
-            {FREEMIUM && n.lock && <span className="nav-lock">🔒</span>}
+            {!subscribed && n.lock && (
+              <span className="nav-lock"><GameIcon name="locked" size={13} /></span>
+            )}
           </a>
         ))}
       </div>
 
       <div className="app-nav" style={{ marginTop: -8 }}>
         <div className="app-side-label">Account</div>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            onManageBilling();
+          }}
+        >
+          <span className="ico">
+            <Icon name="tag" size={16} />
+          </span>
+          <span>{subscribed ? "Billing" : "Upgrade"}</span>
+        </a>
         {bottom.map((n) => (
           <a key={n.l} href="#">
             <span className="ico">
@@ -125,7 +158,7 @@ function AppSidebar({
 
       <div className="app-side-bottom">
         <div className="row">
-          <span className="lvl">⚡ Level 7</span>
+          <span className="lvl"><GameIcon name="bolt" size={14} color="#F59E0B" /> Level 7</span>
           <span className="xp">740 / 1000</span>
         </div>
         <div className="bar">
@@ -150,33 +183,48 @@ function PaywallOverlay({
   page: NavKey;
   onNavigate: (k: NavKey) => void;
 }) {
-  const pages: Record<string, { title: string; desc: string; icon: string }> = {
-    prompts:     { title: "Unlock Prompts",     desc: "See all 42 prompts your customers ask AI — every model, every position, with quest hooks to start winning.", icon: "🎯" },
-    sources:     { title: "Unlock Sources",     desc: "See which Reddit threads, G2 listings, and YouTube channels AI cites — and which ones your rivals own.", icon: "🌐" },
-    models:      { title: "Unlock AI Models",   desc: "Track ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews — and learn how each one sources answers.", icon: "🤖" },
-    quests:      { title: "Unlock Quests",      desc: "Your daily playbook to climb. Concrete steps with XP, streaks, and one-click 'how to' instructions.", icon: "⚔️" },
-    leaderboard: { title: "Unlock Leaderboard", desc: "Race your category — and 3,140 other Clerow founders. Track gap-to-next, defenders, and weekly climbers.", icon: "🏆" },
-    reports:     { title: "Unlock Reports",     desc: "Auto-generated weekly summaries. Clerow Wrapped share cards for X. White-label client reports on Team.", icon: "📊" },
+  const pages: Record<string, { title: string; desc: string; icon: GameIconName }> = {
+    prompts:     { title: "Unlock Prompts",     desc: "See all 42 prompts your customers ask AI — every model, every position, with quest hooks to start winning.", icon: "target" },
+    sources:     { title: "Unlock Sources",     desc: "See which Reddit threads, G2 listings, and YouTube channels AI cites — and which ones your rivals own.", icon: "world" },
+    models:      { title: "Unlock AI Models",   desc: "Track ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews — and learn how each one sources answers.", icon: "brain" },
+    quests:      { title: "Unlock Quests",      desc: "Your daily playbook to climb. Concrete steps with XP, streaks, and one-click 'how to' instructions.", icon: "swords" },
+    leaderboard: { title: "Unlock Leaderboard", desc: "Race your category — and 3,140 other Clerow founders. Track gap-to-next, defenders, and weekly climbers.", icon: "trophy" },
+    reports:     { title: "Unlock Reports",     desc: "Auto-generated weekly summaries. Clerow Wrapped share cards for X. White-label client reports on Team.", icon: "chart" },
   };
-  const p = pages[page] || { title: "Unlock this page", desc: "Pick a plan to keep going.", icon: "✨" };
+  const p = pages[page] || { title: "Unlock this page", desc: "Pick a plan to keep going.", icon: "sparkles" as GameIconName };
   return (
     <div className="paywall">
       <div className="paywall-card">
-        <span className="paywall-icon">{p.icon}</span>
+        <span className="paywall-icon"><GameIcon name={p.icon} size={40} /></span>
         <h2>{p.title}</h2>
         <p>{p.desc}</p>
 
         <div className="paywall-plans">
-          <PaywallPlan name="Founder" price={29} desc="1 domain · 3 AI models" cta="Start free" />
+          <PaywallPlan
+            name="Founder"
+            price={29}
+            desc="1 domain · 3 AI models"
+            cta="Subscribe"
+            onCta={() => startCheckout("founder")}
+          />
           <PaywallPlan
             name="Marketing Team"
             price={89}
             desc="1 domain · 5 seats · all models"
-            cta="Start free"
+            cta="Subscribe"
             tag="Most popular"
             featured
+            onCta={() => startCheckout("team")}
           />
-          <PaywallPlan name="Enterprise" price={249} desc="1 domain · unlimited seats" cta="Talk to sales" />
+          <PaywallPlan
+            name="Enterprise"
+            price={249}
+            desc="1 domain · unlimited seats"
+            cta="Talk to sales"
+            onCta={() => {
+              window.location.href = "mailto:sales@clerow.com?subject=Clerow%20Enterprise";
+            }}
+          />
         </div>
 
         <div className="paywall-foot">
@@ -199,6 +247,7 @@ function PaywallPlan({
   cta,
   featured,
   tag,
+  onCta,
 }: {
   name: string;
   price: number;
@@ -206,10 +255,15 @@ function PaywallPlan({
   cta: string;
   featured?: boolean;
   tag?: string;
+  onCta?: () => void;
 }) {
   return (
     <div className={`pw-plan ${featured ? "pw-plan--featured" : ""}`}>
-      {tag && <span className="pw-tag">⭐ {tag}</span>}
+      {tag && (
+        <span className="pw-tag">
+          <GameIcon name="star" size={12} /> {tag}
+        </span>
+      )}
       <div className="pw-name">{name}</div>
       <div className="pw-price">
         <span className="cur">$</span>
@@ -217,7 +271,7 @@ function PaywallPlan({
         <span className="per">/mo</span>
       </div>
       <div className="pw-desc">{desc}</div>
-      <button className={`btn btn--${featured ? "primary" : "ghost"} btn--sm btn--full`}>
+      <button className={`btn btn--${featured ? "primary" : "ghost"} btn--sm btn--full`} onClick={onCta}>
         {cta}
       </button>
     </div>

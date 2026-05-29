@@ -2,30 +2,34 @@
 
 import React from "react";
 import { PageHead, PageStat } from "./AppShell";
+import { GameIcon, type GameIconName } from "../GameIcon";
 
 export function PageQuests() {
   const [open, setOpen] = React.useState<Record<string, boolean>>({});
   const toggle = (k: string) => setOpen({ ...open, [k]: !open[k] });
 
-  const daily = [
-    { id: "d1", title: "Re-scan your domain", time: "1 min", impact: "low", xp: 15, ico: "🔄",
+  const daily: { id: string; title: string; time: string; impact: string; xp: number; ico: GameIconName; steps: string[] }[] = [
+    { id: "d1", title: "Re-scan your domain", time: "1 min", impact: "low", xp: 15, ico: "cycle",
       steps: ["Click 'Re-scan now' on Overview", "Confirms today's streak ✓"] },
-    { id: "d2", title: "Review 1 source recommendation", time: "5 min", impact: "medium", xp: 25, ico: "🔎",
+    { id: "d2", title: "Review 1 source recommendation", time: "5 min", impact: "medium", xp: 25, ico: "search",
       steps: ["Open Sources page", "Pick a row marked 'gap'", "Skim the 'Why it matters' note"] },
-    { id: "d3", title: "Answer 1 thread on Reddit (r/projectmanagement)", time: "10 min", impact: "high", xp: 60, ico: "💬",
+    { id: "d3", title: "Answer 1 thread on Reddit (r/projectmanagement)", time: "10 min", impact: "high", xp: 60, ico: "chat",
       steps: ["Pick a thread from your prompt watchlist", "Reply with substance — no link drops", "Add your domain to your profile bio"] },
-    { id: "d4", title: "Post 1 LinkedIn update about a customer win", time: "8 min", impact: "medium", xp: 35, ico: "📣",
+    { id: "d4", title: "Post 1 LinkedIn update about a customer win", time: "8 min", impact: "medium", xp: 35, ico: "megaphone",
       steps: ["Pick a recent customer story", "Use this brief →", "Tag the customer's company"] },
-    { id: "d5", title: "Check yesterday's position changes", time: "2 min", impact: "low", xp: 10, ico: "📈",
+    { id: "d5", title: "Check yesterday's position changes", time: "2 min", impact: "low", xp: 10, ico: "chart",
       steps: ["Open Overview → 'How each AI sees you'", "Note any movement", "Done"] },
   ];
 
-  const active = [
+  const active: {
+    id: string; title: string; sub: string; done: number; total: number;
+    xp: number; ico: GameIconName; impact: string; time: string; why: string; steps: string[];
+  }[] = [
     {
       id: "a1",
       title: "Win the comparison-page prompts",
       sub: "Linear vs Jira, Linear vs Asana, Linear vs Notion",
-      done: 2, total: 5, xp: 240, ico: "🥊",
+      done: 2, total: 5, xp: 240, ico: "boxing",
       impact: "very high", time: "2–3 weeks",
       why: "Comparison pages drive 38% of your category's AI citations. You currently rank for 2 of 5.",
       steps: [
@@ -40,7 +44,7 @@ export function PageQuests() {
       id: "a2",
       title: "Get cited on G2 + Capterra",
       sub: "You're missing from both — your top 2 rivals dominate them",
-      done: 0, total: 4, xp: 320, ico: "🏢",
+      done: 0, total: 4, xp: 320, ico: "office",
       impact: "very high", time: "1 week",
       why: "ChatGPT pulls comparison phrasing directly from G2. Each new listing typically adds 6–10 visibility points.",
       steps: [
@@ -54,7 +58,7 @@ export function PageQuests() {
       id: "a3",
       title: "Ship the Reddit citation playbook",
       sub: "Show up in 3 high-signal threads per week",
-      done: 1, total: 3, xp: 180, ico: "🧭",
+      done: 1, total: 3, xp: 180, ico: "compass",
       impact: "high", time: "Ongoing",
       why: "Perplexity pulls 32% of your category's citations from Reddit. Founders ignoring Reddit is a massive opportunity.",
       steps: [
@@ -67,7 +71,7 @@ export function PageQuests() {
       id: "a4",
       title: "Add Product + FAQ schema to top 10 pages",
       sub: "Currently live on 4 of 10",
-      done: 4, total: 10, xp: 200, ico: "🧱",
+      done: 4, total: 10, xp: 200, ico: "bricks",
       impact: "high", time: "3 days",
       why: "Schema gives AI models structured citations. Each page typically adds 1–3 points across all models.",
       steps: [
@@ -79,11 +83,11 @@ export function PageQuests() {
     },
   ];
 
-  const milestones = [
-    { id: "m1", title: "Reach position #1 in any model", xp: 500, progress: 0,  ico: "👑", desc: "You're currently #2 in ChatGPT. Close the gap to Jira." },
-    { id: "m2", title: "Hit visibility score of 80",     xp: 600, progress: 68, ico: "💯", desc: "You're at 68. +12 to go. Most founders take 8–12 weeks." },
-    { id: "m3", title: "30-day scan streak",             xp: 300, progress: 40, ico: "🔥", desc: "12 days in, 18 to go. Don't break the chain." },
-    { id: "m4", title: "Cited in all 5 AI models",       xp: 700, progress: 60, ico: "🌟", desc: "Cited in 3. Gemini + AI Overviews require Team plan." },
+  const milestones: { id: string; title: string; xp: number; progress: number; ico: GameIconName; desc: string }[] = [
+    { id: "m1", title: "Reach position #1 in any model", xp: 500, progress: 0,  ico: "crown",  desc: "You're currently #2 in ChatGPT. Close the gap to Jira." },
+    { id: "m2", title: "Hit visibility score of 80",     xp: 600, progress: 68, ico: "bullseye", desc: "You're at 68. +12 to go. Most founders take 8–12 weeks." },
+    { id: "m3", title: "30-day scan streak",             xp: 300, progress: 40, ico: "flame",  desc: "12 days in, 18 to go. Don't break the chain." },
+    { id: "m4", title: "Cited in all 5 AI models",       xp: 700, progress: 60, ico: "star",   desc: "Cited in 3. Gemini + AI Overviews require Team plan." },
   ];
 
   const impactColor = (k: string) =>
@@ -101,7 +105,7 @@ export function PageQuests() {
         sub="Tiny daily moves. Bigger weekly bets. Long-game milestones. This is what compounds."
         actions={
           <>
-            <span className="streak-mini">🔥 12</span>
+            <span className="streak-mini"><GameIcon name="flame" size={15} color="#F59E0B" /> 12</span>
             <button className="btn btn--ghost btn--sm">Filter</button>
           </>
         }
@@ -115,14 +119,14 @@ export function PageQuests() {
       </div>
 
       <h3 className="quest-section-h">
-        <span>📆 Today&apos;s quests</span>
+        <span><GameIcon name="calendar" size={18} /> Today&apos;s quests</span>
         <span className="quest-section-sub">refreshes 09:00 · 0/{daily.length} complete</span>
       </h3>
       <div className="quest-daily-grid">
         {daily.map((q) => (
           <div key={q.id} className="quest-daily">
             <div className="qd-head">
-              <span className="qd-ico">{q.ico}</span>
+              <span className="qd-ico"><GameIcon name={q.ico} size={22} /></span>
               <span
                 className={`qd-impact qd-impact--${q.impact.replace(" ", "-")}`}
                 style={{
@@ -151,7 +155,7 @@ export function PageQuests() {
       </div>
 
       <h3 className="quest-section-h">
-        <span>🎯 Active quests</span>
+        <span><GameIcon name="target" size={18} /> Active quests</span>
         <span className="quest-section-sub">multi-step · this is what moves your score</span>
       </h3>
       <div className="quest-active-grid">
@@ -160,7 +164,7 @@ export function PageQuests() {
           return (
             <div key={q.id} className="quest-active">
               <div className="qa-head">
-                <span className="qa-ico">{q.ico}</span>
+                <span className="qa-ico"><GameIcon name={q.ico} size={24} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <h4 className="qa-title">{q.title}</h4>
                   <div className="qa-sub">{q.sub}</div>
@@ -211,14 +215,14 @@ export function PageQuests() {
       </div>
 
       <h3 className="quest-section-h">
-        <span>🏔️ Milestones</span>
+        <span><GameIcon name="mountain" size={18} /> Milestones</span>
         <span className="quest-section-sub">rare, big XP · what veterans chase</span>
       </h3>
       <div className="milestones-grid">
         {milestones.map((m) => (
           <div key={m.id} className="milestone">
             <div className="ms-head">
-              <span className="ms-ico">{m.ico}</span>
+              <span className="ms-ico"><GameIcon name={m.ico} size={22} /></span>
               <span className="ms-xp">+{m.xp} XP</span>
             </div>
             <div className="ms-title">{m.title}</div>

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Icon } from "../Icon";
+import { GameIcon } from "../GameIcon";
 import { PageHead, PageStat } from "./AppShell";
 
 export function PageLeaderboard() {
@@ -172,7 +173,7 @@ function BoardUsers() {
   return (
     <>
       <div className="callout callout--accent">
-        <span className="callout-ico">🎮</span>
+        <span className="callout-ico"><GameIcon name="gamepad" size={22} /></span>
         <div>
           <b>You&apos;re #5 of 3,140 Clerow founders this week.</b>
           <span>
@@ -228,10 +229,10 @@ function BoardUsers() {
                 {r.url}
               </span>
               <span style={{ flex: 0.7, textAlign: "right" }} className="dt-pos">
-                ⚡ {r.lvl}
+                <GameIcon name="bolt" size={13} color="#F59E0B" /> {r.lvl}
               </span>
               <span style={{ flex: 0.7, textAlign: "right" }} className="dt-pos">
-                🔥 {r.streak}
+                <GameIcon name="flame" size={13} color="#F59E0B" /> {r.streak}
               </span>
               <span style={{ flex: 1, textAlign: "right" }} className="dt-pos">
                 {r.xp.toLocaleString()}

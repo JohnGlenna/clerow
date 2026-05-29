@@ -2,6 +2,7 @@
 
 import React from "react";
 import { MascotClerow } from "../Mascot";
+import { GameIcon, type GameIconName } from "../GameIcon";
 import { useAuthModal } from "../AuthModalProvider";
 
 export function Landing() {
@@ -222,7 +223,7 @@ function LandingExample() {
       <div className="shell">
         <div className="section-head">
           <div className="section-eyebrow">
-            <span style={{ fontSize: 14 }}>✨</span>
+            <GameIcon name="sparkles" size={16} />
             How the scan works
           </div>
           <h2 className="h2">
@@ -318,32 +319,32 @@ function LandingExample() {
 }
 
 function LandingHow() {
-  const steps = [
+  const steps: { tag: string; title: string; body: string; icon: GameIconName }[] = [
     {
       tag: "01 · Scan",
       title: "We crawl the AI",
       body: "We run hundreds of buyer prompts through ChatGPT, Claude, Perplexity, and Gemini — the exact questions your customers type.",
-      icon: "🔍",
+      icon: "search",
     },
     {
       tag: "02 · Score",
       title: "We grade your visibility",
       body: "You get one number per model and per prompt. Visibility, position, sentiment. No charts you have to interpret — just plain English.",
-      icon: "📊",
+      icon: "chart",
     },
     {
       tag: "03 · Fix",
       title: "We hand you the punch list",
       body: "Each fix is one concrete action: add this schema, write this comparison page, rewrite this paragraph. Ship it, earn XP, keep the streak.",
-      icon: "🎯",
+      icon: "target",
     },
   ];
 
-  const actions = [
-    { ico: "📝", h: "Comparison pages, written for you", p: "We draft the exact \"You vs Competitor\" pages AI models love to quote." },
-    { ico: "🔧", h: "Schema markup, copy-pasteable", p: "Product, FAQ, Organization, Review — generated for your stack, ready to ship." },
-    { ico: "🌐", h: "Get listed in AI-cited sources", p: "We find which directories, Reddit threads, and review sites the models actually read." },
-    { ico: "🧠", h: "Rewrite weak landing copy", p: "Specific lines on your site that confuse the models — with the rewrite, side-by-side." },
+  const actions: { ico: GameIconName; h: string; p: string }[] = [
+    { ico: "quill", h: "Comparison pages, written for you", p: "We draft the exact \"You vs Competitor\" pages AI models love to quote." },
+    { ico: "gears", h: "Schema markup, copy-pasteable", p: "Product, FAQ, Organization, Review — generated for your stack, ready to ship." },
+    { ico: "world", h: "Get listed in AI-cited sources", p: "We find which directories, Reddit threads, and review sites the models actually read." },
+    { ico: "brain", h: "Rewrite weak landing copy", p: "Specific lines on your site that confuse the models — with the rewrite, side-by-side." },
   ];
 
   return (
@@ -351,7 +352,7 @@ function LandingHow() {
       <div className="shell">
         <div className="section-head">
           <div className="section-eyebrow">
-            <span style={{ fontSize: 14 }}>⚙️</span>
+            <GameIcon name="gears" size={16} />
             How it works
           </div>
           <h2 className="h2">
@@ -365,7 +366,7 @@ function LandingHow() {
         <div className="how-grid">
           {steps.map((s, i) => (
             <div key={i} className="how-card">
-              <span className="how-icon">{s.icon}</span>
+              <span className="how-icon"><GameIcon name={s.icon} size={32} /></span>
               <span className="how-tag">{s.tag}</span>
               <h3 className="how-title">{s.title}</h3>
               <p className="how-body">{s.body}</p>
@@ -383,7 +384,7 @@ function LandingHow() {
         <div className="how-actions">
           {actions.map((a, i) => (
             <div key={i} className="how-action">
-              <span className="how-action-ico">{a.ico}</span>
+              <span className="how-action-ico"><GameIcon name={a.ico} size={26} /></span>
               <div>
                 <h4>{a.h}</h4>
                 <p>{a.p}</p>
@@ -404,7 +405,7 @@ function LandingPricing() {
     {
       key: "founder",
       name: "Founder",
-      icon: "🦉",
+      icon: "owl" as GameIconName,
       desc: "For solo founders shipping by themselves.",
       monthly: 29,
       annual: 23,
@@ -420,7 +421,7 @@ function LandingPricing() {
     {
       key: "team",
       name: "Marketing Team",
-      icon: "🚀",
+      icon: "rocket" as GameIconName,
       desc: "For in-house marketing teams of 1–5.",
       monthly: 89,
       annual: 69,
@@ -438,7 +439,7 @@ function LandingPricing() {
     {
       key: "enterprise",
       name: "Enterprise",
-      icon: "🏛️",
+      icon: "temple" as GameIconName,
       desc: "For larger teams that need more power.",
       monthly: 249,
       annual: 199,
@@ -458,7 +459,7 @@ function LandingPricing() {
       <div className="shell">
         <div className="section-head">
           <div className="section-eyebrow">
-            <span style={{ fontSize: 14 }}>💎</span>
+            <GameIcon name="gem" size={16} />
             Pricing
           </div>
           <h2 className="h2">
@@ -483,8 +484,12 @@ function LandingPricing() {
             const price = annual ? t.annual : t.monthly;
             return (
               <div key={t.key} className="price-card">
-                {t.tag && <span className="price-tag">⭐ {t.tag}</span>}
-                <span className="price-icon">{t.icon}</span>
+                {t.tag && (
+                  <span className="price-tag">
+                    <GameIcon name="star" size={13} /> {t.tag}
+                  </span>
+                )}
+                <span className="price-icon"><GameIcon name={t.icon} size={36} /></span>
                 <h3 className="price-name">{t.name}</h3>
                 <p className="price-desc">{t.desc}</p>
                 <div className="price-amount">
@@ -654,7 +659,13 @@ function LandingFooter() {
         </div>
         <div className="footer-bottom">
           <span>© 2026 Clerow · Kristiansand, Norway</span>
-          <span>v0.5.0 · last scan 2 min ago</span>
+          <span>
+            Game icons by{" "}
+            <a href="https://game-icons.net" target="_blank" rel="noopener noreferrer">
+              game-icons.net
+            </a>{" "}
+            (CC BY 3.0) · v0.5.0
+          </span>
         </div>
       </div>
     </footer>

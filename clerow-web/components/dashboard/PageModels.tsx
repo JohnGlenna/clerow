@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "../Icon";
+import { GameIcon } from "../GameIcon";
 import { PageHead, PageStat } from "./AppShell";
 
 type Model = {
@@ -108,7 +109,7 @@ function ModelCard({ m, onNavigate }: { m: Model; onNavigate: (k: string) => voi
           </div>
         </div>
         {locked ? (
-          <span className="tier-lock">🔒 Team plan</span>
+          <span className="tier-lock"><GameIcon name="locked" size={13} /> Team plan</span>
         ) : (
           <label className="switch">
             <input type="checkbox" defaultChecked={m.tracked} />
@@ -149,12 +150,12 @@ function ModelCard({ m, onNavigate }: { m: Model; onNavigate: (k: string) => voi
       <Sparkline points={m.trend} color={m.color} locked={locked} />
 
       <div className="model-source">
-        <div className="src-label">📚 How {m.name} sources answers</div>
+        <div className="src-label"><GameIcon name="book" size={15} /> How {m.name} sources answers</div>
         <p>{m.sources}</p>
       </div>
 
       <div className="model-tip">
-        <span className="tip-ico">💡</span>
+        <span className="tip-ico"><GameIcon name="idea" size={16} color="#F59E0B" /></span>
         <span>{m.tip}</span>
       </div>
 
@@ -212,7 +213,7 @@ function UpgradeCard() {
   return (
     <div className="upgrade-card">
       <div className="upgrade-head">
-        <span style={{ fontSize: 36 }}>🚀</span>
+        <GameIcon name="rocket" size={36} />
         <h3>Unlock all 5 models</h3>
       </div>
       <p>

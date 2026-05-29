@@ -2,6 +2,14 @@
    Clerow v3 — Duolingo-clean + amber accent
    ============================================================= */
 
+/* Game-art icons (react-icons/gi, CC BY 3.0 — see CREDITS.md).
+   Nudge the baseline so glyphs sit centered next to inline text;
+   inside flex-centered icon tiles this is simply ignored. */
+.game-icon {
+  vertical-align: -0.14em;
+  flex-shrink: 0;
+}
+
 :root {
   --bg: #FFFFFF;
   --bg-soft: #F7F7F5;

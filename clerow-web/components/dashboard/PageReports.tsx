@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "../Icon";
+import { GameIcon } from "../GameIcon";
 import { MascotClerow } from "../Mascot";
 import { PageHead } from "./AppShell";
 
@@ -31,19 +32,19 @@ export function PageReports() {
       <WeeklySummary onNavigate={navigate} />
 
       <h3 className="quest-section-h">
-        <span>🌐 Public share card</span>
+        <span><GameIcon name="world" size={18} /> Public share card</span>
         <span className="quest-section-sub">Clerow Wrapped · post to X, get distribution</span>
       </h3>
       <ShareCard />
 
       <h3 className="quest-section-h">
-        <span>📁 Past reports</span>
+        <span><GameIcon name="folder" size={18} /> Past reports</span>
         <span className="quest-section-sub">12 weeks tracked</span>
       </h3>
       <PastReports />
 
       <h3 className="quest-section-h">
-        <span>🏢 White-label client reports</span>
+        <span><GameIcon name="office" size={18} /> White-label client reports</span>
         <span className="quest-section-sub">Team plan · for agencies</span>
       </h3>
       <WhiteLabelCard />
@@ -76,7 +77,7 @@ function WeeklySummary({ onNavigate }: { onNavigate: (k: string) => void }) {
 
       <div className="report-grid">
         <div className="report-block">
-          <h4>📈 Position changes</h4>
+          <h4><GameIcon name="chart" size={16} /> Position changes</h4>
           <div className="report-positions">
             {positions.map((p, i) => (
               <div key={i} className="rp-row">
@@ -95,7 +96,7 @@ function WeeklySummary({ onNavigate }: { onNavigate: (k: string) => void }) {
         </div>
 
         <div className="report-block">
-          <h4>✅ Quests shipped</h4>
+          <h4><GameIcon name="check" size={16} color="#58CC02" /> Quests shipped</h4>
           <ul className="report-list">
             <li>
               <span className="bullet bullet--success" /> FAQ schema added to homepage{" "}
@@ -119,14 +120,14 @@ function WeeklySummary({ onNavigate }: { onNavigate: (k: string) => void }) {
         </div>
 
         <div className="report-block report-block--win">
-          <h4>🏆 Biggest win</h4>
+          <h4><GameIcon name="trophy" size={16} /> Biggest win</h4>
           <p>
             <b>You overtook Asana in ChatGPT.</b> Two weeks ago you were 4th. The /compare/jira page + 5 Reddit answers did it. Asana hasn&apos;t shipped anything new in this prompt cluster for 6 weeks.
           </p>
         </div>
 
         <div className="report-block report-block--opp">
-          <h4>🎯 Biggest opportunity</h4>
+          <h4><GameIcon name="target" size={16} /> Biggest opportunity</h4>
           <p>
             <b>Get listed on G2 + Capterra.</b> Your top rival Jira pulls 22 citations from these directories. You pull 0. Estimated{" "}
             <b style={{ color: "var(--accent-2)" }}>+18 visibility points</b> within 4 weeks of listing.
@@ -137,9 +138,9 @@ function WeeklySummary({ onNavigate }: { onNavigate: (k: string) => void }) {
       <div className="report-next">
         <span className="next-label">Focus next week</span>
         <div className="next-tasks">
-          <span className="next-task">📝 Ship /compare/notion (drafted)</span>
-          <span className="next-task">🏢 Submit G2 + Capterra listings</span>
-          <span className="next-task">💬 5 Reddit replies (r/startups)</span>
+          <span className="next-task"><GameIcon name="quill" size={14} /> Ship /compare/notion (drafted)</span>
+          <span className="next-task"><GameIcon name="office" size={14} /> Submit G2 + Capterra listings</span>
+          <span className="next-task"><GameIcon name="chat" size={14} /> 5 Reddit replies (r/startups)</span>
         </div>
         <button className="btn btn--primary btn--sm" onClick={() => onNavigate("quests")}>
           Open quests <span className="arrow">→</span>
@@ -184,7 +185,7 @@ function ShareCard() {
             </div>
             <div className="share-stat-mini">
               <div className="lbl">Streak</div>
-              <div className="val">🔥 12d</div>
+              <div className="val"><GameIcon name="flame" size={15} color="#F59E0B" /> 12d</div>
             </div>
           </div>
         </div>
@@ -253,7 +254,7 @@ function WhiteLabelCard() {
   return (
     <div className="whitelabel-card">
       <div className="wl-left">
-        <span className="tier-lock">🔒 Team plan</span>
+        <span className="tier-lock"><GameIcon name="locked" size={13} /> Team plan</span>
         <h3>White-label reports for your clients.</h3>
         <p>
           Drop your agency logo and brand colors. Auto-generated weekly. Send to 10 clients in one click. Per-seat contribution breakdowns included.

@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "../Icon";
+import { GameIcon } from "../GameIcon";
 import { PageHead, PageStat } from "./AppShell";
 import { useDashboard } from "@/lib/useDashboard";
 import type { DashboardPrompt } from "@/lib/types";
@@ -163,7 +164,7 @@ function PromptsSuggested() {
   return (
     <>
       <div className="callout">
-        <span className="callout-ico">✨</span>
+        <span className="callout-ico"><GameIcon name="sparkles" size={20} color="#F59E0B" /></span>
         <div>
           <b>Expand your tracked prompts.</b>
           <span> Upgrade to run every discovered prompt across all four AI models, every day.</span>

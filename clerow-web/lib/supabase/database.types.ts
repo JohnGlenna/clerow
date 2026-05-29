@@ -252,6 +252,45 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          created_at: string
+          current_period_end: string | null
+          plan: string | null
+          price_id: string | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          plan?: string | null
+          price_id?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          plan?: string | null
+          price_id?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           brand_id: string
@@ -325,3 +364,4 @@ export type ScanTier = Database["public"]["Enums"]["scan_tier"]
 export type ScanStatus = Database["public"]["Enums"]["scan_status"]
 export type BrandSentiment = Database["public"]["Enums"]["brand_sentiment"]
 export type Citation = { url: string; title: string }
+export type SubscriptionRow = Database["public"]["Tables"]["subscriptions"]["Row"]

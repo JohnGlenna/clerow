@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "../Icon";
+import { GameIcon, type GameIconName } from "../GameIcon";
 import { MascotClerow } from "../Mascot";
 import { PageHead } from "./AppShell";
 import { useDashboard } from "@/lib/useDashboard";
@@ -110,7 +111,7 @@ function AppHello({ company }: { company: string }) {
         Welcome back, {company}.
         <small>Here&apos;s where you stand in AI search today. Let&apos;s climb. ✨</small>
       </div>
-      <div className="streak-mini">🔥 1</div>
+      <div className="streak-mini"><GameIcon name="flame" size={16} color="#F59E0B" /> 1</div>
     </div>
   );
 }
@@ -309,13 +310,13 @@ function CompetitorsCard({ competitors, onNavigate }: { competitors: DashboardCo
 }
 
 function AchievementsCard() {
-  const badges = [
-    { tier: "gold", ico: "🏆", name: "First Scan" },
-    { tier: "locked", ico: "🔒", name: "First Citation" },
-    { tier: "locked", ico: "🔒", name: "Schema Master" },
-    { tier: "locked", ico: "🔒", name: "Position #1" },
-    { tier: "locked", ico: "🔒", name: "Trending Up" },
-    { tier: "locked", ico: "🔒", name: "30-day Streak" },
+  const badges: { tier: string; ico: GameIconName; name: string }[] = [
+    { tier: "gold", ico: "trophy", name: "First Scan" },
+    { tier: "locked", ico: "locked", name: "First Citation" },
+    { tier: "locked", ico: "locked", name: "Schema Master" },
+    { tier: "locked", ico: "locked", name: "Position #1" },
+    { tier: "locked", ico: "locked", name: "Trending Up" },
+    { tier: "locked", ico: "locked", name: "30-day Streak" },
   ];
   return (
     <div className="app-card">
@@ -326,7 +327,7 @@ function AchievementsCard() {
       <div className="ach-row">
         {badges.map((b, i) => (
           <div key={i} className={`ach ${b.tier}`}>
-            <span className="medal"><span>{b.ico}</span></span>
+            <span className="medal"><GameIcon name={b.ico} size={24} /></span>
             <span className="nm">{b.name}</span>
           </div>
         ))}

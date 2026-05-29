@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "../Icon";
+import { GameIcon } from "../GameIcon";
 import { PageHead, PageStat } from "./AppShell";
 
 export function PageSources() {
@@ -58,7 +59,7 @@ export function PageSources() {
       </div>
 
       <div className="callout callout--accent">
-        <span className="callout-ico">💡</span>
+        <span className="callout-ico"><GameIcon name="idea" size={20} color="#F59E0B" /></span>
         <div>
           <b>Sources are where you go to win.</b>
           <span>
