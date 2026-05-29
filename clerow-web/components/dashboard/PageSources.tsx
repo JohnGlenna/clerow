@@ -2,9 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "../Icon";
-import { GameIcon } from "../GameIcon";
-import { PageHead, PageStat } from "./AppShell";
+import { PageHead, PageStat, GuideStrip } from "./AppShell";
 import type { SourceRow } from "@/app/api/sources/route";
 
 const TYPE_COLOR = (t: string) =>
@@ -78,19 +76,20 @@ export function PageSources() {
         <PageStat label="Top source" value={top?.domain ?? "—"} sub={top ? `${top.citedPct}% of scans` : "scan to see"} hi="accent" />
       </div>
 
-      <div className="callout callout--accent">
-        <span className="callout-ico"><GameIcon name="idea" size={20} color="#F59E0B" /></span>
-        <div>
-          <b>Sources are where you go to win.</b>
-          <span> Prompts tell you you&apos;re losing; sources tell you where to show up. Add the top gaps as quests and start earning citations.</span>
-        </div>
-      </div>
+      <GuideStrip
+        title="How to turn a source into a win"
+        steps={[
+          "Find a gap — a page AI cites, but not you",
+          "Add it as a quest",
+          "Earn the citation & climb",
+        ]}
+      />
 
       {sources == null ? (
         <div className="app-card" style={{ padding: 24 }}>Analyzing your citations…</div>
       ) : sources.length === 0 ? (
         <div className="app-card" style={{ padding: 24, textAlign: "center" }}>
-          No sources yet. Scan a prompt across your models and the pages they cite will show up here.
+          No sources yet. Open a prompt and scan it across your models — the pages they cite will show up here.
         </div>
       ) : (
         <div className="app-card" style={{ padding: 0, overflow: "hidden" }}>

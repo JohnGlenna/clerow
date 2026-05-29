@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { loadPromptDetail } from "@/lib/scan/promptDetail";
 import { runPromptScan } from "@/lib/scan/run";
+import { PAID_ENGINES, type EngineId } from "@/lib/engines";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
@@ -39,9 +40,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   return NextResponse.json(detail);
 }
 
-// POST: run a live multi-engine scan on this prompt, then return fresh detail.
+// POST: run a live scan on this prompt, then return fresh detail. Scans all
+// models by default, or a single model when the body carries `{ engine }`.
 // Paid action — gated on an active subscription.
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -55,9 +57,15 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const brandId = await resolveBrandId(supabase, user.id);
   if (!brandId) return NextResponse.json({ error: "No brand" }, { status: 400 });
 
+  // Optional single-model scan: scan just one engine when asked, else all.
+  const body = await req.json().catch(() => ({}));
+  const engine = typeof body?.engine === "string" ? (body.engine as EngineId) : null;
+  const engineIds =
+    engine && PAID_ENGINES.includes(engine) ? [engine] : undefined;
+
   const { id } = await ctx.params;
   try {
-    await runPromptScan(supabase, brandId, id);
+    await runPromptScan(supabase, brandId, id, engineIds);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Scan failed";
     return NextResponse.json({ error: message }, { status: 502 });

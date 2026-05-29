@@ -359,3 +359,34 @@ export function PageStat({
     </div>
   );
 }
+
+// A compact, always-visible "here's how to win on this page" strip. Renders a
+// numbered 1-2-3 of the next actions so a first-time user never has to guess.
+export function GuideStrip({
+  title,
+  steps,
+  icon = "idea",
+}: {
+  title: string;
+  steps: string[];
+  icon?: GameIconName;
+}) {
+  return (
+    <div className="guide-strip">
+      <span className="guide-strip-ico">
+        <GameIcon name={icon} size={20} color="#F59E0B" />
+      </span>
+      <div className="guide-strip-body">
+        <b className="guide-strip-title">{title}</b>
+        <ol className="guide-strip-steps">
+          {steps.map((s, i) => (
+            <li key={i}>
+              <span className="guide-strip-n">{i + 1}</span>
+              {s}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}

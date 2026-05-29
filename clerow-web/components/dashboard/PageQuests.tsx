@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { PageHead, PageStat } from "./AppShell";
+import { PageHead, PageStat, GuideStrip } from "./AppShell";
 import { Icon } from "../Icon";
 import { GameIcon, type GameIconName } from "../GameIcon";
 import { useDashboard } from "@/lib/useDashboard";
@@ -85,6 +85,16 @@ export function PageQuests() {
         }
       />
 
+      <GuideStrip
+        title="How the streak works"
+        steps={[
+          "Quests are your daily punch list",
+          "Complete any one to keep your streak",
+          "Bigger bets move your AI visibility score",
+        ]}
+        icon="flame"
+      />
+
       <div className="page-stats">
         <PageStat label="XP today" value={`+${xpToday}`} sub="earned so far" hi="success" />
         <PageStat label="Streak" value={String(streak?.current ?? 0)} sub={`longest ${streak?.longest ?? 0}`} hi="warn" />
@@ -109,7 +119,10 @@ export function PageQuests() {
           </h3>
           {todays.length === 0 ? (
             <div className="app-card" style={{ padding: 20, color: "var(--ink-2)" }}>
-              No quests for today yet — they generate from your latest scan. Re-scan to refresh them.
+              No quests for today yet — they generate from your latest scan. Open a prompt and scan it to refresh them.
+              <button className="btn btn--ghost btn--sm" style={{ marginLeft: 12 }} onClick={() => router.push("/dashboard/prompts")}>
+                Open prompts →
+              </button>
             </div>
           ) : (
             <div className="quest-task-list">

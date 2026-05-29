@@ -3,7 +3,7 @@
 import React from "react";
 import { Icon } from "../Icon";
 import { GameIcon } from "../GameIcon";
-import { PageHead, PageStat } from "./AppShell";
+import { PageHead, PageStat, GuideStrip } from "./AppShell";
 import { PromptDrawer } from "./PromptDrawer";
 import { useDashboard } from "@/lib/useDashboard";
 import type { DashboardPrompt } from "@/lib/types";
@@ -67,7 +67,7 @@ export function PagePrompts() {
     <>
       <PageHead
         title="Prompts"
-        sub="The real questions buyers ask AI. Click any prompt to see where you rank and exactly how to win it."
+        sub="The real questions buyers ask AI. Open one to see where you rank and exactly how to win it."
         actions={
           <>
             <button className="btn btn--ghost btn--sm" onClick={exportCsv} disabled={!prompts.length}>
@@ -76,6 +76,15 @@ export function PagePrompts() {
             </button>
           </>
         }
+      />
+
+      <GuideStrip
+        title="How to win a prompt"
+        steps={[
+          "Open a prompt to see where you rank",
+          "Scan it across the AI models",
+          "Make the content & add it as a quest",
+        ]}
       />
 
       <div className="page-stats">
@@ -196,7 +205,7 @@ function PromptsTracked({
               </span>
               <span style={{ flex: 1.0, textAlign: "right" }}>
                 <button className="btn-quest" onClick={(e) => { e.stopPropagation(); onOpen(r.id); }}>
-                  {r.scanned ? "View" : "Unlock"} <b>↗</b>
+                  {r.scanned ? "View" : "Scan to reveal"} <b>↗</b>
                 </button>
               </span>
             </div>

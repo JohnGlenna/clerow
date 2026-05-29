@@ -2212,6 +2212,42 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 }
 .callout--accent .callout-ico { background: var(--accent); }
 
+/* Guided "here's what to do" strip — a numbered 1-2-3 of the next actions. */
+.guide-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: linear-gradient(180deg, #FFFDF5, #FEF3C7);
+  border: 2px solid color-mix(in oklab, var(--accent) 40%, var(--border));
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 3px 0 var(--border);
+}
+.guide-strip-ico {
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.guide-strip-body { flex: 1; min-width: 0; }
+.guide-strip-title { display: block; color: var(--ink); font-weight: 800; font-size: 13.5px; margin-bottom: 8px; }
+.guide-strip-steps {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 8px 18px;
+}
+.guide-strip-steps li {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+}
+.guide-strip-n {
+  width: 20px; height: 20px; flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff; font-weight: 800; font-size: 11px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
 /* Data table */
 .data-table { display: flex; flex-direction: column; }
 .dt-head {
@@ -3450,22 +3486,23 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .drawer-backdrop {
   position: fixed; inset: 0;
   background: rgba(20, 20, 20, 0.42);
-  display: flex; justify-content: flex-end;
+  display: flex; justify-content: center; align-items: center;
+  padding: 24px;
   z-index: 200;
   animation: fadeIn .18s ease;
 }
-@keyframes drawerIn { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .drawer {
   width: 100%;
-  max-width: 560px;
-  height: 100%;
+  max-width: 640px;
+  max-height: 90vh;
   background: #fff;
-  border-left: 1px solid var(--border);
-  box-shadow: -30px 0 80px -20px rgba(20, 20, 20, 0.35);
-  padding: 28px 28px 48px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: 0 30px 80px -20px rgba(20, 20, 20, 0.35);
+  padding: 28px 28px 36px;
   overflow-y: auto;
   position: relative;
-  animation: drawerIn .22s ease;
+  animation: popIn .2s ease;
 }
 .drawer-close {
   position: absolute; top: 16px; right: 16px;
@@ -3517,6 +3554,7 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 
 .drawer-scan-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
 .drawer-scan-error { color: var(--danger); font-size: 12px; font-weight: 700; }
+.drawer-engine-scan { padding: 4px 12px; }
 
 .drawer-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .drawer-rival {
@@ -3539,22 +3577,67 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 }
 .drawer-source:hover { background: var(--bg-soft-2); }
 
+/* The playbook — promoted as the headline "punch list" of the modal. */
+.drawer-playbook {
+  border: 1px solid color-mix(in oklab, var(--accent-2) 22%, var(--border));
+  background: color-mix(in oklab, var(--accent-2) 4%, white);
+  border-radius: 18px;
+  padding: 18px;
+}
+.drawer-playbook-lead {
+  color: var(--ink-2); font-size: 12.5px; font-weight: 500;
+  line-height: 1.5; margin: -4px 0 14px;
+}
+
 .drawer-steps { display: flex; flex-direction: column; gap: 10px; }
 .drawer-step {
-  display: flex; align-items: flex-start; gap: 14px;
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: #fff;
 }
+.drawer-step-row { display: flex; align-items: flex-start; gap: 14px; }
 .drawer-step-main { flex: 1; min-width: 0; }
 .drawer-step-title { font-weight: 800; font-size: 14px; margin-bottom: 4px; }
 .drawer-step-detail { color: var(--ink-2); font-size: 12.5px; font-weight: 500; line-height: 1.5; margin-bottom: 10px; }
 .drawer-step-meta { display: flex; align-items: center; gap: 8px; }
 .drawer-step-xp { font-size: 12px; font-weight: 800; color: var(--accent-2); }
-.drawer-step .btn { flex-shrink: 0; white-space: nowrap; }
+.drawer-step-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.drawer-step-actions .btn { white-space: nowrap; }
+.drawer-step-error { color: var(--danger); font-size: 12px; font-weight: 700; margin-top: 10px; }
+
+.drawer-step-content {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-soft);
+  animation: fadeIn .18s ease;
+}
+.drawer-step-content-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.drawer-step-content-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 800; color: var(--ink-2);
+}
+.drawer-step-content pre {
+  margin: 0;
+  padding: 14px;
+  max-height: 360px;
+  overflow: auto;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink);
+}
 
 @media (max-width: 560px) {
-  .drawer { max-width: 100%; }
-  .drawer-step { flex-direction: column; }
+  .drawer { max-width: 100%; max-height: 94vh; }
+  .drawer-step-row { flex-direction: column; }
+  .drawer-step-actions { flex-direction: row; }
 }
