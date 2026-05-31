@@ -54,8 +54,8 @@ function Hero({ onStart }: { onStart: () => void }) {
       </div>
       <div className="model-strip">
         <div className="shell in">
-          {MODELS.map(([l, , n, id], i) => (
-            <span key={i} className="ms-item"><span className="mc" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}><AiIcon id={id} size={19} letter={l} /></span>{n}</span>
+          {MODELS.map(([, , n], i) => (
+            <span key={i} className="ms-item">{n}</span>
           ))}
         </div>
       </div>
