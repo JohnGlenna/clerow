@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
 import { MascotClerow } from "../Mascot";
 import { AiIcon } from "../ui/AiIcon";
+import { useAuthModal } from "../AuthModalProvider";
 
 // Clerow Welcome — Duolingo-style landing, ported from the v2 design
 // (_design_extract/clerow-v2/project/components/welcome.jsx). Scoped under
@@ -30,7 +30,7 @@ function Nav({ onStart }: { onStart: () => void }) {
   );
 }
 
-function Hero({ onStart }: { onStart: () => void }) {
+function Hero({ onStart, onSignIn }: { onStart: () => void; onSignIn: () => void }) {
   return (
     <section className="hero">
       <div className="hero-main shell">
@@ -47,7 +47,7 @@ function Hero({ onStart }: { onStart: () => void }) {
             <p>See where you rank across all 5 AI models — and exactly what to fix to get named.</p>
             <div className="hero-cta">
               <button className="btn btn-primary" onClick={onStart}>Get started</button>
-              <button className="btn btn-ghost" onClick={onStart}>I already have an account</button>
+              <button className="btn btn-ghost" onClick={onSignIn}>I already have an account</button>
             </div>
           </div>
         </div>
@@ -249,49 +249,14 @@ function Final({ onStart }: { onStart: () => void }) {
   );
 }
 
-function GoogleG() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
-      <path fill="#FBBC05" d="M24 9.5c3.3 0 6.3 1.1 8.6 3.3l6.4-6.4C35.5 2.8 30.1.5 24 .5 14.7.5 6.7 5.8 2.9 13.7l7.5 5.8C12.2 13.6 17.6 9.5 24 9.5z" />
-      <path fill="#34A853" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.6c-.6 3-2.3 5.5-4.9 7.2l7.5 5.8c4.4-4 6.8-9.9 6.8-17.5z" />
-      <path fill="#4285F4" d="M10.4 28.5c-.6-1.7-.9-3.5-.9-5.5s.3-3.8.9-5.5l-7.5-5.8C1.1 15.5 0 19.6 0 24s1.1 8.5 2.9 12.3l7.5-5.8z" />
-      <path fill="#EA4335" d="M24 47.5c6.1 0 11.5-2 15.3-5.5l-7.5-5.8c-2.1 1.4-4.7 2.3-7.8 2.3-6.4 0-11.8-4.1-13.6-9.8l-7.5 5.8C6.7 42.2 14.7 47.5 24 47.5z" />
-    </svg>
-  );
-}
-
-function AuthModal({ onClose, onGo }: { onClose: () => void; onGo: () => void }) {
-  React.useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", fn);
-    return () => window.removeEventListener("keydown", fn);
-  }, [onClose]);
-  return (
-    <div className="wl-modal-back" onClick={onClose}>
-      <div className="wl-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="wl-x" onClick={onClose}>✕</button>
-        <div className="wl-modal-mascot"><MascotClerow size={68} /></div>
-        <h2>Get started with Clerow</h2>
-        <p className="wl-modal-sub">Free scan across all 5 AI models. No card.</p>
-        <button className="wl-oauth" onClick={onGo}><GoogleG /> Continue with Google</button>
-        <div className="wl-or">or</div>
-        <input className="wl-input" type="email" placeholder="you@yourcompany.com" />
-        <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={onGo}>Continue with email</button>
-        <p className="wl-legal">By continuing you agree to our Terms &amp; Privacy.</p>
-      </div>
-    </div>
-  );
-}
-
 export function WelcomePage() {
-  const router = useRouter();
-  const [auth, setAuth] = React.useState(false);
-  const onStart = () => setAuth(true);
-  const go = () => router.push("/onboarding");
+  const { open } = useAuthModal();
+  const onStart = () => open("signup");
+  const onSignIn = () => open("signin");
   return (
     <div className="wl-root">
       <Nav onStart={onStart} />
-      <Hero onStart={onStart} />
+      <Hero onStart={onStart} onSignIn={onSignIn} />
       <StatsBand />
       <Row title="Scan every AI at once." art={<IllScan />}>
         Paste your URL and Clerow checks all 5 engines — not just one. See exactly which prompts you show up in and which ones your rivals own.
@@ -313,7 +278,6 @@ export function WelcomePage() {
           <p>© 2026 Clerow · Get recommended by ChatGPT, Claude, Gemini, Grok &amp; Perplexity · Kristiansand 🇳🇴</p>
         </div>
       </footer>
-      {auth && <AuthModal onClose={() => setAuth(false)} onGo={go} />}
     </div>
   );
 }
