@@ -119,6 +119,8 @@ export type Database = {
           id: string
           industry: string
           location: string
+          site_audit: Json | null
+          site_audited_at: string | null
           size: string
           timezone: string
           updated_at: string
@@ -137,6 +139,8 @@ export type Database = {
           id?: string
           industry?: string
           location?: string
+          site_audit?: Json | null
+          site_audited_at?: string | null
           size?: string
           timezone?: string
           updated_at?: string
@@ -155,6 +159,8 @@ export type Database = {
           id?: string
           industry?: string
           location?: string
+          site_audit?: Json | null
+          site_audited_at?: string | null
           size?: string
           timezone?: string
           updated_at?: string
@@ -425,6 +431,8 @@ export type Database = {
           for_date: string | null
           id: string
           impact: string
+          ladder_key: string | null
+          level: number | null
           meta: string
           source: string
           title: string
@@ -440,6 +448,8 @@ export type Database = {
           for_date?: string | null
           id?: string
           impact?: string
+          ladder_key?: string | null
+          level?: number | null
           meta?: string
           source?: string
           title: string
@@ -455,6 +465,8 @@ export type Database = {
           for_date?: string | null
           id?: string
           impact?: string
+          ladder_key?: string | null
+          level?: number | null
           meta?: string
           source?: string
           title?: string

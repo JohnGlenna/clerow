@@ -168,7 +168,7 @@ function PromptsTracked({
           <span style={{ flex: 2.5 }}>Prompt</span>
           <span style={{ flex: 0.9 }}>Intent</span>
           <span style={{ flex: 1.1, justifyContent: "center", display: "flex" }}>Models</span>
-          <span style={{ flex: 0.4, textAlign: "center" }}>Scan</span>
+          <span style={{ flex: 0.9, textAlign: "center" }}>You rank</span>
           <span style={{ flex: 1.0, textAlign: "right" }}>Action</span>
         </div>
         {prompts.map((r) => {
@@ -200,8 +200,16 @@ function PromptsTracked({
                   <ModelDot key={m.k} lit={r.scanned} bg={m.bg} k={m.k} />
                 ))}
               </span>
-              <span style={{ flex: 0.4, textAlign: "center" }} className="dt-pos">
-                {r.scanned ? "✓" : "—"}
+              <span style={{ flex: 0.9, textAlign: "center" }} className="dt-pos">
+                {!r.scanned ? (
+                  <span style={{ color: "var(--ink-3)" }}>—</span>
+                ) : r.yourPosition != null ? (
+                  <span style={{ color: r.yourPosition <= 3 ? "var(--success)" : "var(--ink)", fontWeight: 800 }}>
+                    #{r.yourPosition}
+                  </span>
+                ) : (
+                  <span style={{ color: "var(--danger)", fontWeight: 700 }}>Not found</span>
+                )}
               </span>
               <span style={{ flex: 1.0, textAlign: "right" }}>
                 <button className="btn-quest" onClick={(e) => { e.stopPropagation(); onOpen(r.id); }}>

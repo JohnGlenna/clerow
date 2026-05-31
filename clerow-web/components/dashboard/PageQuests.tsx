@@ -8,7 +8,7 @@ import { GameIcon, type GameIconName } from "../GameIcon";
 import { ContentMaker } from "./ContentMaker";
 import { useDashboard } from "@/lib/useDashboard";
 import { playCheck } from "@/lib/sound";
-import type { DashboardData, DashboardTask } from "@/lib/types";
+import type { DashboardData, DashboardTask, Ladder } from "@/lib/types";
 
 const IMPACT_COLOR = (k: string) =>
   ({ low: "#A8A8A8", medium: "#1CB0F6", high: "#F59E0B", "very high": "#E11D48" }[k] || "#A8A8A8");
@@ -67,9 +67,12 @@ export function PageQuests() {
   };
 
   const today = todayKey();
-  const todays = local.filter((t) => t.forDate === today);
-  const active = local.filter((t) => t.forDate !== today && !t.done);
-  const completed = local.filter((t) => t.forDate !== today && t.done);
+  // Ladder (Climb) tasks render in the full Climb section below — keep them out of
+  // the legacy daily/active/completed lists so they aren't shown twice.
+  const loose = local.filter((t) => t.level == null);
+  const todays = loose.filter((t) => t.forDate === today);
+  const active = loose.filter((t) => t.forDate !== today && !t.done);
+  const completed = loose.filter((t) => t.forDate !== today && t.done);
 
   const xpToday = local.filter((t) => t.done && t.completedAt && t.completedAt.slice(0, 10) === today).reduce((s, t) => s + t.xp, 0);
   const streak = data?.streak;
@@ -102,8 +105,8 @@ export function PageQuests() {
         <PageStat label="Streak" value={String(streak?.current ?? 0)} sub={`longest ${streak?.longest ?? 0}`} hi="warn" />
         <PageStat label="Open quests" value={String(todays.length + active.length)} sub={`${completed.length} done`} />
         <PageStat
-          label="Level"
-          value={`Lv ${xp?.level ?? 1}`}
+          label="Rank"
+          value={xp?.title ?? "Rookie"}
           sub={xp ? `${xp.intoLevel}/${xp.span} to next · ${xp.total} XP` : "0 XP all-time"}
           hi="accent"
         />
@@ -113,6 +116,8 @@ export function PageQuests() {
         <div className="app-card" style={{ padding: 24 }}>Loading quests…</div>
       ) : (
         <>
+          {data?.ladder && <ClimbFull ladder={data.ladder} onToggle={toggle} onOpen={setSelected} />}
+
           <h3 className="quest-section-h">
             <span><GameIcon name="calendar" size={18} /> Today&apos;s quests</span>
             <span className="quest-section-sub">
@@ -176,6 +181,88 @@ export function PageQuests() {
       )}
 
       {selected && <QuestModal task={selected} onClose={() => setSelected(null)} />}
+    </>
+  );
+}
+
+// The full "Climb" — every level expanded (done / active / locked) so the Quests
+// page is the whole journey, where the Overview shows only the current level.
+function ClimbFull({
+  ladder,
+  onToggle,
+  onOpen,
+}: {
+  ladder: Ladder;
+  onToggle: (id: string) => void;
+  onOpen: (task: DashboardTask) => void;
+}) {
+  return (
+    <>
+      <h3 className="quest-section-h">
+        <span><GameIcon name="mountain" size={18} /> The Climb</span>
+        <span className="quest-section-sub">
+          Level {ladder.currentLevel} of {ladder.levels.length} · your full journey
+        </span>
+      </h3>
+      <div className="app-card climb">
+        {ladder.levels.map((l) => (
+          <div key={l.level} className="climb-lvl">
+            <div className={`climb-node ${l.state}`}>
+              <span className="climb-badge">
+                {l.state === "done" ? (
+                  <Icon name="check" size={13} />
+                ) : l.state === "locked" ? (
+                  <Icon name="lock" size={12} />
+                ) : (
+                  l.level
+                )}
+              </span>
+              <div className="climb-node-main">
+                <div className="climb-node-title">Level {l.level} · {l.title}</div>
+                <div className="climb-node-sub">{l.blurb}</div>
+              </div>
+              {l.total > 0 && <span className="climb-node-prog">{l.doneCount}/{l.total}</span>}
+            </div>
+
+            {l.state === "locked" ? (
+              <div className="climb-locked-note">
+                Complete Level {l.level - 1} to unlock {l.total} task{l.total === 1 ? "" : "s"}.
+              </div>
+            ) : (
+              l.tasks.length > 0 && (
+                <div className="task-list climb-lvl-tasks">
+                  {l.tasks.map((t) => {
+                    const interactive = l.state === "active" && !!t.id;
+                    return (
+                      <div
+                        key={t.key}
+                        className={`task ${t.done ? "done" : ""} ${interactive ? "task--click" : ""}`}
+                        onClick={interactive ? () => onOpen({ id: t.id!, title: t.title, meta: t.meta, xp: t.xp, done: t.done }) : undefined}
+                        title={interactive ? "Open to generate content" : undefined}
+                      >
+                        <span
+                          className="tickbox"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (interactive) onToggle(t.id!);
+                          }}
+                        >
+                          {t.done && <Icon name="check" size={12} />}
+                        </span>
+                        <div>
+                          <div className="title">{t.title}</div>
+                          <div className="meta">{t.meta}</div>
+                        </div>
+                        <span className="xp">+{t.xp} XP</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+          </div>
+        ))}
+      </div>
     </>
   );
 }

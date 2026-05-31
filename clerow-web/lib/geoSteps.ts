@@ -11,6 +11,7 @@
 // and act on it in the user's codebase.
 
 import type { PromptIntent } from "./supabase/database.types";
+import { schemaLabel } from "./geoFrameworks";
 
 export type GeoStep = {
   // Stable id so "Add as quest" is idempotent and the UI can mark added ones.
@@ -130,6 +131,20 @@ export function buildGeoSteps(ctx: GeoStepContext): GeoStep[] {
       break;
   }
 
+  // 1.5) E-E-A-T credibility — the content-quality signals AI engines reward on
+  // any page, drawn from the CORE-EEAT benchmark (Experience/Expertise/Authority/
+  // Trust). Cheap relative to its impact and applies whatever the intent.
+  push(
+    {
+      title: `Add first-hand experience and author credentials for "${q}"`,
+      detail: `AI engines cite pages that signal real expertise. On the page targeting this query, add an author byline with credentials, a first-hand note ("we tested…" / "we built…"), one or two quotable stats with named sources, and disclose any affiliations. That makes ${company} read as a trustworthy source instead of generic marketing — and it's exactly what models lift into an answer.`,
+      minutes: 40,
+      xp: impactXp("high"),
+      impact: "high",
+    },
+    "eeat-credibility",
+  );
+
   // 2) Source gaps — the most actionable lever. Get cited where the engine
   // already looks. One step per cited third-party domain (capped).
   for (const domain of citedDomains.slice(0, 3)) {
@@ -145,11 +160,15 @@ export function buildGeoSteps(ctx: GeoStepContext): GeoStep[] {
     );
   }
 
-  // 3) FAQ schema — cheap, compounding, applies to every prompt.
+  // 3) Structured data — cheap, compounding, applies to every prompt. The schema
+  // set is chosen from the buyer intent (schema decision tree) so the markup
+  // matches the page you'd ship for this query.
   push(
     {
       title: `Add an FAQ section answering "${q}"`,
-      detail: `Add a Q&A block (with FAQPage schema) that answers this exact phrasing on the most relevant page. Structured Q&A is one of the easiest things for an answer engine to lift directly into a recommendation.`,
+      detail: `Add a Q&A block that answers this exact phrasing on the most relevant page, marked up with ${schemaLabel(
+        prompt.intent,
+      )} JSON-LD. Structured Q&A and matching schema are among the easiest things for an answer engine to lift directly into a recommendation, and they feed your brand entity into the model's knowledge graph.`,
       minutes: 25,
       xp: impactXp("medium"),
       impact: "medium",

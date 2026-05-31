@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { ENGINES, type EngineId } from "@/lib/engines";
 import { loadBrandSnapshot, captureDailySnapshot, loadSnapshotHistory } from "@/lib/scan/snapshot";
 import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/streak";
-import { ensureDailyQuests, type DailySignals } from "@/lib/dailyTasks";
 import { levelFromXp } from "@/lib/xp";
+import { ensureSiteAudit } from "@/lib/audit/ensure";
+import { buildLadder, ensureLadderTasks, type LadderContext } from "@/lib/ladder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -125,33 +126,60 @@ export async function GET(req: Request) {
       ? `${snapshot.enginesScanned.length} AI models`
       : ENGINES[(snapshot.enginesScanned[0] ?? scan.engines[0] ?? "perplexity") as EngineId].label;
 
-  // Generate today's quests from the brand's real gaps (idempotent: tops up to 2).
+  // Build "The Climb": a leveled ladder from the brand's real gaps. Only the
+  // active level's tasks are seeded (idempotent by ladder_key) — locked levels
+  // are previewed, never written, which is what removes the old task flood.
   const you = snapshot.competitors.find((c) => c.isYou);
   const yourRank = you?.rank ?? Number.POSITIVE_INFINITY;
-  const signals: DailySignals = {
+  const primaryPromptRow = (prompts ?? []).find((p) => p.id === snapshot.primaryPromptId);
+  const audit = await ensureSiteAudit(supabase, brand);
+  const ladderCtx: LadderContext = {
     company: brand.company,
-    industry: brand.industry,
-    primaryPrompt: snapshot.primaryPromptText,
+    audit,
+    primaryPrompt:
+      snapshot.primaryPromptText && primaryPromptRow
+        ? { text: snapshot.primaryPromptText, intent: primaryPromptRow.intent }
+        : null,
+    competitorsAhead: snapshot.competitors.filter((c) => !c.isYou && c.rank < yourRank).map((c) => c.name),
+    sourceGaps: snapshot.citedDomains.slice(0, 5),
     promptGaps: (prompts ?? [])
       .filter((p) => p.is_tracked && p.id !== snapshot.primaryPromptId)
       .map((p) => p.text)
       .slice(0, 5),
-    competitorsAhead: snapshot.competitors
-      .filter((c) => !c.isYou && c.rank < yourRank)
-      .map((c) => c.name),
-    sourceGaps: snapshot.citedDomains.slice(0, 5),
   };
-  const inserted = await ensureDailyQuests(supabase, brand.id, today, signals, tasks ?? []);
+
+  const ladderExisting = new Map<string, { id: string; done: boolean }>();
+  for (const t of tasks ?? []) if (t.ladder_key) ladderExisting.set(t.ladder_key, { id: t.id, done: t.done });
+  const preLadder = buildLadder(ladderCtx, ladderExisting);
+  const inserted = await ensureLadderTasks(supabase, brand.id, preLadder, new Set(ladderExisting.keys()));
+  for (const r of inserted) if (r.ladder_key) ladderExisting.set(r.ladder_key, { id: r.id, done: r.done });
+  const ladder = buildLadder(ladderCtx, ladderExisting);
   const allTasks = [...(tasks ?? []), ...inserted];
 
   // A prompt is "scanned" if ANY done scan produced a result for it — including
   // per-prompt scans the user ran later, not just the latest free scan.
   const { data: scannedRows } = await supabase
     .from("scan_results")
-    .select("prompt_id, scans!inner(brand_id, status)")
+    .select("prompt_id, your_position, your_visibility, scans!inner(brand_id, status)")
     .eq("scans.brand_id", brand.id)
     .eq("scans.status", "done");
   const scannedPromptIds = new Set((scannedRows ?? []).map((r) => r.prompt_id));
+  // Best (lowest) position and highest visibility per prompt across engines, so
+  // the Prompts page can show "you rank #X / not found" instead of just ✓/—.
+  const promptStand = new Map<string, { position: number | null; visibility: number }>();
+  for (const r of scannedRows ?? []) {
+    const cur = promptStand.get(r.prompt_id);
+    const pos = r.your_position;
+    const vis = r.your_visibility ?? 0;
+    if (!cur) {
+      promptStand.set(r.prompt_id, { position: pos, visibility: vis });
+    } else {
+      promptStand.set(r.prompt_id, {
+        position: pos == null ? cur.position : cur.position == null ? pos : Math.min(cur.position, pos),
+        visibility: Math.max(cur.visibility, vis),
+      });
+    }
+  }
 
   const streak = await evalAndPersistStreak(allTasks);
 
@@ -205,6 +233,8 @@ export async function GET(req: Request) {
       volume: p.volume,
       isPrimary: p.is_primary,
       scanned: scannedPromptIds.has(p.id),
+      yourPosition: promptStand.get(p.id)?.position ?? null,
+      yourVisibility: promptStand.get(p.id)?.visibility ?? null,
     })),
     tasks: orderedTasks.map((t) => ({
       id: t.id,
@@ -214,6 +244,8 @@ export async function GET(req: Request) {
       done: t.done,
       forDate: t.for_date,
       completedAt: t.completed_at,
+      level: t.level,
     })),
+    ladder,
   });
 }

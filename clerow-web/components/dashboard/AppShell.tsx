@@ -207,9 +207,8 @@ function AppSidebar({
         </div>
         <div className="side-level" title={`${xp?.total ?? 0} XP all-time`}>
           <div className="side-level-row">
-            <span className="lvl">
-              <GameIcon name="star" size={13} color="#1CB0F6" /> Lv {xp?.level ?? 1}
-              {xp?.title ? ` · ${xp.title}` : ""}
+            <span className="lvl" title={`Rank ${xp?.level ?? 1}`}>
+              <GameIcon name="star" size={13} color="#1CB0F6" /> {xp?.title ?? "Rookie"}
             </span>
             <span>{xp ? `${xp.intoLevel}/${xp.span} XP` : "0 XP"}</span>
           </div>

@@ -10,6 +10,7 @@
 import type { BrandProfile } from "../types";
 import type { GeoStep } from "../geoSteps";
 import type { PromptIntent } from "../supabase/database.types";
+import { geoWritingGuidelines } from "../geoFrameworks";
 
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
@@ -48,7 +49,8 @@ const SYSTEM =
   "'who each is best for', and a short verdict. " +
   "5) If the fix is a landing/how-to page, write the H1, opening paragraph, and section outline with real copy. " +
   "6) If the fix is about getting cited on a third-party source, write the actual submission/post/listing copy. " +
-  "7) Write in a confident, plain, non-fluffy voice. Honest about competitors — AI engines reward even-handed pages.";
+  "7) Write in a confident, plain, non-fluffy voice. Honest about competitors — AI engines reward even-handed pages.\n\n" +
+  geoWritingGuidelines();
 
 function apiKey(): string {
   const key = process.env.ANTHROPIC_API_KEY;

@@ -1,6 +1,9 @@
 // Shared app-level types passed between the scan pipeline, API routes, and UI.
 import type { PromptIntent, PromptVolume, BrandSentiment, Citation } from "./supabase/database.types";
 import type { GeoStep } from "./geoSteps";
+import type { Ladder } from "./ladder";
+
+export type { Ladder, LadderLevel, LadderTask, LevelState } from "./ladder";
 
 // The brand profile the scan reasons about (subset of the `brands` row).
 export type BrandProfile = {
@@ -90,6 +93,8 @@ export type DashboardPrompt = {
   volume: PromptVolume;
   isPrimary: boolean;
   scanned: boolean;
+  yourPosition?: number | null; // best rank across engines, null if scanned but not found
+  yourVisibility?: number | null;
 };
 
 export type DashboardTask = {
@@ -101,6 +106,7 @@ export type DashboardTask = {
   archived?: boolean;
   forDate?: string | null;
   completedAt?: string | null;
+  level?: number | null; // set when this task belongs to a Climb level
 };
 
 // Duolingo-style streak surfaced everywhere the fake level bar used to be.
@@ -171,6 +177,7 @@ export type DashboardData = {
   competitors?: DashboardCompetitor[];
   prompts?: DashboardPrompt[];
   tasks?: DashboardTask[];
+  ladder?: Ladder;
   streak?: DashboardStreak;
   xp?: DashboardXp;
   trend?: DashboardTrend;

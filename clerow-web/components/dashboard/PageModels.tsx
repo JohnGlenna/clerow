@@ -6,6 +6,7 @@ import { Icon } from "../Icon";
 import { GameIcon } from "../GameIcon";
 import { PageHead, PageStat } from "./AppShell";
 import { useDashboard } from "@/lib/useDashboard";
+import { modelStatus, sentimentLabel, METRIC_HELP } from "@/lib/modelStatus";
 import type { DashboardModel } from "@/lib/types";
 
 // Curated, accurate guidance for how each engine sources its answers and what
@@ -105,6 +106,7 @@ export function PageModels() {
 function ModelCard({ m, onNavigate }: { m: DashboardModel; onNavigate: (k: string) => void }) {
   const copy = COPY[m.id] ?? { maker: "", sources: "", tip: "" };
   const scanned = !m.locked && m.visibility != null;
+  const status = modelStatus(m);
   return (
     <div className={`model-card ${m.locked ? "model-card--locked" : ""}`}>
       <div className="model-card-head">
@@ -122,18 +124,23 @@ function ModelCard({ m, onNavigate }: { m: DashboardModel; onNavigate: (k: strin
         )}
       </div>
 
+      <div className={`model-status mr-${status.tone}`}>{status.text}</div>
+
       <div className="model-stats">
-        <div className="model-stat">
+        <div className="model-stat" title={METRIC_HELP.visibility}>
           <div className="label">Visibility</div>
           <div className="val">{scanned ? `${m.visibility}%` : "—"}</div>
         </div>
-        <div className="model-stat">
+        <div className="model-stat" title={METRIC_HELP.position}>
           <div className="label">Position</div>
           <div className="val">{m.position != null ? `#${m.position}` : "—"}</div>
         </div>
-        <div className="model-stat">
+        <div className="model-stat" title={METRIC_HELP.sentiment}>
           <div className="label">Sentiment</div>
-          <div className="val">{m.sentiment != null ? m.sentiment : "—"}</div>
+          <div className="val">
+            {m.sentiment != null ? sentimentLabel(m.sentiment) : "—"}
+            {m.sentiment != null && <span className="model-stat-raw"> {m.sentiment}</span>}
+          </div>
         </div>
       </div>
 

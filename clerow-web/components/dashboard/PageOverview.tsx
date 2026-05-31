@@ -6,13 +6,13 @@ import { Icon } from "../Icon";
 import { GameIcon, type GameIconName } from "../GameIcon";
 import { MascotClerow } from "../Mascot";
 import { PageHead } from "./AppShell";
+import { ClimbCard } from "./ClimbCard";
 import { useDashboard } from "@/lib/useDashboard";
-import { playCheck } from "@/lib/sound";
+import { modelStatus, METRIC_HELP } from "@/lib/modelStatus";
 import type {
   DashboardData,
   DashboardModel,
   DashboardCompetitor,
-  DashboardTask,
 } from "@/lib/types";
 import type { SourceRow } from "@/app/api/sources/route";
 
@@ -94,16 +94,21 @@ export function PageOverview() {
       {!loading && data && data.hasScan && (
         <>
           <AppHello company={domainName(data.brand?.url) ?? "founder"} streak={data.streak?.current ?? 0} />
+          {data.ladder && (
+            <ClimbCard
+              ladder={data.ladder}
+              onNavigate={navigate}
+              onChanged={refresh}
+              onRescan={() => router.push("/onboarding")}
+            />
+          )}
           <ScoreCard score={data.score} trend={data.trend} />
           <PageSummary data={data} sources={sources} onNavigate={navigate} />
           <div className="app-grid">
-            <TasksCard tasks={data.tasks ?? []} onNavigate={navigate} onChanged={refresh} />
             <ModelsCard models={data.models ?? []} onNavigate={navigate} />
-          </div>
-          <div className="app-grid">
             <CompetitorsCard competitors={data.competitors ?? []} onNavigate={navigate} />
-            <AchievementsCard />
           </div>
+          <AchievementsCard />
         </>
       )}
     </>
@@ -383,101 +388,6 @@ function ScoreStat({
   );
 }
 
-function TasksCard({
-  tasks,
-  onNavigate,
-  onChanged,
-}: {
-  tasks: DashboardTask[];
-  onNavigate: (k: string) => void;
-  onChanged?: () => void;
-}) {
-  const [local, setLocal] = React.useState(tasks);
-  React.useEffect(() => setLocal(tasks), [tasks]);
-
-  // Persist the toggle (stamps completed_at → feeds the streak). Optimistic, with
-  // a revert on failure; refresh pulls the recomputed streak into the sidebar.
-  const toggle = async (i: number) => {
-    const task = local[i];
-    const next = !task.done;
-    if (next) playCheck(); // satisfying chime only when completing
-    setLocal((prev) => prev.map((t, j) => (j === i ? { ...t, done: next } : t)));
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: task.id, done: next }),
-      });
-      if (!res.ok) throw new Error("save failed");
-      onChanged?.();
-    } catch {
-      setLocal((prev) => prev.map((t, j) => (j === i ? { ...t, done: task.done } : t)));
-    }
-  };
-
-  // Clear a completed quest from the active list (it stays done, so streak + XP
-  // are untouched). Optimistically remove it; revert on failure.
-  const archive = async (i: number) => {
-    const task = local[i];
-    setLocal((prev) => prev.filter((_, j) => j !== i));
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: task.id, archived: true }),
-      });
-      if (!res.ok) throw new Error("archive failed");
-      onChanged?.();
-    } catch {
-      setLocal((prev) => {
-        const copy = [...prev];
-        copy.splice(i, 0, task);
-        return copy;
-      });
-    }
-  };
-
-  const doneCount = local.filter((t) => t.done).length;
-  const totalXP = local.filter((t) => t.done).reduce((sum, t) => sum + t.xp, 0);
-
-  return (
-    <div className="app-card">
-      <div className="app-card-head">
-        <h4>Today&apos;s quests</h4>
-        <span className="sub">
-          {doneCount}/{local.length} done · <b style={{ color: "var(--accent-2)" }}>+{totalXP} XP earned</b>
-        </span>
-      </div>
-      <div className="task-list">
-        {local.length === 0 && (
-          <div className="task"><div><div className="title">No tasks yet — your scan will generate fixes.</div></div></div>
-        )}
-        {local.map((task, i) => (
-          <div key={task.id} className={`task ${task.done ? "done" : ""}`}>
-            <span className="tickbox" onClick={() => toggle(i)}>
-              {task.done && <Icon name="check" size={12} />}
-            </span>
-            <div>
-              <div className="title">{task.title}</div>
-              <div className="meta">{task.meta}</div>
-            </div>
-            {task.done ? (
-              <button className="btn btn--ghost btn--sm task-archive" onClick={() => archive(i)} title="Clear from today's quests">
-                Archive
-              </button>
-            ) : (
-              <span className="xp">+{task.xp} XP</span>
-            )}
-          </div>
-        ))}
-      </div>
-      <button className="btn btn--ghost btn--sm" style={{ alignSelf: "flex-start" }} onClick={() => onNavigate("quests")}>
-        See all quests →
-      </button>
-    </div>
-  );
-}
-
 function ModelsCard({ models, onNavigate }: { models: DashboardModel[]; onNavigate: (k: string) => void }) {
   return (
     <div className="app-card">
@@ -488,24 +398,28 @@ function ModelsCard({ models, onNavigate }: { models: DashboardModel[]; onNaviga
         </a>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {models.map((m) => (
-          <div key={m.id} className="model-row">
-            <span className="l">
+        {models.map((m) => {
+          const status = modelStatus(m);
+          return (
+            <div key={m.id} className="model-row model-row--rich">
               <span className="model-icon" style={{ background: m.swatch }}>{m.letter}</span>
-              {m.label}
-            </span>
-            <span className="right">
-              {m.locked ? (
-                <span className="pos-pill" style={{ opacity: 0.7 }}>🔒 Upgrade</span>
-              ) : (
-                <>
-                  <span className="pos-pill">{m.position != null ? `#${m.position}` : "—"}</span>
-                  <span>{m.visibility != null ? `${m.visibility}%` : "—"}</span>
-                </>
-              )}
-            </span>
-          </div>
-        ))}
+              <div className="mr-main">
+                <div className="mr-top">
+                  <b>{m.label}</b>
+                  {m.locked ? (
+                    <span className="pos-pill" style={{ opacity: 0.7 }}>🔒 Upgrade</span>
+                  ) : (
+                    <span className="mr-metrics">
+                      {m.position != null && <span className="pos-pill">#{m.position}</span>}
+                      <span title={METRIC_HELP.visibility}>{m.visibility != null ? `${m.visibility}%` : "—"}</span>
+                    </span>
+                  )}
+                </div>
+                <div className={`mr-status mr-${status.tone}`}>{status.text}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

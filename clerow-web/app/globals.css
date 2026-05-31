@@ -2197,6 +2197,51 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   white-space: nowrap;
 }
 
+/* The Climb — leveled ladder hero */
+.climb { margin-bottom: 16px; }
+.climb-title-ico { display: inline-flex; vertical-align: -3px; margin-right: 4px; color: var(--accent-2); }
+.climb-path { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.climb-node {
+  display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center;
+  padding: 9px 12px; border-radius: 12px; border: 1px solid var(--border-soft);
+  background: var(--bg-soft);
+}
+.climb-node.active {
+  border-color: color-mix(in oklab, var(--accent-2) 45%, var(--border));
+  background: color-mix(in oklab, var(--accent-2) 6%, var(--surface));
+}
+.climb-node.locked { opacity: 0.55; }
+.climb-badge {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 13px; font-family: var(--font-mono);
+  background: var(--bg-soft-2); color: var(--ink-2); border: 1px solid var(--border);
+}
+.climb-node.done .climb-badge { background: var(--success); color: #fff; border-color: var(--success); }
+.climb-node.active .climb-badge { background: var(--accent-2); color: #fff; border-color: var(--accent-2); }
+.climb-node-title { font-weight: 800; font-size: 13.5px; color: var(--ink); }
+.climb-node-sub { font-size: 12px; color: var(--ink-2); margin-top: 1px; font-weight: 600; }
+.climb-node-prog { font-family: var(--font-mono); font-size: 12px; font-weight: 800; color: var(--ink-2); }
+.climb-node.active .climb-node-prog { color: var(--accent-2); }
+.climb-active { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.climb-active-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--ink-2); font-weight: 700; }
+.climb-active-head b { color: var(--ink); font-size: 14px; }
+.climb-rescan {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 14px; border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--success) 30%, var(--border));
+  background: color-mix(in oklab, var(--success) 7%, var(--surface));
+}
+.climb-rescan b { font-size: 14px; color: var(--ink); }
+.climb-rescan p { font-size: 12.5px; color: var(--ink-2); margin-top: 3px; font-weight: 600; }
+/* Full Climb (Quests page): each level expanded */
+.climb-lvl { margin-bottom: 12px; }
+.climb-lvl:last-child { margin-bottom: 0; }
+.climb-lvl-tasks { margin-top: 8px; }
+.climb-locked-note { font-size: 12px; color: var(--ink-3); font-weight: 600; padding: 8px 12px 0; }
+.task--click { cursor: pointer; }
+.task--click:hover { border-color: color-mix(in oklab, var(--accent-2) 40%, var(--border)); }
+
 /* Models row */
 .model-row {
   display: flex; justify-content: space-between; align-items: center;
@@ -2223,6 +2268,19 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 }
 .model-row .delta.up { color: var(--success); }
 .model-row .delta.down { color: var(--danger); }
+/* Richer "How each AI sees you" row: label + metrics on top, plain-language status below */
+.model-row--rich { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: center; }
+.mr-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mr-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; }
+.mr-metrics { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); font-weight: 700; }
+.mr-status { font-size: 12px; font-weight: 700; }
+.mr-good { color: var(--success); }
+.mr-warn { color: var(--streak); }
+.mr-bad { color: var(--danger); }
+.mr-muted { color: var(--ink-3); }
+/* AI Models page: plain-language status banner + raw sentiment number */
+.model-status { font-size: 12.5px; font-weight: 800; margin: 2px 0 4px; }
+.model-stat-raw { font-size: 11px; color: var(--ink-3); font-weight: 700; }
 
 /* Competitors list */
 .comp-row {
