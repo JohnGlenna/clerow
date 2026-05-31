@@ -56,8 +56,15 @@ Detailed reference docs live in `_spec/` and `_design/` and are **not** loaded a
 
 - `_spec/README.md` — index of product specs and reference docs. Read the relevant doc when implementing a feature it covers; don't load everything.
 - `_design/README.md` — index of screen mockups by section. **Read the README first to know what's there, then open the specific image you need — never load all images at once.**
+- `.claude/skills/geo-seo-expert/SKILL.md` — the canonical GEO/AEO playbook (how sites get cited by ChatGPT, Claude, Perplexity, Grok, Gemini). Auto-activates when working on the scan pipeline, `geoSteps.ts`, the content generator, the prompt set, or task generation. It is the single source the intent model in `clerow-web/lib/geoSteps.ts` and the writer `SYSTEM` prompt in `clerow-web/lib/content/generate.ts` are kept consistent with.
 
 Anything truly durable (architecture decisions, data model, build conventions) belongs in CLAUDE.md itself, not in `_spec/`.
+
+## Installed GEO/SEO skill suite
+
+We've installed the full [`aaron-he-zhu/seo-geo-claude-skills`](https://github.com/aaron-he-zhu/seo-geo-claude-skills) collection — 20 markdown-only skills (no executable code; reviewed) covering the GEO/SEO lifecycle: **research** (keyword-research, competitor-analysis, content-gap-analysis, serp-analysis), **build** (geo-content-optimizer, schema-markup-generator, seo-content-writer, meta-tags-optimizer), **optimize** (on-page-seo-auditor, technical-seo-checker, internal-linking-optimizer, content-refresher), **monitor** (backlink-analyzer, rank-tracker, performance-reporter, alert-manager), and **cross-cutting** (content-quality-auditor = CORE-EEAT, domain-authority-auditor = CITE, entity-optimizer, memory-management). They auto-activate on matching tasks and complement our own `geo-seo-expert` playbook.
+
+**Install layout (important for git):** `npx skills` writes the real skill files to `.agents/skills/<name>/` and junctions them into `.claude/skills/<name>/` so Claude Code can discover them. Only the real content in `.agents/skills/` and the `skills-lock.json` pin-file are committed; the `.claude/skills/*` junctions are machine-local and git-ignored (except our own `geo-seo-expert/`). **After cloning, run `npx skills install` to recreate the junctions** from `skills-lock.json`. To add or update skills: `npx skills add https://github.com/aaron-he-zhu/seo-geo-claude-skills --skill <name>`.
 
 ## Mobile build & release (EAS)
 

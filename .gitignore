@@ -48,3 +48,10 @@ coverage/
 # Supabase local
 **/supabase/.branches
 **/supabase/.temp
+
+# Installed agent skills (skills.sh)
+# Real skill content lives in .agents/skills/ and is committed; the .claude/skills/*
+# entries are machine-local junctions recreated via `npx skills install`. Keep our
+# own geo-seo-expert skill, which is real (not a junction).
+/.claude/skills/*
+!/.claude/skills/geo-seo-expert/
