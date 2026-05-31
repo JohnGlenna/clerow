@@ -2242,6 +2242,29 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .task--click { cursor: pointer; }
 .task--click:hover { border-color: color-mix(in oklab, var(--accent-2) 40%, var(--border)); }
 
+/* Clerow MCP / API key card */
+.key-code {
+  display: block; font-family: var(--font-mono); font-size: 12px; line-height: 1.5;
+  background: var(--bg-soft-2); border: 1px solid var(--border-soft); border-radius: 10px;
+  padding: 10px 12px; color: var(--ink); word-break: break-all; user-select: all;
+}
+.key-fresh {
+  border: 1px solid color-mix(in oklab, var(--success) 35%, var(--border));
+  background: color-mix(in oklab, var(--success) 7%, var(--surface));
+  border-radius: 12px; padding: 12px; margin-bottom: 12px;
+}
+.key-fresh-head { font-size: 13px; margin-bottom: 8px; color: var(--ink); }
+.key-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.key-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border-radius: 10px; background: var(--bg-soft); border: 1px solid var(--border-soft);
+}
+.key-row-name { font-weight: 700; font-size: 13.5px; color: var(--ink); }
+.key-row-meta { font-size: 11.5px; color: var(--ink-2); font-family: var(--font-mono); margin-top: 2px; }
+.key-snippet { display: flex; flex-direction: column; gap: 8px; }
+.key-snippet-label { font-size: 12px; font-weight: 800; color: var(--ink-2); }
+.key-snippet .btn { align-self: flex-start; }
+
 /* Models row */
 .model-row {
   display: flex; justify-content: space-between; align-items: center;

@@ -66,6 +66,17 @@ We've installed the full [`aaron-he-zhu/seo-geo-claude-skills`](https://github.c
 
 **Install layout (important for git):** `npx skills` writes the real skill files to `.agents/skills/<name>/` and junctions them into `.claude/skills/<name>/` so Claude Code can discover them. Only the real content in `.agents/skills/` and the `skills-lock.json` pin-file are committed; the `.claude/skills/*` junctions are machine-local and git-ignored (except our own `geo-seo-expert/`). **After cloning, run `npx skills install` to recreate the junctions** from `skills-lock.json`. To add or update skills: `npx skills add https://github.com/aaron-he-zhu/seo-geo-claude-skills --skill <name>`.
 
+## Clerow MCP server
+
+Clerow exposes a Model Context Protocol server so a user's AI agent (Claude Code, Cursor, any MCP client) can pull their prioritized GEO tasks, generate ready-to-ship files/content, and mark tasks done — keeping the streak. **Clerow returns content + data; the agent does the repo writes/PR** (Clerow never needs repo access).
+
+- **Endpoint:** `POST <APP_URL>/api/mcp` (Streamable HTTP). Implemented with `mcp-handler` at `clerow-web/app/api/[transport]/route.ts` (basePath `/api`, SSE disabled).
+- **Auth:** long-lived Clerow API key `clerow_sk_…`. Users mint/revoke keys in **Settings → Clerow MCP** (`/api/keys`); only a SHA-256 hash + prefix are stored (`api_keys` table, migration `0007`). The MCP resolves a presented key with the service-role admin client (`lib/apiKeys.ts` `resolveKey`) and stashes `{userId, brandId}` in `authInfo.extra`.
+- **Tools** (`clerow-web/lib/mcp/tools.ts`): `get_visibility` (multi-model standings — the moat), `list_tasks` (the active Climb level), `get_site_audit` (technical gaps) — all free; `get_task_content` (deterministic robots.txt/llms.txt via `lib/content/files.ts`, else `generateFixContent`) and `complete_task` — gated to an active subscription.
+- **Connect:** `claude mcp add --transport http clerow <APP_URL>/api/mcp --header "Authorization: Bearer <key>"`.
+- **Env:** needs `SUPABASE_SERVICE_ROLE_KEY` (key resolution) and `ANTHROPIC_API_KEY` (content gen).
+- **Not in v1:** triggering new multi-model scans from MCP (cost/latency) — re-scan stays a dashboard action; MCP can run the cheap site audit.
+
 ## Mobile build & release (EAS)
 
 The mobile app uses Expo Application Services (EAS) for builds and submissions.

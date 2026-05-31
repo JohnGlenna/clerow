@@ -33,6 +33,7 @@ export function PageSettings() {
       <div className="settings-stack">
         <AccountCard />
         <BrandCard />
+        <IntegrationCard />
         <NotificationsCard />
         <BillingCard />
         <DangerCard />
@@ -252,6 +253,125 @@ function BrandCard() {
           </div>
         </>
       )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------ MCP / API access -- */
+
+type ApiKeyRow = {
+  id: string;
+  name: string;
+  prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+};
+
+// Connect Clerow to Claude Code / Cursor / any MCP client so an agent can pull
+// your GEO tasks, generate the files, and ship them into your repo.
+function IntegrationCard() {
+  const [keys, setKeys] = React.useState<ApiKeyRow[] | null>(null);
+  const [creating, setCreating] = React.useState(false);
+  const [fresh, setFresh] = React.useState<string | null>(null); // plaintext shown once
+  const [copied, setCopied] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    const res = await fetch("/api/keys", { cache: "no-store" });
+    const json = await res.json().catch(() => ({ keys: [] }));
+    setKeys(json.keys ?? []);
+  }, []);
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  const create = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/keys", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "MCP key" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (json.plaintext) setFresh(json.plaintext);
+      await load();
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const revoke = async (id: string) => {
+    await fetch(`/api/keys?id=${id}`, { method: "DELETE" });
+    await load();
+  };
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://app.clerow.com";
+  const keyForSnippet = fresh ?? "YOUR_KEY";
+  const snippet = `claude mcp add --transport http clerow ${origin}/api/mcp --header "Authorization: Bearer ${keyForSnippet}"`;
+
+  const active = (keys ?? []).filter((k) => !k.revoked_at);
+
+  return (
+    <section className="app-card">
+      <div className="app-card-head">
+        <h4>Clerow MCP — let your AI agent do the work</h4>
+        <span className="sub">Claude Code, Cursor &amp; other agents</span>
+      </div>
+
+      <p className="settings-hint" style={{ marginBottom: 12 }}>
+        Connect Clerow to your coding agent. It can read your prioritized GEO tasks, generate the exact
+        files (robots.txt, llms.txt, FAQ schema, comparison pages), write them into your site&apos;s repo, and
+        check them off — keeping your streak.
+      </p>
+
+      {fresh && (
+        <div className="key-fresh">
+          <div className="key-fresh-head">
+            <b>Your new key — copy it now, it won&apos;t be shown again.</b>
+          </div>
+          <code className="key-code">{fresh}</code>
+        </div>
+      )}
+
+      <div className="settings-actions" style={{ justifyContent: "flex-start", marginBottom: 14 }}>
+        <button className="btn btn--primary btn--sm" onClick={create} disabled={creating}>
+          <Icon name="bolt" size={14} /> {creating ? "Creating…" : "Create MCP key"}
+        </button>
+      </div>
+
+      {active.length > 0 && (
+        <div className="key-list">
+          {active.map((k) => (
+            <div key={k.id} className="key-row">
+              <div>
+                <div className="key-row-name">{k.name}</div>
+                <div className="key-row-meta">
+                  {k.prefix}…··· · {k.last_used_at ? `last used ${new Date(k.last_used_at).toLocaleDateString()}` : "never used"}
+                </div>
+              </div>
+              <button className="btn btn--ghost btn--sm" onClick={() => revoke(k.id)}>
+                Revoke
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="key-snippet">
+        <div className="key-snippet-label">Add to Claude Code</div>
+        <code className="key-code">{snippet}</code>
+        <button
+          className="btn btn--ghost btn--sm"
+          onClick={() => {
+            navigator.clipboard?.writeText(snippet);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
+          }}
+        >
+          {copied ? "Copied ✓" : "Copy command"}
+        </button>
+      </div>
     </section>
   );
 }
