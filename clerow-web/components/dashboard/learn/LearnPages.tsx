@@ -4,6 +4,8 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { MascotClerow } from "../../Mascot";
 import { AiIcon } from "../../ui/AiIcon";
+import { PixelXpBar } from "../../ui/PixelXpBar";
+import { PixelAreaChart } from "../../ui/PixelAreaChart";
 import { useDashboard } from "@/lib/useDashboard";
 import { createClient } from "@/lib/supabase/client";
 import type { DashboardData, DashboardModel, DashboardPrompt } from "@/lib/types";
@@ -36,8 +38,8 @@ function ModelDots({ models, lit }: { models: DashboardModel[]; lit: boolean }) 
   return (
     <span style={{ display: "inline-flex", gap: 4 }}>
       {models.map((m) => (
-        <span key={m.id} className="mc" style={{ width: 20, height: 20, fontSize: 9, borderRadius: 6, background: lit && !m.locked ? m.swatch : "var(--surface-3)", color: lit && !m.locked ? "#fff" : "var(--ink-4)", marginLeft: 0 }}>
-          <AiIcon id={m.id} size={11} letter={m.letter} />
+        <span key={m.id} className="mc" style={{ width: 22, height: 22, borderRadius: 6, background: "#fff", border: "1px solid rgba(0,0,0,0.08)", marginLeft: 0, opacity: lit && !m.locked ? 1 : 0.4 }}>
+          <AiIcon id={m.id} size={13} letter={m.letter} />
         </span>
       ))}
     </span>
@@ -133,7 +135,7 @@ export function DashModels({ data, onLearn }: { data: DashboardData; onLearn: ()
         {models.map((m) => (
           <div key={m.id} className={`lm-card ${m.locked ? "locked" : ""}`}>
             <div className="lm-top">
-              <span className="lm-ic" style={{ background: m.swatch }}><AiIcon id={m.id} size={20} letter={m.letter} /></span>
+              <span className="lm-ic" style={{ background: "#fff" }}><AiIcon id={m.id} size={24} letter={m.letter} /></span>
               <div style={{ flex: 1 }}><div className="lm-name">{m.label}</div><div className="lm-maker">by {MAKER[m.id] ?? "—"}</div></div>
               {m.locked ? <span className="lm-lock"><Lock /> Upgrade</span> : <span className="lm-live">● live</span>}
             </div>
@@ -199,11 +201,16 @@ export function DashProfile({ data }: { data: DashboardData }) {
         </div>
         <div style={{ fontWeight: 900, fontSize: 20 }}>{data.brand?.company || data.brand?.url || "Your brand"}</div>
         <div style={{ color: "var(--ink-2)", fontWeight: 700, fontSize: 13 }}>{xp?.title ?? "Rookie"}</div>
-        <div className="pf-bar"><i style={{ width: `${xp?.pct ?? 0}%` }} /></div>
+        <div style={{ maxWidth: 320, margin: "16px auto 0" }}>
+          <PixelXpBar value={xp?.pct ?? 0} level={xp?.level} />
+        </div>
         <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 16 }}>
           <Pf n={String(xp?.total ?? 0)} l="XP" /><Pf n={`🔥 ${streak?.current ?? 0}`} l="Streak" /><Pf n={String(data.scansLeft ?? 0)} l="Scans left" />
         </div>
       </div>
+      <h2 className="lp-sec">AI visibility trend</h2>
+      <PixelAreaChart data={(data.trend?.sparkline ?? []).map((v, i) => ({ label: `#${i + 1}`, value: v }))} max={100} />
+
       <h2 className="lp-sec">Achievements</h2>
       <div className="lp-card" style={{ padding: 18 }}>
         <div className="lmedal-row">

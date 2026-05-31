@@ -3,18 +3,20 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { MascotClerow } from "../Mascot";
+import { AiIcon } from "../ui/AiIcon";
 
 // Clerow Welcome — Duolingo-style landing, ported from the v2 design
 // (_design_extract/clerow-v2/project/components/welcome.jsx). Scoped under
 // .wl-root (see app/welcome/welcome.css). CTAs open the auth modal; the modal
 // routes into onboarding.
 
-const MODELS: [string, string, string][] = [
-  ["C", "#10A37F", "ChatGPT"],
-  ["A", "#D97706", "Claude"],
-  ["G", "#4285F4", "Gemini"],
-  ["X", "#566270", "Grok"],
-  ["P", "#1CB0F6", "Perplexity"],
+// [letter, color, name, engineId]
+const MODELS: [string, string, string, string][] = [
+  ["C", "#10A37F", "ChatGPT", "chatgpt"],
+  ["A", "#D97706", "Claude", "claude"],
+  ["G", "#4285F4", "Gemini", "gemini"],
+  ["X", "#566270", "Grok", "grok"],
+  ["P", "#1CB0F6", "Perplexity", "perplexity"],
 ];
 
 function Nav({ onStart }: { onStart: () => void }) {
@@ -22,7 +24,7 @@ function Nav({ onStart }: { onStart: () => void }) {
     <header className="wl-nav">
       <div className="shell in">
         <a className="brand"><MascotClerow size={34} /> Clerow</a>
-        <button className="btn btn-green btn-sm" onClick={onStart}>Get started</button>
+        <button className="btn btn-primary btn-sm" onClick={onStart}>Get started</button>
       </div>
     </header>
   );
@@ -34,8 +36,8 @@ function Hero({ onStart }: { onStart: () => void }) {
       <div className="hero-main shell">
         <div className="hero-grid">
           <div className="hero-art">
-            {MODELS.map(([l, c], i) => (
-              <span key={i} className={`float-tile t${i + 1}`} style={{ background: c }}>{l}</span>
+            {MODELS.map(([l, , , id], i) => (
+              <span key={i} className={`float-tile t${i + 1}`} style={{ background: "#fff" }}><AiIcon id={id} size={36} letter={l} /></span>
             ))}
             <span className="hero-mascot"><MascotClerow size={210} float /></span>
           </div>
@@ -53,8 +55,8 @@ function Hero({ onStart }: { onStart: () => void }) {
       <div className="model-strip">
         <div className="shell in">
           <span className="ms-chev">‹</span>
-          {MODELS.map(([l, c, n], i) => (
-            <span key={i} className="ms-item"><span className="mc" style={{ background: c }}>{l}</span>{n}</span>
+          {MODELS.map(([l, , n, id], i) => (
+            <span key={i} className="ms-item"><span className="mc" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}><AiIcon id={id} size={15} letter={l} /></span>{n}</span>
           ))}
           <span className="ms-chev">›</span>
         </div>
@@ -78,14 +80,14 @@ function Row({ rev, title, children, art }: { rev?: boolean; title: string; chil
 }
 
 function IllScan() {
-  const rows: [string, string, number][] = [["C", "#10A37F", 78], ["A", "#D97706", 54], ["P", "#1CB0F6", 40], ["X", "#566270", 22], ["G", "#4285F4", 14]];
+  const rows: [string, number, string][] = [["chatgpt", 78, "C"], ["claude", 54, "A"], ["perplexity", 40, "P"], ["grok", 22, "X"], ["gemini", 14, "G"]];
   return (
     <div className="ill">
       <div style={{ fontWeight: 900, fontSize: 13, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>&quot;best AI music generator&quot;</div>
       <div className="ill-bars">
-        {rows.map(([l, c, v], i) => (
+        {rows.map(([id, v, l], i) => (
           <div key={i} className="ill-bar">
-            <span className="mc" style={{ background: c }}>{l}</span>
+            <span className="mc" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}><AiIcon id={id} size={17} letter={l} /></span>
             <span className="track"><i style={{ width: `${v}%` }} /></span>
             <span className="v">{v}%</span>
           </div>
@@ -176,8 +178,8 @@ function Results() {
 function AppSection() {
   return (
     <section className="app-sec">
-      {MODELS.map(([l, c], i) => (
-        <span key={i} className="app-float" style={{ background: c, top: `${15 + i * 14}%`, left: i % 2 ? "auto" : `${6 + i * 4}%`, right: i % 2 ? `${8 + i * 5}%` : "auto", animationDelay: `${i * 0.5}s` }}>{l}</span>
+      {MODELS.map(([l, , , id], i) => (
+        <span key={i} className="app-float" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", top: `${15 + i * 14}%`, left: i % 2 ? "auto" : `${6 + i * 4}%`, right: i % 2 ? `${8 + i * 5}%` : "auto", animationDelay: `${i * 0.5}s` }}><AiIcon id={id} size={30} letter={l} /></span>
       ))}
       <div className="shell">
         <span className="soon">Coming soon</span>

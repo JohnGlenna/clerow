@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { MascotClerow } from "../../Mascot";
 import { PixelProgress } from "../../ui/PixelProgress";
+import { PixelXpBar } from "../../ui/PixelXpBar";
 import { AiIcon } from "../../ui/AiIcon";
 import { DashPrompts, DashModels, DashLeaderboard, DashProfile } from "./LearnPages";
 import { DashboardProvider, useDashboard } from "@/lib/useDashboard";
@@ -72,7 +73,7 @@ function LearnTop({ data }: { data: DashboardData }) {
         <MascotClerow size={26} /> {domainOf(data.brand?.url)}
         <span className="mono">· scanned across</span>
         <span className="model-cluster">
-          {models.map((m) => <span key={m.id} className="mc" style={{ background: m.swatch }}><AiIcon id={m.id} size={13} letter={m.letter} /></span>)}
+          {models.map((m) => <span key={m.id} className="mc" style={{ background: "#fff" }}><AiIcon id={m.id} size={16} letter={m.letter} /></span>)}
         </span>
       </div>
       <span className="stat-pill streak"><span className="ic">🔥</span>{data.streak?.current ?? 0}</span>
@@ -164,7 +165,7 @@ function LearnRail({ data }: { data: DashboardData }) {
         <div className="rail-models">
           {models.map((m: DashboardModel) => (
             <div key={m.id} className="rail-model">
-              <span className="mc" style={{ background: m.swatch }}><AiIcon id={m.id} size={13} letter={m.letter} /></span>{m.label}
+              <span className="mc" style={{ background: "#fff" }}><AiIcon id={m.id} size={16} letter={m.letter} /></span>{m.label}
               <span className={`st ${m.visibility ? "ok" : "no"}`}>{m.locked ? "🔒" : m.visibility != null ? `${m.visibility}%` : "—"}</span>
             </div>
           ))}
@@ -177,6 +178,16 @@ function LearnRail({ data }: { data: DashboardData }) {
         <h4>Let your AI do the work</h4>
         <p>Plug Clerow into Claude Code, Cursor or any agent. It ships the fixes — Clerow verifies across every model.</p>
         <button className="btn-violet" onClick={() => router.push("/dashboard/settings")}>Connect MCP</button>
+      </div>
+
+      <div className="rail-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+          <h4 style={{ margin: 0 }}>{data.xp?.title ?? "Rookie"}</h4>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 800, color: "var(--ink-2)" }}>
+            {data.xp ? `${data.xp.intoLevel}/${data.xp.span} XP` : "0 XP"}
+          </span>
+        </div>
+        <PixelXpBar value={data.xp?.pct ?? 0} level={data.xp?.level ?? 1} />
       </div>
 
       <div className="rail-card">
