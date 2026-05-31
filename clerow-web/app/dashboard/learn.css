@@ -9,7 +9,8 @@
   --ink: #F3F7F8; --ink-2: #A7BCC4; --ink-3: #6E848C; --ink-4: #46585F;
   --blue: #38A9E0; --blue-2: #2E86C1; --blue-deep: #1A5374; --blue-soft: #15303d; --blue-mid: #1f5a78;
   --xp: #FFC800; --xp-deep: #B98E00; --streak: #FF9600; --streak-deep: #C56E00;
-  --green: #58CC02; --green-deep: #46A302; --red: #FF4B4B; --violet: #A560F0; --violet-deep: #7A3FBF;
+  /* No green in the dashboard — alias green tokens to brand blue. */
+  --green: #38A9E0; --green-deep: #1A5374; --red: #FF4B4B; --violet: #A560F0; --violet-deep: #7A3FBF;
   --gold: #FFD43B;
   --ldfont: "Nunito", -apple-system, system-ui, sans-serif; --mono: "Geist Mono", monospace;
   background: var(--bg); color: var(--ink); font-family: var(--ldfont); min-height: 100vh;
@@ -89,6 +90,13 @@
 .mcp-card p { margin: 0 0 12px; font-size: 12.5px; color: #B9AFD6; font-weight: 600; line-height: 1.5; }
 .btn-violet { width: 100%; height: 48px; border: 0; border-radius: 13px; background: linear-gradient(180deg,#B97CF5,var(--violet)); color: #fff; font-weight: 900; font-size: 14px; box-shadow: 0 4px 0 var(--violet-deep); text-transform: uppercase; letter-spacing: .03em; }
 .btn-violet:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--violet-deep); }
+/* upgrade / subscribe box (over the MCP card) */
+.upgrade-card { background: linear-gradient(180deg, var(--blue-2), var(--blue-deep)); border: 2px solid var(--blue-mid); border-radius: 16px; padding: 18px; }
+.upgrade-card .up-tag { display: inline-block; background: var(--xp); color: #5A4200; font-weight: 900; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; }
+.upgrade-card h4 { margin: 10px 0 4px; font-size: 16px; font-weight: 900; color: #fff; }
+.upgrade-card p { margin: 0 0 12px; font-size: 12.5px; color: #dbeefc; font-weight: 600; line-height: 1.5; }
+.btn-upgrade { width: 100%; height: 46px; border: 0; border-radius: 12px; background: var(--xp); color: #5A4200; font-weight: 900; font-size: 14px; box-shadow: 0 4px 0 var(--xp-deep); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+.btn-upgrade:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--xp-deep); }
 .rail-mini-q { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
 .rail-mini-q:last-child { border-bottom: 0; }
 .rail-mini-q .qc { width: 32px; height: 32px; border-radius: 9px; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex: 0 0 32px; }
@@ -135,15 +143,15 @@
 .lesson-foot { border-top: 2px solid var(--line); background: var(--bg); position: fixed; bottom: 0; left: 0; right: 0; }
 .lesson-foot-in { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 18px 26px; }
 .btn-skip { background: none; border: 2px solid var(--line); color: var(--ink-2); font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; padding: 13px 28px; border-radius: 14px; box-shadow: 0 4px 0 var(--line); }
-.btn-check { background: var(--green); border: 0; color: #0c2400; font-weight: 900; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; padding: 15px 40px; border-radius: 14px; box-shadow: 0 4px 0 var(--green-deep); }
+.btn-check { background: var(--blue); border: 0; color: #06222e; font-weight: 900; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; padding: 15px 40px; border-radius: 14px; box-shadow: 0 4px 0 var(--blue-deep); }
 .btn-check:disabled { background: var(--surface-2); color: var(--ink-4); box-shadow: 0 4px 0 var(--line); }
 .btn-check:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--green-deep); }
 
-.done-toast { position: fixed; left: 0; right: 0; bottom: 0; background: #1b3a10; border-top: 2px solid var(--green-deep); z-index: 61; }
+.done-toast { position: fixed; left: 0; right: 0; bottom: 0; background: #10303f; border-top: 2px solid var(--blue-deep); z-index: 61; }
 .done-toast-in { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 16px; padding: 20px 26px; }
 .done-check { width: 52px; height: 52px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; color: var(--green); font-size: 26px; }
-.done-toast .dt-t { font-weight: 900; font-size: 20px; color: var(--green); }
-.done-toast .dt-s { font-size: 13px; color: #9fd47a; font-weight: 700; }
+.done-toast .dt-t { font-weight: 900; font-size: 20px; color: var(--blue); }
+.done-toast .dt-s { font-size: 13px; color: #bfe0f0; font-weight: 700; }
 .done-toast .btn-check { margin-left: auto; }
 
 /* steps + share */

@@ -184,4 +184,5 @@ export type DashboardData = {
   citations?: { url: string; title: string }[];
   scansLeft?: number; // scans remaining this billing period (budget)
   budget?: { spent: number; ceiling: number };
+  subscribed?: boolean; // active paid plan (gates re-scan, extra models, MCP)
 };

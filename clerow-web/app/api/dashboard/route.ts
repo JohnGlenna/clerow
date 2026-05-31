@@ -7,7 +7,7 @@ import { levelFromXp } from "@/lib/xp";
 import { ensureSiteAudit } from "@/lib/audit/ensure";
 import { buildLadder, ensureLadderTasks, type LadderContext } from "@/lib/ladder";
 import { budgetStatus, planFromSub } from "@/lib/billing/limits";
-import { getSubscription } from "@/lib/billing/subscription";
+import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -194,7 +194,8 @@ export async function GET(req: Request) {
   const xp = levelFromXp(totalXp);
 
   // Monthly scan-budget status (the COGS guard) → surfaced as "scans left".
-  const plan = planFromSub(await getSubscription(supabase, user.id));
+  const sub = await getSubscription(supabase, user.id);
+  const plan = planFromSub(sub);
   const budget = await budgetStatus(supabase, user.id, plan, now);
 
   // Score movement vs the previous daily snapshot, for the Overview score card.
@@ -257,5 +258,6 @@ export async function GET(req: Request) {
     ladder,
     scansLeft: budget.scansLeft,
     budget: { spent: Math.round(budget.spent * 100) / 100, ceiling: budget.ceiling },
+    subscribed: isSubscribed(sub),
   });
 }

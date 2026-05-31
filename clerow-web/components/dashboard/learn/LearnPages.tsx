@@ -38,16 +38,14 @@ function ModelDots({ models, lit }: { models: DashboardModel[]; lit: boolean }) 
   return (
     <span style={{ display: "inline-flex", gap: 4 }}>
       {models.map((m) => (
-        <span key={m.id} className="mc" style={{ width: 22, height: 22, borderRadius: 6, background: "#fff", border: "1px solid rgba(0,0,0,0.08)", marginLeft: 0, opacity: lit && !m.locked ? 1 : 0.4 }}>
-          <AiIcon id={m.id} size={13} letter={m.letter} />
-        </span>
+        <span key={m.id} className="mc" title={m.label} style={{ width: 20, height: 20, fontSize: 9, borderRadius: 6, background: lit && !m.locked ? m.swatch : "var(--surface-3)", color: lit && !m.locked ? "#fff" : "var(--ink-4)", marginLeft: 0 }}>{m.letter}</span>
       ))}
     </span>
   );
 }
 
 /* ---------------- Prompts ---------------- */
-export function DashPrompts({ data, onLearn }: { data: DashboardData; onLearn: () => void }) {
+export function DashPrompts({ data, onFix }: { data: DashboardData; onFix: (p: DashboardPrompt) => void }) {
   const { refresh } = useDashboard();
   const models = data.models ?? [];
   const prompts = data.prompts ?? [];
@@ -106,7 +104,7 @@ export function DashPrompts({ data, onLearn }: { data: DashboardData; onLearn: (
               <div style={{ flex: 1, minWidth: 0 }}><div className="lp-q">&quot;{r.text}&quot;{r.isPrimary && <span className="lp-new" style={{ background: "var(--blue)", color: "#fff" }}>PRIMARY</span>}</div></div>
               <ModelDots models={models} lit={r.scanned} />
               <span className="lp-pos" style={{ background: !r.scanned ? "var(--surface-3)" : r.yourPosition == null ? "var(--red)" : win ? "var(--green)" : "var(--surface-3)", color: r.yourPosition == null && r.scanned ? "#fff" : win ? "#06210a" : "var(--ink)" }}>{pos}</span>
-              {win ? <span className="lp-win">Winning</span> : <button className="lp-fix" onClick={onLearn}>Fix →</button>}
+              {win ? <span className="lp-win">Winning</span> : <button className="lp-fix" onClick={() => onFix(r)}>Fix →</button>}
             </div>
           );
         })}

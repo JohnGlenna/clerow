@@ -54,11 +54,9 @@ function Hero({ onStart }: { onStart: () => void }) {
       </div>
       <div className="model-strip">
         <div className="shell in">
-          <span className="ms-chev">‹</span>
           {MODELS.map(([l, , n, id], i) => (
-            <span key={i} className="ms-item"><span className="mc" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}><AiIcon id={id} size={15} letter={l} /></span>{n}</span>
+            <span key={i} className="ms-item"><span className="mc" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}><AiIcon id={id} size={19} letter={l} /></span>{n}</span>
           ))}
-          <span className="ms-chev">›</span>
         </div>
       </div>
     </section>
@@ -214,6 +212,40 @@ function WhoFor() {
   );
 }
 
+function Pricing({ onStart }: { onStart: () => void }) {
+  const lines = [
+    "Scan across all 5 AI models",
+    "Discover + add custom prompts",
+    "The full quest path — XP & streaks",
+    "Re-scan anytime to track your climb",
+    "Clerow MCP autopilot",
+  ];
+  return (
+    <section id="pricing" className="pricing">
+      <div className="shell">
+        <div className="pr-head">
+          <div className="pr-eyebrow">Pricing</div>
+          <h2>One simple plan. No sales call.</h2>
+        </div>
+        <div className="price-grid price-grid--single">
+          <div className="price feat">
+            <span className="tag">⭐ For founders &amp; small teams</span>
+            <span className="pic">🦉</span>
+            <span className="nm">Founder</span>
+            <div className="amt"><span className="c">$</span>29</div>
+            <div className="per">per month · cancel anytime</div>
+            <ul>{lines.map((f, j) => <li key={j}><span className="ck">✓</span>{f}</li>)}</ul>
+            <button className="btn btn-primary" onClick={onStart}>Subscribe — $29/mo</button>
+            <p style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 700, margin: "12px 0 0", textAlign: "center" }}>
+              Free: your first scan (Perplexity) + Level 1 fixes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Final({ onStart }: { onStart: () => void }) {
   return (
     <section className="final shell">
@@ -280,6 +312,7 @@ export function WelcomePage() {
       <Results />
       <AppSection />
       <WhoFor />
+      <Pricing onStart={onStart} />
       <Final onStart={onStart} />
       <footer className="foot">
         <div className="shell">

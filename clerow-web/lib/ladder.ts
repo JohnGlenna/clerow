@@ -102,10 +102,13 @@ const L1_FALLBACK: Spec[] = [
 ];
 
 function level1(ctx: LadderContext): Spec[] {
+  // The 4 highest-leverage, FREE quick wins for getting read & cited by AI, in
+  // priority order (GEO playbook): be crawlable → allow AI bots → llms.txt →
+  // one clear H1 → title → meta. Surface only the top 4 detected gaps so the free
+  // tier feels like fast, focused wins (the rest carry into later levels).
   const fromAudit = auditSpecs(ctx.audit, L1_AUDIT);
-  // Audit ran and everything passed → no Level 1 work (power users skip ahead).
-  if (ctx.audit) return fromAudit;
-  return L1_FALLBACK;
+  if (ctx.audit) return fromAudit.slice(0, 4);
+  return L1_FALLBACK.slice(0, 4);
 }
 
 function level2(ctx: LadderContext): Spec[] {

@@ -19,6 +19,7 @@ const OFF = [0, -52, -76, -52, 0, 52, 76, 52];
 type SheetTask = {
   kind: "task" | "mcp" | "checkpoint";
   id: string | null;
+  promptId?: string | null; // when the lesson is for a tracked prompt (Prompts page → Fix)
   title: string;
   why: string;
   xp: number;
@@ -170,14 +171,26 @@ function LearnRail({ data }: { data: DashboardData }) {
             </div>
           ))}
         </div>
-        <div className="rail-note"><b>Why Clerow &gt; just asking Claude:</b> Claude can&apos;t tell you how ChatGPT or Perplexity rank you. Clerow can.</div>
       </div>
+
+      {!data.subscribed && (
+        <div className="upgrade-card">
+          <span className="up-tag">Founder · $29/mo</span>
+          <h4>Unlock the full climb</h4>
+          <p>Level 1 is free. Upgrade to scan all 5 AI models, re-scan anytime, and let Clerow MCP ship your fixes.</p>
+          <button className="btn-upgrade" onClick={() => router.push("/dashboard/settings")}>Upgrade — $29/mo</button>
+        </div>
+      )}
 
       <div className="mcp-card">
         <span className="mcp-tag">⚡ Clerow MCP</span>
         <h4>Let your AI do the work</h4>
         <p>Plug Clerow into Claude Code, Cursor or any agent. It ships the fixes — Clerow verifies across every model.</p>
-        <button className="btn-violet" onClick={() => router.push("/dashboard/settings")}>Connect MCP</button>
+        {data.subscribed ? (
+          <button className="btn-violet" onClick={() => router.push("/dashboard/settings")}>Connect MCP</button>
+        ) : (
+          <button className="btn-violet" style={{ opacity: 0.6 }} onClick={() => router.push("/dashboard/settings")}>Subscribe to use</button>
+        )}
       </div>
 
       <div className="rail-card">
@@ -211,17 +224,28 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
   const cmd = `Clerow: read my open Clerow tasks and ship "${task.title}" as a PR, then re-check all my AI models when done.`;
 
   const loadContent = async () => {
-    if (!task.id) { setView("steps"); return; }
     setBusy(true);
+    setView("steps");
     try {
-      const res = await fetch(`/api/tasks/${task.id}/content`, { method: "POST" });
+      let res: Response | null = null;
+      if (task.promptId) {
+        // Prompt lesson: rebuild the prompt's playbook, then generate its top step.
+        const detail = await fetch(`/api/prompts/${task.promptId}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const stepId = detail?.steps?.[0]?.id;
+        if (!stepId) { setContent("Scan this prompt across your models first, then we can generate the fix."); return; }
+        res = await fetch(`/api/prompts/${task.promptId}/content`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stepId }) });
+      } else if (task.id) {
+        res = await fetch(`/api/tasks/${task.id}/content`, { method: "POST" });
+      } else {
+        setContent("We'll have a guide here shortly.");
+        return;
+      }
       const json = await res.json().catch(() => ({}));
       setContent(typeof json.content === "string" ? json.content : json.error || "Couldn't generate content.");
     } catch {
       setContent("Couldn't generate content. Try again.");
     } finally {
       setBusy(false);
-      setView("steps");
     }
   };
 
@@ -259,7 +283,7 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
   if (view === "done") {
     return (
       <div className="sheet-back">
-        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={100} fill="#58CC02" track="rgba(88,204,2,0.18)" /></div></div>
+        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={100} /></div></div>
         <div className="done-toast"><div className="done-toast-in">
           <div className="done-check">✓</div>
           <div>
@@ -371,7 +395,21 @@ function LearnInner() {
           ) : data ? (
             <>
               {page === "learn" && <LearnPath data={data} onOpen={setTask} />}
-              {page === "prompts" && <DashPrompts data={data} onLearn={toLearn} />}
+              {page === "prompts" && (
+                <DashPrompts
+                  data={data}
+                  onFix={(p) =>
+                    setTask({
+                      kind: "task",
+                      id: null,
+                      promptId: p.id,
+                      title: `Win the query: "${p.text}"`,
+                      why: "Ship a focused page that answers this query and names you as a top option, then get it cited — Clerow generates the draft for you.",
+                      xp: 60,
+                    })
+                  }
+                />
+              )}
               {page === "models" && <DashModels data={data} onLearn={toLearn} />}
               {page === "leaderboard" && <DashLeaderboard data={data} />}
               {page === "profile" && <DashProfile data={data} />}

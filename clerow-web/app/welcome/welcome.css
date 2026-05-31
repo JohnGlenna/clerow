@@ -58,9 +58,9 @@
 .wl-root .model-strip { border-top: 1px solid var(--line); padding: 18px 0; }
 .wl-root .model-strip .in { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .wl-root .ms-chev { color: var(--ink-3); font-size: 20px; font-weight: 900; padding: 0 6px; }
-.wl-root .ms-item { display: inline-flex; align-items: center; gap: 9px; padding: 9px 16px; border-radius: 13px; font-weight: 800; font-size: 14px; color: var(--ink); }
+.wl-root .ms-item { display: inline-flex; align-items: center; gap: 11px; padding: 11px 19px; border-radius: 15px; font-weight: 800; font-size: 17px; color: var(--ink); }
 .wl-root .ms-item:hover { background: var(--bg-soft); }
-.wl-root .ms-item .mc { width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: 12px; }
+.wl-root .ms-item .mc { width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: 14px; }
 
 .wl-root .row { padding: 90px 0; }
 .wl-root .row .in { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
@@ -123,7 +123,7 @@
 .wl-root .results .in { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
 .wl-root .res-eyebrow { display: inline-block; font-weight: 900; font-size: 12.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--blue); margin-bottom: 12px; }
 .wl-root .results h2 { font-weight: 900; font-size: clamp(28px,3.6vw,42px); line-height: 1.1; letter-spacing: -.02em; margin: 0 0 14px; color: var(--ink); }
-.wl-root .results h2 .b { color: var(--ink-3); } .wl-root .results h2 .g { color: var(--green); }
+.wl-root .results h2 .b { color: var(--ink-3); } .wl-root .results h2 .g { color: var(--blue); }
 .wl-root .results p { font-size: 16px; color: var(--ink-2); font-weight: 600; line-height: 1.55; margin: 0 0 20px; }
 .wl-root .results p b { color: var(--ink); }
 .wl-root .res-quote { display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 2px solid var(--line); border-radius: 16px; padding: 16px; }
@@ -132,10 +132,10 @@
 .wl-root .res-card { background: #fff; border: 2px solid var(--line); border-radius: 22px; padding: 22px; box-shadow: 0 26px 50px -28px rgba(20,40,60,.3); }
 .wl-root .res-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 12px; }
 .wl-root .res-card-top .mono { font-family: var(--mono); color: var(--ink-3); font-weight: 600; }
-.wl-root .res-up { color: var(--green); font-weight: 900; font-size: 13px; }
+.wl-root .res-up { color: var(--blue); font-weight: 900; font-size: 13px; }
 .wl-root .res-chart { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
 .wl-root .res-chart span { flex: 1; background: var(--blue-soft); border-radius: 6px 6px 0 0; min-height: 6px; }
-.wl-root .res-chart span.hot { background: var(--green); }
+.wl-root .res-chart span.hot { background: var(--blue); }
 .wl-root .res-axis { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--ink-3); font-weight: 700; margin-top: 8px; }
 .wl-root .res-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .wl-root .res-stats .rn { font-weight: 900; font-size: 18px; color: var(--blue); letter-spacing: -.01em; }
@@ -155,6 +155,30 @@
 .wl-root .wl-input { width: 100%; height: 54px; border: 2px solid var(--line); border-radius: 14px; padding: 0 16px; font-family: var(--wlfont); font-weight: 700; font-size: 15px; color: var(--ink); outline: 0; }
 .wl-root .wl-input:focus { border-color: var(--blue); }
 .wl-root .wl-legal { font-size: 11px; color: var(--ink-3); font-weight: 600; margin: 14px 0 0; }
+
+/* pricing */
+.wl-root .pricing { padding: 90px 0; }
+.wl-root .pr-head { text-align: center; max-width: 640px; margin: 0 auto 30px; }
+.wl-root .pr-eyebrow { font-weight: 900; font-size: 12.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--blue); margin-bottom: 10px; }
+.wl-root .pr-head h2 { font-weight: 900; font-size: clamp(28px,3.4vw,42px); letter-spacing: -.02em; margin: 0; color: var(--ink); }
+.wl-root .pr-toggle { display: inline-flex; margin: 20px auto 0; background: var(--bg-soft); border: 2px solid var(--line); border-radius: 999px; padding: 4px; }
+.wl-root .pr-toggle button { border: 0; background: transparent; padding: 9px 20px; border-radius: 999px; font-family: var(--wlfont); font-weight: 900; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.wl-root .pr-toggle button.on { background: var(--blue-soft); color: var(--blue); }
+.wl-root .price-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; max-width: 980px; margin: 38px auto 0; }
+.wl-root .price-grid--single { grid-template-columns: 1fr; max-width: 380px; }
+.wl-root .price { background: #fff; border: 2px solid var(--line); border-radius: 22px; padding: 28px 24px; display: flex; flex-direction: column; position: relative; box-shadow: 0 5px 0 var(--line); }
+.wl-root .price.feat { border-color: var(--blue); box-shadow: 0 5px 0 var(--blue-deep); }
+.wl-root .price .tag { position: absolute; top: -13px; left: 24px; background: var(--blue); color: #fff; font-weight: 900; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 5px 12px; border-radius: 999px; }
+.wl-root .price .pic { font-size: 30px; margin-bottom: 12px; }
+.wl-root .price .nm { font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
+.wl-root .price .amt { font-weight: 900; font-size: 46px; letter-spacing: -.03em; margin: 6px 0 2px; color: var(--ink); }
+.wl-root .price .amt .c { font-size: 22px; color: var(--ink-3); vertical-align: top; }
+.wl-root .price .per { font-size: 13px; color: var(--ink-3); font-weight: 700; margin-bottom: 18px; }
+.wl-root .price ul { list-style: none; padding: 0; margin: 0 0 22px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.wl-root .price li { display: flex; gap: 10px; font-weight: 700; font-size: 14px; color: var(--ink); }
+.wl-root .price li .ck { color: var(--blue); font-weight: 900; }
+.wl-root .price .btn { width: 100%; }
+@media (max-width: 860px) { .wl-root .price-grid { grid-template-columns: 1fr; } }
 
 .wl-root .foot { background: var(--bg-soft); border-top: 1px solid var(--line); padding: 40px 0; text-align: center; font-weight: 700; }
 .wl-root .foot .brand { justify-content: center; margin-bottom: 10px; }
