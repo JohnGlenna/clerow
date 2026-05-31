@@ -52,13 +52,6 @@ function Hero({ onStart }: { onStart: () => void }) {
           </div>
         </div>
       </div>
-      <div className="model-strip">
-        <div className="shell in">
-          {MODELS.map(([, , n], i) => (
-            <span key={i} className="ms-item">{n}</span>
-          ))}
-        </div>
-      </div>
     </section>
   );
 }
