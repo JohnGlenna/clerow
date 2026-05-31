@@ -1428,3 +1428,192 @@ Both changes are in:
 
 Verifier's checking contrast and the serif headings; I'll patch anything it flags.
 
+## User
+
+Verifier agent check completed
+
+## Assistant
+
+Hero heading needs more clearance. Let me bump its line-height/padding and the subhead gap.
+
+_[tool: str_replace_edit]_
+
+_[tool: snip]_
+
+_[tool: done]_
+
+_[tool: fork_verifier_agent]_
+
+_[tool: snip]_
+
+Gave the hero heading more room — raised its line-height and bottom padding and pushed the subhead gap to 50px so the italic descenders in "name you?" clear the paragraph. Verifier's confirming the hero now.
+
+## User
+
+Verifier agent check completed
+
+## Assistant
+
+_[tool: snip]_
+
+Verified clean — the hero heading clears its paragraph now. The white `Clerow Home.html` is done: light theme, the "Rank high on every AI chat" section, 5 models including Grok, MCP autopilot, gamified path, and all CTAs route into the dashboard. Ready for whatever's next.
+
+## User
+
+Make a brand new landing page file.
+
+Make me this kind of landing hero page. Then instead of the langauges show the models logos, chatgpt, claude, gemini, grok and peplexity. See image 1. And hero section should always show the full screen. And just show a title that explains the concept super easly. We are soon at app store also.. 
+
+Then easy to understand pointers. See image 2, 3, and 4.
+
+## Assistant
+
+_[tool: snip]_
+
+_[tool: write_file]_
+
+_[tool: write_file]_
+
+_[tool: write_file]_
+
+_[tool: done]_
+
+_[tool: snip]_
+
+_[tool: fork_verifier_agent]_
+
+I built **`Clerow Welcome.html`** — a brand-new Duolingo-style landing:
+
+- **Full-screen hero** with the Clerow mascot surrounded by 5 floating model tiles (ChatGPT, Claude, Gemini, Grok, Perplexity), a simple concept-first headline "The fun way to get your brand recommended by AI," an "iOS & Android coming soon" badge, and Get started / I-already-have-an-account buttons.
+- **Bottom model strip** (replacing Duolingo's language bar) with the 5 model logos as chips + chevrons.
+- **3 easy pointer rows** — "Scan every AI at once," "Fix it like a game," "Or let your AI do it" (MCP terminal).
+- **App-store section** "Climb anytime, anywhere" with a Coming soon badge + App Store / Google Play buttons.
+- Final CTA + footer. All CTAs route into the dashboard.
+
+Verifier's checking now — I'll fix anything it flags.
+
+## User
+
+Verifier agent check completed
+
+## Assistant
+
+_[tool: snip]_
+
+Verified clean — `Clerow Welcome.html` is done: full-screen Duolingo-style hero with the 5 model logos, simple concept headline, app-store-soon section, and easy pointer rows. Ready for what's next.
+
+## User
+
+add some more relevant componenets on landing page. Also i dont like the title, dont focus on so much that its fun, focus on what it gives the companies. Like "Get your brand recommonded by AI".
+
+## Assistant
+
+_[tool: str_replace_edit]_
+
+_[tool: str_replace_edit]_
+
+_[tool: str_replace_edit]_
+
+_[tool: str_replace_edit]_
+
+_[tool: str_replace_edit]_
+
+I broke the `.foot` rule with that last edit. Let me fix it and add the new section styles.Let me check the current state of the footer area in welcome.css.
+
+_[tool: grep]_
+
+_[tool: snip]_
+
+Now I can see the broken line. Let me fix it and add the new section styles.
+
+_[tool: str_replace_edit]_
+
+_[tool: done]_
+
+_[tool: snip]_
+
+_[tool: fork_verifier_agent]_
+
+Done. The hero now leads with the outcome — **"Get your brand recommended by AI."** — and the subcopy frames the value (buyers ask the 5 AI engines before Google). I also added two relevant sections: a **stats band** (60% ask AI first · 5 engines tracked · 2–6 weeks to climb) and a **"Built for everyone who needs to be found"** block with Founders / Marketing teams / Agencies cards. Verifier's confirming the layout and the repaired footer.
+
+## User
+
+Verifier agent check completed
+
+## Assistant
+
+_[tool: snip]_
+
+Verified clean. The Welcome page now leads with the outcome ("Get your brand recommended by AI.") and has the new stats band + "Built for…" sections, with the footer intact. What's next?
+
+## User
+
+is this the best subtitle? "Your buyers ask ChatGPT, Claude, Gemini, Grok & Perplexity before they Google you. Clerow shows where you stand in each — and exactly what to fix to get named.?" Im not sure we need it? Also remove the "ITs free" from the cta button. Also on the top nav bar make it say "GET STARTED" instead of "GET CITED BY AI" and then it opens up a pop up sign in box with google and email login. Make this..  We also need to show like results from this, like after "Warbls.com" used Clerow it went from 0 organic users to 50 - 100 new users everyday from the GEO help from Clerow...
+
+## Assistant
+
+_[tool: str_replace_edit]_
+
+_[tool: snip]_
+
+_[tool: str_replace_edit]_
+
+_[tool: read_file]_
+
+_[tool: read_file]_
+
+_[tool: grep]_
+
+_[tool: str_replace_edit]_
+
+_[tool: read_file]_
+
+_[tool: str_replace_edit]_
+
+_[tool: snip]_
+
+Now replace the App block to add Results, AuthModal, and wire onStart:
+
+_[tool: read_file]_
+
+_[tool: str_replace_edit]_
+
+Now the CSS for the results section and the auth modal:
+
+_[tool: str_replace_edit]_
+
+_[tool: read_file]_
+
+_[tool: read_file]_
+
+Now I'll fix the broken `.foot` rule and add the results + modal CSS in one edit.
+
+_[tool: str_replace_edit]_
+
+_[tool: snip]_
+
+_[tool: done]_
+
+_[tool: fork_verifier_agent]_
+
+_[tool: snip]_
+
+All your changes are in:
+
+- **Shorter subtitle** — "See where you rank across all 5 AI models — and exactly what to fix to get named."
+- **CTA cleaned up** — buttons now just say "Get started" (no "it's free").
+- **Nav button is "GET STARTED"** and opens a **sign-in popup** with Google + email login (Esc/backdrop to close). Every CTA on the page opens the same modal.
+- **New results/proof section** — "From invisible to 50–100 new users a day," the warbls.com story, a founder quote, and a card with a green growth chart + stats (0→100 users/day, 18→71 visibility, #6→#2 in ChatGPT).
+
+Verifier's checking it now.
+
+## User
+
+Verifier agent check completed
+
+## Assistant
+
+_[tool: snip]_
+
+Verified clean. The Welcome page now has the outcome-led subtitle, "Get started" CTAs, a GET STARTED nav button that opens the Google/email sign-in popup, and the warbls.com results/proof section. Ready for the next thing.
+

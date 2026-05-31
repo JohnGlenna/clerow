@@ -1,10 +1,5 @@
-import { AppShell } from "@/components/dashboard/AppShell";
-import { PageSources } from "@/components/dashboard/PageSources";
+import { redirect } from "next/navigation";
 
-export default function SourcesPage() {
-  return (
-    <AppShell page="sources">
-      <PageSources />
-    </AppShell>
-  );
+export default function Page() {
+  redirect("/dashboard");
 }

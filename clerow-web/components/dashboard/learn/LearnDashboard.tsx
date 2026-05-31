@@ -3,9 +3,14 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { MascotClerow } from "../../Mascot";
+import { PixelProgress } from "../../ui/PixelProgress";
+import { AiIcon } from "../../ui/AiIcon";
+import { DashPrompts, DashModels, DashLeaderboard, DashProfile } from "./LearnPages";
 import { DashboardProvider, useDashboard } from "@/lib/useDashboard";
 import { playCheck } from "@/lib/sound";
 import type { DashboardData, DashboardModel, LadderLevel, LadderTask } from "@/lib/types";
+
+type Page = "learn" | "prompts" | "models" | "leaderboard" | "profile";
 
 // Zig-zag horizontal offsets for the path nodes (mirrors the v2 design's OFF).
 const OFF = [0, -52, -76, -52, 0, 52, 76, 52];
@@ -32,21 +37,20 @@ function LDIcon({ name }: { name: string }) {
   }
 }
 
-const NAV = [
-  { k: "overview", route: "/dashboard", i: "learn", l: "Tasks" },
-  { k: "prompts", route: "/dashboard/prompts", i: "quest", l: "Prompts" },
-  { k: "models", route: "/dashboard/models", i: "scan", l: "AI Models" },
-  { k: "leaderboard", route: "/dashboard/leaderboard", i: "board", l: "Leaderboard" },
-  { k: "settings", route: "/dashboard/settings", i: "profile", l: "Profile" },
+const NAV: { k: Page; i: string; l: string }[] = [
+  { k: "learn", i: "learn", l: "Tasks" },
+  { k: "prompts", i: "quest", l: "Prompts" },
+  { k: "models", i: "scan", l: "AI Models" },
+  { k: "leaderboard", i: "board", l: "Leaderboard" },
+  { k: "profile", i: "profile", l: "Profile" },
 ];
 
-function LearnNav() {
-  const router = useRouter();
+function LearnNav({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
   return (
     <nav className="ld-nav">
       <div className="ld-brand"><MascotClerow size={34} /><span>Clerow</span></div>
       {NAV.map((it) => (
-        <button key={it.k} className={`ld-navitem ${it.k === "overview" ? "on" : ""}`} onClick={() => router.push(it.route)}>
+        <button key={it.k} className={`ld-navitem ${page === it.k ? "on" : ""}`} onClick={() => onNav(it.k)}>
           <span className="ic"><LDIcon name={it.i} /></span><span>{it.l}</span>
         </button>
       ))}
@@ -68,7 +72,7 @@ function LearnTop({ data }: { data: DashboardData }) {
         <MascotClerow size={26} /> {domainOf(data.brand?.url)}
         <span className="mono">· scanned across</span>
         <span className="model-cluster">
-          {models.map((m) => <span key={m.id} className="mc" style={{ background: m.swatch }}>{m.letter}</span>)}
+          {models.map((m) => <span key={m.id} className="mc" style={{ background: m.swatch }}><AiIcon id={m.id} size={13} letter={m.letter} /></span>)}
         </span>
       </div>
       <span className="stat-pill streak"><span className="ic">🔥</span>{data.streak?.current ?? 0}</span>
@@ -160,7 +164,7 @@ function LearnRail({ data }: { data: DashboardData }) {
         <div className="rail-models">
           {models.map((m: DashboardModel) => (
             <div key={m.id} className="rail-model">
-              <span className="mc" style={{ background: m.swatch }}>{m.letter}</span>{m.label}
+              <span className="mc" style={{ background: m.swatch }}><AiIcon id={m.id} size={13} letter={m.letter} /></span>{m.label}
               <span className={`st ${m.visibility ? "ok" : "no"}`}>{m.locked ? "🔒" : m.visibility != null ? `${m.visibility}%` : "—"}</span>
             </div>
           ))}
@@ -244,7 +248,7 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
   if (view === "done") {
     return (
       <div className="sheet-back">
-        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div className="lesson-prog"><i style={{ width: "100%" }} /></div></div>
+        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={100} fill="#58CC02" track="rgba(88,204,2,0.18)" /></div></div>
         <div className="done-toast"><div className="done-toast-in">
           <div className="done-check">✓</div>
           <div>
@@ -260,7 +264,7 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
   if (view === "steps") {
     return (
       <div className="sheet-back">
-        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div className="lesson-prog"><i style={{ width: "80%" }} /></div><span className="lesson-heart">🛠️ DIY</span></div>
+        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={80} /></div><span className="lesson-heart">🛠️ DIY</span></div>
         <div className="lesson-body"><div className="lesson-inner">
           <div className="lesson-tag"><span className="dot">✦</span>Copy-ready fix</div>
           <h1 className="lesson-h">{task.title}</h1>
@@ -296,7 +300,7 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
 
   return (
     <div className="sheet-back">
-      <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div className="lesson-prog"><i style={{ width: "55%" }} /></div><span className="lesson-heart">📊 {modelCount} models</span></div>
+      <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={55} /></div><span className="lesson-heart">📊 {modelCount} models</span></div>
       <div className="lesson-body"><div className="lesson-inner">
         <div className="lesson-tag"><span className="dot">{task.kind === "mcp" ? "⚡" : task.kind === "checkpoint" ? "🚩" : "✓"}</span>{task.kind === "checkpoint" ? "Checkpoint" : task.kind === "mcp" ? "Autopilot" : "Fix"}</div>
         <h1 className="lesson-h">{task.title}</h1>
@@ -341,20 +345,29 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
 function LearnInner() {
   const { data, loading, refresh } = useDashboard();
   const [task, setTask] = React.useState<SheetTask | null>(null);
+  const [page, setPage] = React.useState<Page>("learn");
+  const toLearn = () => setPage("learn");
+  const hasRail = page === "learn";
 
   return (
     <div className="ld-root">
-      <div className="ld-shell">
-        <LearnNav />
+      <div className={`ld-shell ${hasRail ? "" : "ld-shell--norail"}`}>
+        <LearnNav page={page} onNav={setPage} />
         <div className="ld-center">
           {data && <LearnTop data={data} />}
           {loading && !data ? (
-            <div className="ld-path" style={{ color: "var(--ink-2)" }}>Loading your climb…</div>
+            <div className="ld-path" style={{ color: "var(--ink-2)" }}>Loading…</div>
           ) : data ? (
-            <LearnPath data={data} onOpen={setTask} />
+            <>
+              {page === "learn" && <LearnPath data={data} onOpen={setTask} />}
+              {page === "prompts" && <DashPrompts data={data} onLearn={toLearn} />}
+              {page === "models" && <DashModels data={data} onLearn={toLearn} />}
+              {page === "leaderboard" && <DashLeaderboard data={data} />}
+              {page === "profile" && <DashProfile data={data} />}
+            </>
           ) : null}
         </div>
-        {data && <LearnRail data={data} />}
+        {data && hasRail && <LearnRail data={data} />}
       </div>
       {task && <LessonSheet task={task} modelCount={data?.models?.length ?? 0} onClose={() => setTask(null)} onChanged={refresh} />}
     </div>

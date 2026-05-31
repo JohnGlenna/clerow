@@ -1,10 +1,5 @@
-import { AppShell } from "@/components/dashboard/AppShell";
-import { PageArchive } from "@/components/dashboard/PageArchive";
+import { redirect } from "next/navigation";
 
-export default function ArchivePage() {
-  return (
-    <AppShell page="archive">
-      <PageArchive />
-    </AppShell>
-  );
+export default function Page() {
+  redirect("/dashboard");
 }

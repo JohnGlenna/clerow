@@ -1,10 +1,5 @@
-import { AppShell } from "@/components/dashboard/AppShell";
-import { PageQuests } from "@/components/dashboard/PageQuests";
+import { redirect } from "next/navigation";
 
-export default function QuestsPage() {
-  return (
-    <AppShell page="quests">
-      <PageQuests />
-    </AppShell>
-  );
+export default function Page() {
+  redirect("/dashboard");
 }
