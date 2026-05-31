@@ -297,13 +297,20 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
   }
 
   if (view === "steps") {
+    const canCopy = !busy && !!content;
+    const copyContent = () => { if (!canCopy) return; navigator.clipboard?.writeText(content); setCopied(true); setTimeout(() => setCopied(false), 1600); };
     return (
       <div className="sheet-back">
         <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={80} /></div><span className="lesson-heart">🛠️ DIY</span></div>
-        <div className="lesson-body"><div className="lesson-inner">
+        <div className="lesson-body lesson-body--steps"><div className="lesson-inner lesson-inner--steps">
           <div className="lesson-tag"><span className="dot">✦</span>Copy-ready fix</div>
           <h1 className="lesson-h">{task.title}</h1>
-          <div className="lesson-content">{busy ? "Generating your content…" : content}</div>
+          <div className="lesson-code">
+            <button className="lesson-copy" onClick={copyContent} disabled={!canCopy}>
+              <span className="lc-ic">{copied ? "✓" : "⧉"}</span>{copied ? "Copied" : "Copy"}
+            </button>
+            <pre className="lesson-content">{busy ? "Generating your content…" : content}</pre>
+          </div>
         </div></div>
         <div className="lesson-foot"><div className="lesson-foot-in">
           <button className="btn-skip" onClick={() => setView("choose")}>← Back</button>
