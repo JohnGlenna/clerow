@@ -1,225 +1,215 @@
-/* Quests — Daily / Active / Milestones. The retention engine. */
+/* Quests — the full Duolingo-style conquest path. This is the core loop. */
 
-function PageQuests() {
-  const [open, setOpen] = React.useState({});
-  const toggle = (k) => setOpen({ ...open, [k]: !open[k] });
+const QUEST_LEVELS = [
+  {
+    n: 1, name: "Quick Wins", sub: "The technical basics AI needs to even read you", reward: 60,
+    status: "active",
+    tasks: [
+      { t: "Let AI crawlers in via robots.txt", why: "GPTBot & ClaudeBot were blocked — they literally couldn't read your site.", time: "2 min", xp: 20, done: true },
+      { t: "Add an llms.txt file", why: "A plain-text map telling AI what Warbls is and which pages matter.", time: "5 min", xp: 25, done: true },
+      { t: "Give your homepage one clear H1", why: "You had 3 competing H1s. AI couldn't tell what you actually do.", time: "3 min", xp: 20, done: false },
+      { t: "Write meta descriptions for 8 pages", why: "Missing everywhere — it's often the exact snippet AI quotes back.", time: "8 min", xp: 25, done: false },
+    ],
+  },
+  {
+    n: 2, name: "Structure", sub: "Help AI understand every page", reward: 120,
+    status: "locked",
+    tasks: [
+      { t: "Add Product schema (JSON-LD)", time: "15 min", xp: 40 },
+      { t: "Add FAQ schema", time: "10 min", xp: 30 },
+      { t: "Fix your H2 / H3 hierarchy", time: "12 min", xp: 25 },
+      { t: "Add alt text to product images", time: "15 min", xp: 20 },
+      { t: "Submit a clean sitemap.xml", time: "5 min", xp: 20 },
+      { t: "Add canonical tags", time: "10 min", xp: 25 },
+    ],
+  },
+  {
+    n: 3, name: "Content", sub: "Give AI something worth quoting", reward: 200,
+    status: "locked",
+    tasks: [
+      { t: "Publish /compare/warbls-vs-suno", time: "45 min", xp: 80 },
+      { t: "Publish /compare/warbls-vs-udio", time: "45 min", xp: 80 },
+      { t: "Write a real FAQ answering buyer prompts", time: "40 min", xp: 60 },
+      { t: "Add a 'for creators' use-case page", time: "35 min", xp: 50 },
+      { t: "Clarify your pricing page copy", time: "15 min", xp: 30 },
+    ],
+  },
+  {
+    n: 4, name: "Authority", sub: "Show up in the sources AI actually trusts", reward: 300,
+    status: "locked",
+    tasks: [
+      { t: "Claim your G2 + Capterra listings", time: "30 min", xp: 120 },
+      { t: "Answer 3 threads in r/WeAreTheMusicMakers", time: "1 h", xp: 90 },
+      { t: "Land a mention from a YouTube creator", time: "outreach", xp: 200 },
+      { t: "Expand your Wikidata presence", time: "30 min", xp: 60 },
+      { t: "Get 1 guest post / press mention", time: "outreach", xp: 100 },
+    ],
+  },
+];
 
-  const daily = [
-    { id: "d1", title: "Re-scan your domain", time: "1 min", impact: "low", xp: 15, ico: "🔄",
-      steps: ["Click 'Re-scan now' on Overview", "Confirms today's streak ✓"] },
-    { id: "d2", title: "Review 1 source recommendation", time: "5 min", impact: "medium", xp: 25, ico: "🔎",
-      steps: ["Open Sources page", "Pick a row marked 'gap'", "Skim the 'Why it matters' note"] },
-    { id: "d3", title: "Answer 1 thread on Reddit (r/projectmanagement)", time: "10 min", impact: "high", xp: 60, ico: "💬",
-      steps: ["Pick a thread from your prompt watchlist", "Reply with substance — no link drops", "Add your domain to your profile bio"] },
-    { id: "d4", title: "Post 1 LinkedIn update about a customer win", time: "8 min", impact: "medium", xp: 35, ico: "📣",
-      steps: ["Pick a recent customer story", "Use this brief →", "Tag the customer's company"] },
-    { id: "d5", title: "Check yesterday's position changes", time: "2 min", impact: "low", xp: 10, ico: "📈",
-      steps: ["Open Overview → 'How each AI sees you'", "Note any movement", "Done"] },
-  ];
+function PageQuests({ onNavigate }) {
+  const [tasks, setTasks] = React.useState(QUEST_LEVELS[0].tasks);
+  const [openLevel, setOpenLevel] = React.useState(1);
+  const [openWhy, setOpenWhy] = React.useState(2);
+  const toggle = (i) => setTasks(tasks.map((t, j) => j === i ? { ...t, done: !t.done } : t));
 
-  const active = [
-    {
-      id: "a1",
-      title: "Win the comparison-page prompts",
-      sub: "Linear vs Jira, Linear vs Asana, Linear vs Notion",
-      done: 2, total: 5,
-      xp: 240,
-      ico: "🥊",
-      impact: "very high",
-      time: "2–3 weeks",
-      why: "Comparison pages drive 38% of your category's AI citations. You currently rank for 2 of 5.",
-      steps: [
-        "Ship /compare/linear-vs-jira (drafted ✓)",
-        "Ship /compare/linear-vs-asana (drafted ✓)",
-        "Ship /compare/linear-vs-notion (in progress)",
-        "Submit all 3 to your sitemap.xml",
-        "Wait 2 weeks for re-crawl, scan again",
-      ],
-    },
-    {
-      id: "a2",
-      title: "Get cited on G2 + Capterra",
-      sub: "You're missing from both — your top 2 rivals dominate them",
-      done: 0, total: 4,
-      xp: 320,
-      ico: "🏢",
-      impact: "very high",
-      time: "1 week",
-      why: "ChatGPT pulls comparison phrasing directly from G2. Each new listing typically adds 6–10 visibility points.",
-      steps: [
-        "Claim your G2 vendor profile",
-        "Upload 3 product screenshots (from this brief)",
-        "Request 5 reviews from happy customers",
-        "Repeat for Capterra",
-      ],
-    },
-    {
-      id: "a3",
-      title: "Ship the Reddit citation playbook",
-      sub: "Show up in 3 high-signal threads per week",
-      done: 1, total: 3,
-      xp: 180,
-      ico: "🧭",
-      impact: "high",
-      time: "Ongoing",
-      why: "Perplexity pulls 32% of your category's citations from Reddit. Founders ignoring Reddit is a massive opportunity.",
-      steps: [
-        "Subscribe to r/projectmanagement, r/startups, r/devops",
-        "Set up 'monitor mentions' for Linear",
-        "Reply substantively to 3 threads this week",
-      ],
-    },
-    {
-      id: "a4",
-      title: "Add Product + FAQ schema to top 10 pages",
-      sub: "Currently live on 4 of 10",
-      done: 4, total: 10,
-      xp: 200,
-      ico: "🧱",
-      impact: "high",
-      time: "3 days",
-      why: "Schema gives AI models structured citations. Each page typically adds 1–3 points across all models.",
-      steps: [
-        "We've drafted schema for all 10 pages — click the link",
-        "Copy into your Next.js layout",
-        "Validate with Google's Rich Results Test",
-        "Re-run scan",
-      ],
-    },
-  ];
+  const l1done = tasks.filter(t => t.done).length;
+  const l1total = tasks.length;
+  const l1complete = l1done === l1total;
+  const totalFixes = QUEST_LEVELS.reduce((s, l) => s + l.tasks.length, 0);
+  const doneFixes = l1done; // only L1 actionable in this proto
 
-  const milestones = [
-    { id: "m1", title: "Reach position #1 in any model", xp: 500, progress: 0,   ico: "👑", desc: "You're currently #2 in ChatGPT. Close the gap to Jira." },
-    { id: "m2", title: "Hit visibility score of 80",     xp: 600, progress: 68,  ico: "💯", desc: "You're at 68. +12 to go. Most founders take 8–12 weeks." },
-    { id: "m3", title: "30-day scan streak",             xp: 300, progress: 40,  ico: "🔥", desc: "12 days in, 18 to go. Don't break the chain." },
-    { id: "m4", title: "Cited in all 5 AI models",       xp: 700, progress: 60,  ico: "🌟", desc: "Cited in 3. Gemini + AI Overviews require Team plan." },
-  ];
-
-  const impactColor = (k) => ({
-    "low":        "#A8A8A8",
-    "medium":     "#1CB0F6",
-    "high":       "#F59E0B",
-    "very high":  "#E11D48",
-  }[k] || "#A8A8A8");
+  const flip = (n) => setOpenLevel(openLevel === n ? -1 : n);
 
   return (
     <>
       <PageHead
         title="Quests"
-        sub="Tiny daily moves. Bigger weekly bets. Long-game milestones. This is what compounds."
-        actions={
-          <>
-            <span className="streak-mini">🔥 12</span>
-            <button className="btn btn--ghost btn--sm">Filter</button>
-          </>
-        }
+        sub="Your path to getting cited. Do them in order — quick wins first."
       />
 
-      <div className="page-stats">
-        <PageStat label="XP today"      value="+185" sub="of 800 weekly goal" hi="success" />
-        <PageStat label="Streak"        value="12" sub="days · longest 18" hi="warn" />
-        <PageStat label="Active quests" value="4"  sub="2 wins this week" />
-        <PageStat label="Next reward"   value="Lvl 8" sub="260 XP to SEO Mage" hi="accent" />
-      </div>
-
-      {/* Daily */}
-      <h3 className="quest-section-h">
-        <span>📆 Today's quests</span>
-        <span className="quest-section-sub">refreshes 09:00 · 0/{daily.length} complete</span>
-      </h3>
-      <div className="quest-daily-grid">
-        {daily.map((q) => (
-          <div key={q.id} className="quest-daily">
-            <div className="qd-head">
-              <span className="qd-ico">{q.ico}</span>
-              <span className={`qd-impact qd-impact--${q.impact.replace(" ", "-")}`} style={{ background: `color-mix(in oklab, ${impactColor(q.impact)} 18%, white)`, color: impactColor(q.impact) }}>
-                {q.impact}
-              </span>
-              <span className="qd-xp">+{q.xp} XP</span>
-            </div>
-            <div className="qd-title">{q.title}</div>
-            <div className="qd-meta">{q.time}</div>
-            <button className="qd-cta" onClick={() => toggle(q.id)}>
-              {open[q.id] ? "Hide steps ↑" : "Show steps ↓"}
-            </button>
-            {open[q.id] && (
-              <ul className="qd-steps">
-                {q.steps.map((s, i) => <li key={i}>{s}</li>)}
-              </ul>
-            )}
+      {/* Player progression header */}
+      <div className="quest-hero">
+        <div className="qhero-avatar"><MascotClerow size={56} float /></div>
+        <div className="qhero-main">
+          <div className="qhero-rank">
+            <span className="qhero-lv">⚡ Level 7</span>
+            <span className="qhero-title">SEO Apprentice</span>
+            <span className="qhero-next">→ SEO Mage</span>
           </div>
-        ))}
+          <div className="qhero-bar"><i style={{ width: "74%" }} /></div>
+          <div className="qhero-meta">
+            <span className="mono">740 / 1000 XP</span>
+            <span>{doneFixes} of {totalFixes} fixes done</span>
+          </div>
+        </div>
+        <div className="qhero-streak">
+          <span className="flame">🔥</span>
+          <span className="n">12</span>
+          <span className="lbl">streak</span>
+        </div>
       </div>
 
-      {/* Active */}
-      <h3 className="quest-section-h">
-        <span>🎯 Active quests</span>
-        <span className="quest-section-sub">multi-step · this is what moves your score</span>
-      </h3>
-      <div className="quest-active-grid">
-        {active.map((q) => {
-          const pct = (q.done / q.total) * 100;
+      {/* The conquest path */}
+      <div className="ladder">
+        {QUEST_LEVELS.map((lv) => {
+          const isL1 = lv.n === 1;
+          const done = isL1 && l1complete;
+          const active = isL1 && !l1complete;
+          const locked = !isL1;
+          const open = openLevel === lv.n;
+          const cls = done ? "lvl--done" : active ? "lvl--active" : "lvl--locked";
+          const liveTasks = isL1 ? tasks : lv.tasks;
+          const ldone = isL1 ? l1done : 0;
+
           return (
-            <div key={q.id} className="quest-active">
-              <div className="qa-head">
-                <span className="qa-ico">{q.ico}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h4 className="qa-title">{q.title}</h4>
-                  <div className="qa-sub">{q.sub}</div>
+            <div key={lv.n} className={`lvl ${cls}`}>
+              <div className="lvl-rail">
+                <div className="lvl-node">
+                  {done ? <Icon name="check" size={22} /> : locked ? <Icon name="lock" size={18} /> : <span>{lv.n}</span>}
+                  {active && <span className="lvl-node-pulse" />}
                 </div>
-                <span className="qa-xp">+{q.xp} XP</span>
               </div>
+              <div className="lvl-body">
+                <div className={`lvl-card ${locked ? "lvl-card--locked" : ""}`}>
+                  <div className="lvl-card-head lvl-card-head--btn" onClick={() => flip(lv.n)}>
+                    <div>
+                      <div className="lvl-name">Level {lv.n} · {lv.name}</div>
+                      <div className="lvl-sub">{lv.sub}</div>
+                    </div>
+                    <div className="lvl-head-right">
+                      <span className={`lvl-badge ${locked ? "lvl-badge--ghost" : ""}`}>
+                        {isL1 ? `${ldone}/${l1total}` : `${lv.tasks.length} tasks`} · +{lv.reward} XP
+                      </span>
+                      <span className="lvl-chev">{open ? "▲" : "▼"}</span>
+                    </div>
+                  </div>
 
-              <div className="qa-meta">
-                <span><span className="qa-meta-l">Impact</span> <b style={{ color: impactColor(q.impact) }}>{q.impact}</b></span>
-                <span><span className="qa-meta-l">Time</span> <b>{q.time}</b></span>
-                <span><span className="qa-meta-l">Progress</span> <b>{q.done} / {q.total}</b></span>
+                  {open && (
+                    <div className="lvl-tasks">
+                      {liveTasks.map((task, i) => (
+                        <div key={i} className={`ltask ${task.done ? "done" : ""} ${locked ? "ltask--upcoming" : ""} ${openWhy === i && isL1 ? "open" : ""}`}>
+                          <div className="ltask-row">
+                            <span className="ltask-check" onClick={() => !locked && toggle(i)}>
+                              {task.done && <Icon name="check" size={13} />}
+                              {locked && <Icon name="lock" size={11} />}
+                            </span>
+                            <div className="ltask-main" onClick={() => isL1 && setOpenWhy(openWhy === i ? -1 : i)}>
+                              <div className="ltask-title">{task.t}</div>
+                              <div className="ltask-meta">≈ {task.time}</div>
+                            </div>
+                            <span className="ltask-xp">+{task.xp}</span>
+                          </div>
+                          {isL1 && openWhy === i && task.why && (
+                            <div className="ltask-why">
+                              <span className="why-tag">Why this?</span>{task.why}
+                              <button className="why-cta">Show me how →</button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {locked ? (
+                        <div className="lvl-locked-hint" style={{ marginTop: 4 }}>🔒 Clear Level {lv.n - 1} to start these</div>
+                      ) : l1complete ? (
+                        <div className="lvl-foot lvl-foot--win"><span>🎉 Level 1 cleared! Level 2 is open.</span></div>
+                      ) : (
+                        <div className="lvl-foot"><span>🎁 Clear all {l1total} to unlock <b>Level 2</b> + a <b>+60 XP</b> bonus.</span></div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-
-              <div className="qa-progress"><i style={{ width: `${pct}%` }} /></div>
-
-              <div className="qa-why">
-                <b>Why it matters:</b> {q.why}
-              </div>
-
-              <button className="qa-toggle" onClick={() => toggle(q.id)}>
-                {open[q.id] ? "Hide playbook ↑" : "Show step-by-step playbook ↓"}
-              </button>
-              {open[q.id] && (
-                <ol className="qa-steps">
-                  {q.steps.map((s, i) => (
-                    <li key={i} className={i < q.done ? "done" : ""}>
-                      <span className="qa-tick">{i < q.done ? "✓" : i + 1}</span>
-                      {s}
-                    </li>
-                  ))}
-                </ol>
-              )}
             </div>
           );
         })}
+
+        {/* Re-scan checkpoint */}
+        <div className="lvl lvl--checkpoint">
+          <div className="lvl-rail">
+            <div className="lvl-node lvl-node--flag">🚩</div>
+          </div>
+          <div className="lvl-body">
+            <div className="lvl-card lvl-card--checkpoint">
+              <div className="cp-main">
+                <div className="lvl-name">Checkpoint · Re-scan</div>
+                <div className="lvl-sub">After Level 2, re-scan to bank your gains and reveal a fresh set of fixes.</div>
+              </div>
+              <button className="btn btn--primary btn--sm" disabled title="Clear Level 2 first">
+                <Icon name="bolt" size={14} />Re-scan
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Milestones */}
-      <h3 className="quest-section-h">
+      {/* Milestones strip — the long game */}
+      <h3 className="quest-section-h" style={{ marginTop: 26 }}>
         <span>🏔️ Milestones</span>
-        <span className="quest-section-sub">rare, big XP · what veterans chase</span>
+        <span className="quest-section-sub">rare · big XP · what veterans chase</span>
       </h3>
       <div className="milestones-grid">
-        {milestones.map((m) => (
-          <div key={m.id} className="milestone">
-            <div className="ms-head">
-              <span className="ms-ico">{m.ico}</span>
-              <span className="ms-xp">+{m.xp} XP</span>
-            </div>
-            <div className="ms-title">{m.title}</div>
-            <div className="ms-desc">{m.desc}</div>
-            <div className="ms-progress"><i style={{ width: `${m.progress}%` }} /></div>
-            <div className="ms-progress-l">{m.progress}% there</div>
-          </div>
-        ))}
+        <Milestone ico="💯" title="Hit visibility score 80" xp={600} progress={18} desc="You're at 18. Levels 1–3 get you most of the way." />
+        <Milestone ico="🔥" title="30-day scan streak" xp={300} progress={40} desc="12 days in, 18 to go. Don't break the chain." />
+        <Milestone ico="👑" title="Reach #1 in any model" xp={500} progress={8} desc="Closest in ChatGPT — comparison pages do it." />
+        <Milestone ico="🌟" title="Cited in all 4 models" xp={700} progress={25} desc="Cited in 1. Authority quests open the rest." />
       </div>
     </>
+  );
+}
+
+function Milestone({ ico, title, xp, progress, desc }) {
+  return (
+    <div className="milestone">
+      <div className="ms-head">
+        <span className="ms-ico">{ico}</span>
+        <span className="ms-xp">+{xp} XP</span>
+      </div>
+      <div className="ms-title">{title}</div>
+      <div className="ms-desc">{desc}</div>
+      <div className="ms-progress"><i style={{ width: `${progress}%` }} /></div>
+      <div className="ms-progress-l">{progress}% there</div>
+    </div>
   );
 }
 

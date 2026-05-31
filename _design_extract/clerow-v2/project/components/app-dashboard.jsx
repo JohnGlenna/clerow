@@ -141,48 +141,169 @@ function PageHead({ title, sub, actions }) {
   );
 }
 
-/* -------- OVERVIEW (was the main dashboard) -------- */
+/* -------- OVERVIEW — conquest-path redesign -------- */
 function PageOverview({ showMascot, onNavigate }) {
   return (
     <>
       <PageHead
         title="Overview"
-        sub="linear.app · scanning daily · last update 2 min ago"
+        sub="warbls.com · last scan 2 days ago · 20 fixes found"
         actions={
-          <>
-            <button className="btn btn--ghost btn--sm"><Icon name="download" size={14} />Export</button>
-            <button className="btn btn--primary btn--sm"><Icon name="bolt" size={14} />Re-scan now</button>
-          </>
+          <button className="btn btn--ghost btn--sm" onClick={() => onNavigate("reports")}><Icon name="download" size={14} />Weekly report</button>
         }
       />
       <AppHello showMascot={showMascot} />
 
+      <ConquestLadder showMascot={showMascot} onNavigate={onNavigate} />
+
       <div className="app-grid">
         <ScoreCard />
-        <TasksCard onNavigate={onNavigate} />
+        <ModelsCard onNavigate={onNavigate} />
       </div>
 
       <div className="app-grid">
-        <ModelsCard onNavigate={onNavigate} />
         <CompetitorsCard onNavigate={onNavigate} />
+        <AchievementsCard />
       </div>
-
-      <AchievementsCard />
     </>
   );
 }
 
 function AppHello({ showMascot }) {
   return (
-    <div className="app-hello">
-      <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--bg-soft)", border: "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {showMascot ? <MascotOwl pose="wave" size={44} /> : <span style={{ fontSize: 28 }}>🦉</span>}
+    <div className="app-hello app-hello--next">
+      <div className="hello-mascot">
+        {showMascot ? <MascotClerow size={52} float /> : <span style={{ fontSize: 30 }}>🦉</span>}
       </div>
       <div className="greet">
         Welcome back, John.
-        <small>You climbed 2 positions in ChatGPT this week. Keep going. ✨</small>
+        <small>You've banked <b>2 quick wins</b>. Just <b>2 more tasks</b> to clear Level 1 and unlock your next scan boost. ✨</small>
       </div>
-      <div className="streak-mini">🔥 12</div>
+      <div className="hello-streak">
+        <span className="flame">🔥</span>
+        <span className="n">12</span>
+        <span className="lbl">day streak</span>
+      </div>
+    </div>
+  );
+}
+
+/* ====== THE CONQUEST LADDER ====== */
+function ConquestLadder({ showMascot, onNavigate }) {
+  const [tasks, setTasks] = React.useState([
+    { t: "Let AI crawlers in via robots.txt", why: "GPTBot & ClaudeBot were blocked — they literally couldn't read your site.", time: "2 min", xp: 20, done: true },
+    { t: "Add an llms.txt file", why: "A plain-text map that tells AI what Warbls is and which pages matter.", time: "5 min", xp: 25, done: true },
+    { t: "Give your homepage one clear H1", why: "You had 3 competing H1s. AI couldn't tell what you actually do.", time: "3 min", xp: 20, done: false },
+    { t: "Write a meta description for 8 pages", why: "Missing everywhere. It's often the exact snippet AI quotes back.", time: "8 min", xp: 25, done: false },
+  ]);
+  const toggle = (i) => setTasks(tasks.map((t, j) => j === i ? { ...t, done: !t.done } : t));
+  const [openTask, setOpenTask] = React.useState(2);
+
+  const l1done = tasks.filter(t => t.done).length;
+  const l1total = tasks.length;
+  const l1complete = l1done === l1total;
+  const l1xp = tasks.filter(t => t.done).reduce((s, t) => s + t.xp, 0);
+
+  const lockedLevels = [
+    { n: 2, name: "Structure",  sub: "Help AI understand every page",     count: 6, xp: 180, ex: "Product & FAQ schema, clean H2/H3s, alt text, sitemap" },
+  ];
+
+  return (
+    <div className="ladder-wrap">
+      <div className="ladder-head">
+        <div>
+          <div className="ladder-eyebrow">Your conquest path</div>
+          <h3 className="ladder-title">Do these in order. Quick wins first.</h3>
+        </div>
+        <div className="ladder-progress">
+          <span className="lp-label">Overall</span>
+          <div className="lp-bar"><i style={{ width: "10%" }} /></div>
+          <span className="lp-count"><b>2</b> / 20 fixes</span>
+        </div>
+      </div>
+
+      <div className="ladder">
+        {/* LEVEL 1 — active, expanded */}
+        <div className={`lvl ${l1complete ? "lvl--done" : "lvl--active"}`}>
+          <div className="lvl-rail">
+            <div className="lvl-node">
+              {l1complete ? <Icon name="check" size={22} /> : <span>1</span>}
+              {!l1complete && <span className="lvl-node-pulse" />}
+            </div>
+          </div>
+          <div className="lvl-body">
+            <div className="lvl-card">
+              <div className="lvl-card-head">
+                <div>
+                  <div className="lvl-name">Level 1 · Quick Wins</div>
+                  <div className="lvl-sub">The technical basics AI needs to even read you</div>
+                </div>
+                <div className="lvl-badge">{l1done}/{l1total} · +{l1xp} XP</div>
+              </div>
+
+              <div className="lvl-tasks">
+                {tasks.map((task, i) => (
+                  <div key={i} className={`ltask ${task.done ? "done" : ""} ${openTask === i ? "open" : ""}`}>
+                    <div className="ltask-row">
+                      <span className="ltask-check" onClick={() => toggle(i)}>
+                        {task.done && <Icon name="check" size={13} />}
+                      </span>
+                      <div className="ltask-main" onClick={() => setOpenTask(openTask === i ? -1 : i)}>
+                        <div className="ltask-title">{task.t}</div>
+                        <div className="ltask-meta">≈ {task.time}</div>
+                      </div>
+                      <span className="ltask-xp">+{task.xp}</span>
+                    </div>
+                    {openTask === i && (
+                      <div className="ltask-why">
+                        <span className="why-tag">Why this?</span>
+                        {task.why}
+                        <button className="why-cta">Show me how →</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {!l1complete ? (
+                <div className="lvl-foot">
+                  <span>🎁 Clear all 4 to unlock <b>Level 2</b> + a <b>+60 XP</b> bonus.</span>
+                </div>
+              ) : (
+                <div className="lvl-foot lvl-foot--win">
+                  <span>🎉 Level 1 cleared! Level 2 is now open.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* LEVELS 2–4 — locked */}
+        {lockedLevels.map((lv) => (
+          <div key={lv.n} className="lvl lvl--locked">
+            <div className="lvl-rail">
+              <div className="lvl-node"><Icon name="lock" size={18} /></div>
+            </div>
+            <div className="lvl-body">
+              <div className="lvl-card lvl-card--locked">
+                <div className="lvl-card-head">
+                  <div>
+                    <div className="lvl-name">Level {lv.n} · {lv.name}</div>
+                    <div className="lvl-sub">{lv.sub}</div>
+                  </div>
+                  <div className="lvl-badge lvl-badge--ghost">{lv.count} tasks · +{lv.xp} XP</div>
+                </div>
+                <div className="lvl-locked-ex">{lv.ex}</div>
+                <div className="lvl-locked-hint">🔒 Finish Level {lv.n - 1} to unlock</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="ladder-cta">
+        <button onClick={() => onNavigate("quests")}>Open your full quest path →</button>
+      </div>
     </div>
   );
 }
@@ -192,21 +313,24 @@ function ScoreCard() {
     <div className="app-card">
       <div className="app-card-head">
         <h4>Your AI visibility score</h4>
-        <span className="sub" style={{ color: "var(--success)" }}>+12 this month ↑</span>
+        <span className="sub">from your latest scan</span>
       </div>
 
       <div className="score-row">
-        <ScoreRing value={68} />
+        <ScoreRing value={18} />
         <div className="score-stats">
-          <ScoreStat label="Visibility" icon="eye"    value="66%" pct={66} color="#F59E0B" />
-          <ScoreStat label="Position"   icon="target" value="#2"  pct={84} color="#1CB0F6" />
-          <ScoreStat label="Sentiment"  icon="smile"  value="92"  pct={92} color="#58CC02" />
+          <ScoreStat label="Visibility" icon="eye"    value="6%" pct={6}  color="#1E4F6B"
+            hint="AI names Warbls in 6% of relevant answers." />
+          <ScoreStat label="Position"   icon="target" value="#7" pct={22} color="#1CB0F6"
+            hint="When you are named, you land 7th on average." />
+          <ScoreStat label="Sentiment"  icon="smile"  value="72" pct={72} color="#34A853"
+            hint="The good news — when AI does mention you, it likes you." />
         </div>
       </div>
 
-      <div className="mini-chart" />
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--ink-3)", fontWeight: 700 }}>
-        <span>W1</span><span>W2</span><span>W3</span><span>W4</span><span>W5</span><span>W6</span><span>W7</span><span>W8</span>
+      <div className="score-read">
+        <span className="sr-emoji">🌱</span>
+        <span><b>You're just getting started.</b> Sentiment is already high, so once AI starts noticing Warbls it'll speak well of you. Clear Level 1 to get on the board.</span>
       </div>
     </div>
   );
@@ -238,12 +362,15 @@ function ScoreRing({ value, size = 156 }) {
   );
 }
 
-function ScoreStat({ label, icon, value, pct, color }) {
+function ScoreStat({ label, icon, value, pct, color, hint }) {
   return (
-    <div className="score-stat">
-      <span className="label"><span className="ico"><Icon name={icon} size={14} /></span>{label}</span>
-      <span className="bar"><i style={{ width: `${pct}%`, background: color }} /></span>
-      <span className="val">{value}</span>
+    <div className="score-stat-wrap">
+      <div className="score-stat">
+        <span className="label"><span className="ico"><Icon name={icon} size={14} /></span>{label}</span>
+        <span className="bar"><i style={{ width: `${pct}%`, background: color }} /></span>
+        <span className="val">{value}</span>
+      </div>
+      {hint && <div className="score-stat-hint">{hint}</div>}
     </div>
   );
 }
@@ -290,11 +417,16 @@ function TasksCard({ onNavigate }) {
 
 function ModelsCard({ onNavigate }) {
   const models = [
-    { sw: "#10A37F", l: "C", name: "ChatGPT",    pos: 2, vis: "62%", delta: "+0.8", up: true },
-    { sw: "#D97706", l: "A", name: "Claude",     pos: 3, vis: "54%", delta: "+0.4", up: true },
-    { sw: "#1CB0F6", l: "P", name: "Perplexity", pos: 4, vis: "41%", delta: "−0.2", up: false },
-    { sw: "#4285F4", l: "G", name: "Gemini",     pos: 5, vis: "33%", delta: "+0.1", up: true },
+    { sw: "#10A37F", l: "C", name: "ChatGPT",    vis: 9, pos: "#6", sent: 74, state: "weak",
+      read: "Names Warbls occasionally, near the bottom of the list. Tone is positive — you mainly need more mentions." },
+    { sw: "#D97706", l: "A", name: "Claude",     vis: 6, pos: "#8", sent: 80, state: "weak",
+      read: "Rarely names you, but speaks warmly when it does. More depth in your docs and FAQs will lift this." },
+    { sw: "#1CB0F6", l: "P", name: "Perplexity", vis: 0, pos: "—", sent: null, state: "none",
+      read: "You don't show up here at all yet. Perplexity leans on Reddit & YouTube — those citations move you fastest." },
+    { sw: "#4285F4", l: "G", name: "Gemini",     vis: 0, pos: "—", sent: null, state: "none",
+      read: "Not appearing. Gemini mirrors Google, so your classic SEO basics (titles, schema) carry straight over here." },
   ];
+  const [open, setOpen] = React.useState(0);
   return (
     <div className="app-card">
       <div className="app-card-head">
@@ -303,18 +435,35 @@ function ModelsCard({ onNavigate }) {
           Full breakdown →
         </a>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+
+      <div className="aisee-legend">
+        <span><b>Visibility</b> how often it names you</span>
+        <span><b>Position</b> where in the answer</span>
+        <span><b>Sentiment</b> how it describes you</span>
+      </div>
+
+      <div className="aisee-list">
         {models.map((m, i) => (
-          <div key={i} className="model-row">
-            <span className="l">
+          <div key={i} className={`aisee ${open === i ? "open" : ""} ${m.state === "none" ? "aisee--none" : ""}`}>
+            <div className="aisee-row" onClick={() => setOpen(open === i ? -1 : i)}>
               <span className="model-icon" style={{ background: m.sw }}>{m.l}</span>
-              {m.name}
-            </span>
-            <span className="right">
-              <span className="pos-pill">#{m.pos}</span>
-              <span>{m.vis}</span>
-              <span className={`delta ${m.up ? "up" : "down"}`}>{m.delta}</span>
-            </span>
+              <span className="aisee-name">{m.name}</span>
+              <span className="aisee-metrics">
+                <span className="aim"><i>Vis</i><b>{m.vis}%</b></span>
+                <span className="aim"><i>Pos</i><b>{m.pos}</b></span>
+                <span className="aim"><i>Sent</i><b>{m.sent == null ? "—" : m.sent}</b></span>
+              </span>
+              <span className="aisee-caret">{open === i ? "▲" : "▼"}</span>
+            </div>
+            {open === i && (
+              <div className="aisee-read">
+                {m.state === "none" && <span className="aisee-flag">Not cited yet</span>}
+                {m.read}
+                {m.state === "none" && (
+                  <button className="why-cta" onClick={() => onNavigate("quests")}>Make this a quest →</button>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -324,11 +473,11 @@ function ModelsCard({ onNavigate }) {
 
 function CompetitorsCard({ onNavigate }) {
   const rows = [
-    { sw: "#1CB0F6", name: "Jira",          vis: "78%", delta: "+0.2", up: true },
-    { sw: "#F59E0B", name: "You (Linear)",  vis: "66%", delta: "+1.2", up: true, me: true },
-    { sw: "#58CC02", name: "Asana",         vis: "54%", delta: "+0.4", up: true },
-    { sw: "#A560FF", name: "Notion",        vis: "47%", delta: "−0.3", up: false },
-    { sw: "#E11D48", name: "Monday",        vis: "39%", delta: "−0.1", up: false },
+    { sw: "#FF7A45", name: "Suno",         vis: "78%", delta: "+0.2", up: true },
+    { sw: "#3D7BFF", name: "Soundraw",     vis: "54%", delta: "+0.4", up: true },
+    { sw: "#131313", name: "Udio",         vis: "47%", delta: "−0.1", up: false },
+    { sw: "#1E4F6B", name: "Warbls (you)", vis: "6%",  delta: "+1.2", up: true, me: true },
+    { sw: "#34A853", name: "Amper",        vis: "4%",  delta: "−0.0", up: false },
   ];
   return (
     <div className="app-card">

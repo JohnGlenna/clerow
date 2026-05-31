@@ -6,6 +6,8 @@ import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/st
 import { levelFromXp } from "@/lib/xp";
 import { ensureSiteAudit } from "@/lib/audit/ensure";
 import { buildLadder, ensureLadderTasks, type LadderContext } from "@/lib/ladder";
+import { budgetStatus, planFromSub } from "@/lib/billing/limits";
+import { getSubscription } from "@/lib/billing/subscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -148,11 +150,13 @@ export async function GET(req: Request) {
       .slice(0, 5),
   };
 
-  const ladderExisting = new Map<string, { id: string; done: boolean }>();
-  for (const t of tasks ?? []) if (t.ladder_key) ladderExisting.set(t.ladder_key, { id: t.id, done: t.done });
+  const ladderExisting = new Map<string, { id: string; done: boolean; resolved: boolean }>();
+  for (const t of tasks ?? [])
+    if (t.ladder_key) ladderExisting.set(t.ladder_key, { id: t.id, done: t.done, resolved: t.done || t.archived });
   const preLadder = buildLadder(ladderCtx, ladderExisting);
   const inserted = await ensureLadderTasks(supabase, brand.id, preLadder, new Set(ladderExisting.keys()));
-  for (const r of inserted) if (r.ladder_key) ladderExisting.set(r.ladder_key, { id: r.id, done: r.done });
+  for (const r of inserted)
+    if (r.ladder_key) ladderExisting.set(r.ladder_key, { id: r.id, done: r.done, resolved: r.done || r.archived });
   const ladder = buildLadder(ladderCtx, ladderExisting);
   const allTasks = [...(tasks ?? []), ...inserted];
 
@@ -188,6 +192,10 @@ export async function GET(req: Request) {
   // always-up counter that pairs with the resettable streak.
   const totalXp = allTasks.reduce((sum, t) => sum + (t.done ? t.xp : 0), 0);
   const xp = levelFromXp(totalXp);
+
+  // Monthly scan-budget status (the COGS guard) → surfaced as "scans left".
+  const plan = planFromSub(await getSubscription(supabase, user.id));
+  const budget = await budgetStatus(supabase, user.id, plan, now);
 
   // Score movement vs the previous daily snapshot, for the Overview score card.
   const history = await loadSnapshotHistory(supabase, brand.id, 7);
@@ -247,5 +255,7 @@ export async function GET(req: Request) {
       level: t.level,
     })),
     ladder,
+    scansLeft: budget.scansLeft,
+    budget: { spent: Math.round(budget.spent * 100) / 100, ceiling: budget.ceiling },
   });
 }

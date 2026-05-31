@@ -1,0 +1,370 @@
+"use client";
+
+import React from "react";
+import { useRouter } from "next/navigation";
+import { MascotClerow } from "../../Mascot";
+import { DashboardProvider, useDashboard } from "@/lib/useDashboard";
+import { playCheck } from "@/lib/sound";
+import type { DashboardData, DashboardModel, LadderLevel, LadderTask } from "@/lib/types";
+
+// Zig-zag horizontal offsets for the path nodes (mirrors the v2 design's OFF).
+const OFF = [0, -52, -76, -52, 0, 52, 76, 52];
+
+type SheetTask = {
+  kind: "task" | "mcp" | "checkpoint";
+  id: string | null;
+  title: string;
+  why: string;
+  xp: number;
+};
+
+/* ---------------- icons ---------------- */
+function LDIcon({ name }: { name: string }) {
+  const p = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (name) {
+    case "learn": return (<svg {...p}><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /></svg>);
+    case "quest": return (<svg {...p}><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M3 12h18M12 8v12" /></svg>);
+    case "scan": return (<svg {...p}><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" /><circle cx="12" cy="12" r="3" /></svg>);
+    case "board": return (<svg {...p}><path d="M6 4h12v3a6 6 0 0 1-12 0z" /><path d="M9 20h6M12 13v7" /></svg>);
+    case "profile": return (<svg {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-7 8-7s8 3 8 7" /></svg>);
+    case "lock": return (<svg {...p}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>);
+    default: return null;
+  }
+}
+
+const NAV = [
+  { k: "overview", route: "/dashboard", i: "learn", l: "Tasks" },
+  { k: "prompts", route: "/dashboard/prompts", i: "quest", l: "Prompts" },
+  { k: "models", route: "/dashboard/models", i: "scan", l: "AI Models" },
+  { k: "leaderboard", route: "/dashboard/leaderboard", i: "board", l: "Leaderboard" },
+  { k: "settings", route: "/dashboard/settings", i: "profile", l: "Profile" },
+];
+
+function LearnNav() {
+  const router = useRouter();
+  return (
+    <nav className="ld-nav">
+      <div className="ld-brand"><MascotClerow size={34} /><span>Clerow</span></div>
+      {NAV.map((it) => (
+        <button key={it.k} className={`ld-navitem ${it.k === "overview" ? "on" : ""}`} onClick={() => router.push(it.route)}>
+          <span className="ic"><LDIcon name={it.i} /></span><span>{it.l}</span>
+        </button>
+      ))}
+      <div className="ld-nav-spacer" />
+    </nav>
+  );
+}
+
+function domainOf(url?: string) {
+  if (!url) return "your site";
+  return url.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+}
+
+function LearnTop({ data }: { data: DashboardData }) {
+  const models = data.models ?? [];
+  return (
+    <div className="ld-top">
+      <div className="dom">
+        <MascotClerow size={26} /> {domainOf(data.brand?.url)}
+        <span className="mono">· scanned across</span>
+        <span className="model-cluster">
+          {models.map((m) => <span key={m.id} className="mc" style={{ background: m.swatch }}>{m.letter}</span>)}
+        </span>
+      </div>
+      <span className="stat-pill streak"><span className="ic">🔥</span>{data.streak?.current ?? 0}</span>
+      <span className="stat-pill xp"><span className="ic">💎</span>{data.xp?.total ?? 0}</span>
+      <span className="stat-pill heart" title="Scans left this month"><span className="ic">📊</span>{data.scansLeft ?? 0}</span>
+    </div>
+  );
+}
+
+/* ---------------- the path ---------------- */
+function LearnPath({ data, onOpen }: { data: DashboardData; onOpen: (t: SheetTask) => void }) {
+  const ladder = data.ladder;
+  if (!ladder) return <div className="ld-path" style={{ color: "var(--ink-2)" }}>Run a scan to start your climb.</div>;
+  let idx = -1;
+  const off = () => { idx += 1; return OFF[idx % OFF.length]; };
+
+  const Node = ({ kind, icon, cap, xp, start, mascot, onClick }: {
+    kind: string; icon: React.ReactNode; cap: string; xp?: number | null; start?: boolean; mascot?: boolean; onClick?: () => void;
+  }) => (
+    <div className="node-row">
+      <div className={`node ${kind}`} style={{ transform: `translateX(${off()}px)` }}>
+        {start && <span className="start-bubble">Start</span>}
+        <button className="node-btn" onClick={onClick} disabled={!onClick}>{icon}</button>
+        {cap && <span className="node-cap">{cap}</span>}
+        {xp != null && <span className="node-xp">{kind === "done" ? "✓ earned" : `+${xp} XP`}</span>}
+        {mascot && <span className="node-mascot"><MascotClerow size={56} float /></span>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="ld-path">
+      {ladder.levels.map((lvl: LadderLevel, li: number) => {
+        const active = lvl.state === "active";
+        const locked = lvl.state === "locked";
+        // First unresolved task in the active level is "current".
+        const firstCurrent = active ? lvl.tasks.findIndex((t) => !t.resolved) : -1;
+        return (
+          <React.Fragment key={lvl.level}>
+            {li > 0 && <div className="unit-sep">Level {lvl.level}</div>}
+            <div className={`unit-banner ${locked ? "locked" : ""}`}>
+              <div>
+                <div className="k">Level {lvl.level}{active ? " · in progress" : locked ? " · locked" : " · done"}</div>
+                <h3>{lvl.title}</h3>
+              </div>
+            </div>
+            <div className="path-wrap">
+              {lvl.tasks.map((t: LadderTask, ti: number) => {
+                const kind = t.resolved ? "done" : active && ti === firstCurrent ? "current" : "locked";
+                const clickable = (kind === "done" || kind === "current") && !!t.id;
+                return (
+                  <Node
+                    key={t.key}
+                    kind={kind}
+                    icon={kind === "done" ? "✓" : kind === "locked" ? <LDIcon name="lock" /> : "①"}
+                    cap={t.title}
+                    xp={t.xp}
+                    start={kind === "current" && ti === firstCurrent}
+                    mascot={kind === "current" && ti === firstCurrent}
+                    onClick={clickable ? () => onOpen({ kind: "task", id: t.id, title: t.title, why: t.detail, xp: t.xp }) : undefined}
+                  />
+                );
+              })}
+              {active && (
+                <>
+                  <Node kind="mcp" icon="🤖" cap="Auto-fix the rest with Clerow MCP"
+                    onClick={() => onOpen({ kind: "mcp", id: null, title: "Let Clerow MCP fix everything", why: "Connect Clerow to Claude Code, Cursor, or any agent. It reads your open quests, ships the fixes as a PR, and Clerow re-checks every model.", xp: 0 })} />
+                  <Node kind="checkpoint" icon="🚩" cap="Re-scan checkpoint"
+                    onClick={() => onOpen({ kind: "checkpoint", id: null, title: "Re-scan across your AI models", why: "Re-scan to bank your gains and reveal the next fixes. This is the part one chatbot can't do — Clerow queries every model.", xp: 0 })} />
+                </>
+              )}
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------- right rail ---------------- */
+function LearnRail({ data }: { data: DashboardData }) {
+  const router = useRouter();
+  const models = data.models ?? [];
+  return (
+    <aside className="ld-rail">
+      <div className="rail-card">
+        <h4>Scanned across {models.length} AIs</h4>
+        <p className="sub">Each model cites differently. One chatbot can&apos;t see the others — Clerow watches all of them.</p>
+        <div className="rail-models">
+          {models.map((m: DashboardModel) => (
+            <div key={m.id} className="rail-model">
+              <span className="mc" style={{ background: m.swatch }}>{m.letter}</span>{m.label}
+              <span className={`st ${m.visibility ? "ok" : "no"}`}>{m.locked ? "🔒" : m.visibility != null ? `${m.visibility}%` : "—"}</span>
+            </div>
+          ))}
+        </div>
+        <div className="rail-note"><b>Why Clerow &gt; just asking Claude:</b> Claude can&apos;t tell you how ChatGPT or Perplexity rank you. Clerow can.</div>
+      </div>
+
+      <div className="mcp-card">
+        <span className="mcp-tag">⚡ Clerow MCP</span>
+        <h4>Let your AI do the work</h4>
+        <p>Plug Clerow into Claude Code, Cursor or any agent. It ships the fixes — Clerow verifies across every model.</p>
+        <button className="btn-violet" onClick={() => router.push("/dashboard/settings")}>Connect MCP</button>
+      </div>
+
+      <div className="rail-card">
+        <h4>Daily quests</h4>
+        <div className="rail-mini-q"><span className="qc">⚡</span><span className="qt">Clear 1 task today</span><span className="qx">+10</span></div>
+        <div className="rail-bar"><i style={{ width: `${data.streak?.activeToday ? 100 : 0}%` }} /></div>
+        <div className="rail-mini-q" style={{ borderBottom: 0, marginTop: 6 }}><span className="qc">🔥</span><span className="qt">Keep your {data.streak?.current ?? 0}-day streak</span><span className="qx">+5</span></div>
+      </div>
+    </aside>
+  );
+}
+
+/* ---------------- lesson sheet ---------------- */
+function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask; modelCount: number; onClose: () => void; onChanged: () => void }) {
+  const [sel, setSel] = React.useState<"diy" | "mcp" | "rescan" | null>(task.kind === "mcp" ? "mcp" : task.kind === "checkpoint" ? "rescan" : null);
+  const [view, setView] = React.useState<"choose" | "steps" | "share" | "done">("choose");
+  const [content, setContent] = React.useState<string>("");
+  const [busy, setBusy] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+
+  const cmd = `Clerow: read my open Clerow tasks and ship "${task.title}" as a PR, then re-check all my AI models when done.`;
+
+  const loadContent = async () => {
+    if (!task.id) { setView("steps"); return; }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/content`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      setContent(typeof json.content === "string" ? json.content : json.error || "Couldn't generate content.");
+    } catch {
+      setContent("Couldn't generate content. Try again.");
+    } finally {
+      setBusy(false);
+      setView("steps");
+    }
+  };
+
+  const markDone = async () => {
+    if (task.id) {
+      playCheck();
+      await fetch("/api/tasks", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: task.id, done: true }) }).catch(() => {});
+    }
+    setView("done");
+  };
+
+  const skip = async () => {
+    if (task.id) {
+      await fetch("/api/tasks", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: task.id, archived: true }) }).catch(() => {});
+    }
+    onChanged();
+    onClose();
+  };
+
+  const rescan = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/scan/rescan", { method: "POST" });
+      if (res.status === 402) { const j = await res.json().catch(() => ({})); alert(j.error || "You're out of scans this month."); setBusy(false); return; }
+      setView("done");
+    } catch {
+      alert("Re-scan failed. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const close = () => { onChanged(); onClose(); };
+
+  if (view === "done") {
+    return (
+      <div className="sheet-back">
+        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div className="lesson-prog"><i style={{ width: "100%" }} /></div></div>
+        <div className="done-toast"><div className="done-toast-in">
+          <div className="done-check">✓</div>
+          <div>
+            <div className="dt-t">{task.kind === "checkpoint" ? "Re-scanning your models…" : "Nice! Quest cleared"}</div>
+            <div className="dt-s">{task.kind === "checkpoint" ? "Querying every AI model — your score updates shortly." : `+${task.xp || 20} XP · streak kept 🔥`}</div>
+          </div>
+          <button className="btn-check" onClick={close}>Continue</button>
+        </div></div>
+      </div>
+    );
+  }
+
+  if (view === "steps") {
+    return (
+      <div className="sheet-back">
+        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div className="lesson-prog"><i style={{ width: "80%" }} /></div><span className="lesson-heart">🛠️ DIY</span></div>
+        <div className="lesson-body"><div className="lesson-inner">
+          <div className="lesson-tag"><span className="dot">✦</span>Copy-ready fix</div>
+          <h1 className="lesson-h">{task.title}</h1>
+          <div className="lesson-content">{busy ? "Generating your content…" : content}</div>
+        </div></div>
+        <div className="lesson-foot"><div className="lesson-foot-in">
+          <button className="btn-skip" onClick={() => setView("choose")}>← Back</button>
+          <button className="btn-check" onClick={markDone}>Mark done ✓</button>
+        </div></div>
+      </div>
+    );
+  }
+
+  const sharePop = view === "share" ? (
+    <div className="share-pop-back" onClick={() => setView("choose")}>
+      <div className="share-pop" onClick={(e) => e.stopPropagation()}>
+        <div className="sp-ic">🤖</div>
+        <h3>Share with your AI agent</h3>
+        <p className="sp-sub">Paste this into Claude Code, Cursor, or any agent connected to Clerow MCP.</p>
+        <div className="share-box">{cmd}</div>
+        <button className="btn-violet" onClick={() => { navigator.clipboard?.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? "Copied ✓" : "Copy command"}</button>
+        <button className="sp-manual" onClick={markDone}>I&apos;ll mark it done</button>
+      </div>
+    </div>
+  ) : null;
+
+  const footLabel = sel === "diy" ? "See the fix" : sel === "mcp" ? "Share with AI" : sel === "rescan" ? "Re-scan now" : "Continue";
+  const onFoot = () => {
+    if (sel === "diy") loadContent();
+    else if (sel === "mcp") setView("share");
+    else if (sel === "rescan") rescan();
+  };
+
+  return (
+    <div className="sheet-back">
+      <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div className="lesson-prog"><i style={{ width: "55%" }} /></div><span className="lesson-heart">📊 {modelCount} models</span></div>
+      <div className="lesson-body"><div className="lesson-inner">
+        <div className="lesson-tag"><span className="dot">{task.kind === "mcp" ? "⚡" : task.kind === "checkpoint" ? "🚩" : "✓"}</span>{task.kind === "checkpoint" ? "Checkpoint" : task.kind === "mcp" ? "Autopilot" : "Fix"}</div>
+        <h1 className="lesson-h">{task.title}</h1>
+        <p className="lesson-why">{task.why}</p>
+
+        {task.kind === "checkpoint" ? (
+          <button className={`opt ${sel === "rescan" ? "on" : ""}`} onClick={() => setSel("rescan")}>
+            <span className="oic">🚩</span>
+            <div><div className="ot">Re-scan now</div><div className="od">Clerow re-queries all your AI models and recomputes your score. ~60s.</div></div>
+          </button>
+        ) : task.kind === "mcp" ? (
+          <button className="opt violet on" onClick={() => setSel("mcp")}>
+            <span className="oic">🤖</span>
+            <div><div className="ot">Connect Clerow MCP</div><div className="od">Your agent reads every open quest and ships the fixes. Clerow verifies across all models.</div></div>
+            <span className="obadge">Autopilot</span>
+          </button>
+        ) : (
+          <>
+            <div className="lesson-choose">How do you want to fix this?</div>
+            <button className={`opt ${sel === "diy" ? "on" : ""}`} onClick={() => setSel("diy")}>
+              <span className="onum">1</span><span className="oic">🛠️</span>
+              <div><div className="ot">I&apos;ll do it myself</div><div className="od">Get the copy-paste-ready fix tailored to your brand.</div></div>
+            </button>
+            <button className={`opt violet ${sel === "mcp" ? "on" : ""}`} onClick={() => setSel("mcp")}>
+              <span className="onum">2</span><span className="oic">🤖</span>
+              <div><div className="ot">Let Clerow MCP do it</div><div className="od">Share a command with your AI agent — it ships the fix, Clerow re-checks every model.</div></div>
+              <span className="obadge">Autopilot</span>
+            </button>
+          </>
+        )}
+      </div></div>
+      <div className="lesson-foot"><div className="lesson-foot-in">
+        <button className="btn-skip" onClick={skip}>Skip</button>
+        <button className="btn-check" disabled={!sel || busy} onClick={onFoot}>{busy ? "…" : footLabel}</button>
+      </div></div>
+      {sharePop}
+    </div>
+  );
+}
+
+/* ---------------- shell ---------------- */
+function LearnInner() {
+  const { data, loading, refresh } = useDashboard();
+  const [task, setTask] = React.useState<SheetTask | null>(null);
+
+  return (
+    <div className="ld-root">
+      <div className="ld-shell">
+        <LearnNav />
+        <div className="ld-center">
+          {data && <LearnTop data={data} />}
+          {loading && !data ? (
+            <div className="ld-path" style={{ color: "var(--ink-2)" }}>Loading your climb…</div>
+          ) : data ? (
+            <LearnPath data={data} onOpen={setTask} />
+          ) : null}
+        </div>
+        {data && <LearnRail data={data} />}
+      </div>
+      {task && <LessonSheet task={task} modelCount={data?.models?.length ?? 0} onClose={() => setTask(null)} onChanged={refresh} />}
+    </div>
+  );
+}
+
+export function LearnDashboard() {
+  return (
+    <DashboardProvider>
+      <LearnInner />
+    </DashboardProvider>
+  );
+}

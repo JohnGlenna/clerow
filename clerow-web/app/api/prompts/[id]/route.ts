@@ -4,7 +4,7 @@ import { loadPromptDetail } from "@/lib/scan/promptDetail";
 import { runPromptScan } from "@/lib/scan/run";
 import { ENGINES, type EngineId } from "@/lib/engines";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
-import { planFromSub, enginesForPlan, dailyScanLimit } from "@/lib/billing/limits";
+import { planFromSub, enginesForPlan, dailyScanLimit, BudgetExceededError } from "@/lib/billing/limits";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -106,6 +106,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   try {
     await runPromptScan(supabase, brandId, id, engineIds);
   } catch (err) {
+    if (err instanceof BudgetExceededError) {
+      return NextResponse.json(
+        { error: "You're out of scans for this month. Upgrade for more.", budget: err.status, code: "budget" },
+        { status: 402 },
+      );
+    }
     const message = err instanceof Error ? err.message : "Scan failed";
     return NextResponse.json({ error: message }, { status: 502 });
   }

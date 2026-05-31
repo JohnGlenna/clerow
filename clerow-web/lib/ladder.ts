@@ -34,6 +34,9 @@ export type LadderTask = {
   // Runtime, attached from existing tasks:
   id: string | null;
   done: boolean;
+  // Resolved = done OR skipped(archived) — counts toward level completion so a
+  // skipped task still advances the path (it just earns no XP).
+  resolved: boolean;
 };
 
 export type LevelState = "locked" | "active" | "done";
@@ -205,7 +208,7 @@ const LEVEL_META: { title: string; blurb: string; build: (c: LadderContext) => S
   { title: "Measure & repeat", blurb: "Re-scan, see your gains, and unlock the next climb.", build: level5 },
 ];
 
-function toTask(s: Spec, existing: Map<string, { id: string; done: boolean }>): LadderTask {
+function toTask(s: Spec, existing: Map<string, { id: string; done: boolean; resolved: boolean }>): LadderTask {
   const e = existing.get(s.key);
   return {
     key: s.key,
@@ -217,6 +220,7 @@ function toTask(s: Spec, existing: Map<string, { id: string; done: boolean }>): 
     impact: s.impact,
     id: e?.id ?? null,
     done: e?.done ?? false,
+    resolved: e?.resolved ?? e?.done ?? false,
   };
 }
 
@@ -225,12 +229,13 @@ function toTask(s: Spec, existing: Map<string, { id: string; done: boolean }>): 
 // counts as complete so the user advances.
 export function buildLadder(
   ctx: LadderContext,
-  existing: Map<string, { id: string; done: boolean }>,
+  existing: Map<string, { id: string; done: boolean; resolved: boolean }>,
 ): Ladder {
   const built = LEVEL_META.map((meta, i) => {
     const tasks = meta.build(ctx).map((s) => toTask(s, existing));
     const total = tasks.length;
-    const doneCount = tasks.filter((t) => t.done).length;
+    // Completion counts resolved (done or skipped); progress shown to the user.
+    const doneCount = tasks.filter((t) => t.resolved).length;
     return { level: i + 1, title: meta.title, blurb: meta.blurb, tasks, total, doneCount };
   });
 

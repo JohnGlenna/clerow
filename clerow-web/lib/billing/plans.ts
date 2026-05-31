@@ -15,17 +15,19 @@ export type Plan = {
   checkout: boolean;
   /** How many AI models this plan may scan (prefix of PAID_ENGINES order). */
   maxEngines: number;
-  /** Max prompt-scans per brand per rolling 24h — the per-plan cost ceiling. */
+  /** Max prompt-scans per brand per rolling 24h (legacy hint; budget is the real cap). */
   dailyScans: number;
+  /** Monthly API-cost ceiling in USD — the real per-plan COGS guard, enforced in
+   *  limits.ts against summed scan est_cost. Founder $29 plan caps at $5 of spend. */
+  monthlyBudgetUsd: number;
 };
 
-// `maxEngines` / `dailyScans` are the cost ceiling per plan, enforced server-side
-// (see lib/billing/limits.ts). Tune as COGS/pricing demand — they are the guard
-// that stops paid AI calls from outrunning subscription revenue.
+// `maxEngines` + `monthlyBudgetUsd` are the cost ceiling per plan, enforced
+// server-side (see lib/billing/limits.ts + cost.ts). Tune as COGS/pricing demand.
 export const PLANS: Record<PlanKey, Plan> = {
-  founder:    { key: "founder",    name: "Founder",        price: 29,  priceEnv: "STRIPE_PRICE_FOUNDER",    checkout: true,  maxEngines: 3, dailyScans: 25 },
-  team:       { key: "team",       name: "Marketing Team", price: 89,  priceEnv: "STRIPE_PRICE_TEAM",       checkout: true,  maxEngines: 4, dailyScans: 100 },
-  enterprise: { key: "enterprise", name: "Enterprise",     price: 249, priceEnv: "STRIPE_PRICE_ENTERPRISE", checkout: false, maxEngines: 4, dailyScans: 1000 },
+  founder:    { key: "founder",    name: "Founder",        price: 29,  priceEnv: "STRIPE_PRICE_FOUNDER",    checkout: true,  maxEngines: 3, dailyScans: 25,   monthlyBudgetUsd: 5 },
+  team:       { key: "team",       name: "Marketing Team", price: 89,  priceEnv: "STRIPE_PRICE_TEAM",       checkout: true,  maxEngines: 5, dailyScans: 100,  monthlyBudgetUsd: 13 },
+  enterprise: { key: "enterprise", name: "Enterprise",     price: 249, priceEnv: "STRIPE_PRICE_ENTERPRISE", checkout: false, maxEngines: 5, dailyScans: 1000, monthlyBudgetUsd: 35 },
 };
 
 export function isPlanKey(value: unknown): value is PlanKey {

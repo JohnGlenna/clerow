@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEngine, enabledEngines, ENGINES, FREE_ENGINES, PAID_ENGINES, type EngineId } from "../engines";
 import { discoverPrompts } from "./discover";
 import { detectRanking } from "./detect";
+import { costForEngines, roundUsd } from "../billing/cost";
+import { assertBudget, planFromSub } from "../billing/limits";
+import { getSubscription } from "../billing/subscription";
 import type { BrandProfile, RankedBrand, RunResponse } from "../types";
 import type { Database, BrandSentiment, Citation } from "../supabase/database.types";
 
@@ -128,7 +131,7 @@ export async function runFreeScan(db: DB, brandId: string): Promise<RunResponse>
 
     await db
       .from("scans")
-      .update({ status: "done", finished_at: new Date().toISOString() })
+      .update({ status: "done", est_cost: roundUsd(costForEngines([engineId])), finished_at: new Date().toISOString() })
       .eq("id", scan.id);
 
     return {
@@ -240,6 +243,11 @@ export async function runPromptScan(
   const { data: brand, error: be } = await db.from("brands").select("*").eq("id", brandId).single();
   if (be || !brand) throw new Error(`Brand not found: ${be?.message ?? brandId}`);
 
+  // Per-plan monthly cost guard — refuse the scan if it would exceed the budget.
+  // Throws BudgetExceededError (callers map it to an "out of scans" response).
+  const plan = planFromSub(await getSubscription(db, brand.user_id));
+  await assertBudget(db, brand.user_id, plan, costForEngines(engines), new Date());
+
   const { data: prompt, error: pe } = await db
     .from("prompts")
     .select("*")
@@ -276,11 +284,14 @@ export async function runPromptScan(
   });
 
   const anyOk = outcomes.some((o) => o.ok);
+  // Charge only for engines that actually produced a result.
+  const okEngines = outcomes.filter((o) => o.ok).map((o) => o.engine);
   await db
     .from("scans")
     .update({
       status: anyOk ? "done" : "error",
       error: anyOk ? null : "All engines failed",
+      est_cost: roundUsd(costForEngines(okEngines)),
       finished_at: new Date().toISOString(),
     })
     .eq("id", scan.id);

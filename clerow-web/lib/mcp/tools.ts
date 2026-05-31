@@ -87,11 +87,13 @@ async function loadLadder(admin: Db, brand: BrandRow) {
       .map((p) => p.text)
       .slice(0, 5),
   };
-  const existing = new Map<string, { id: string; done: boolean }>();
-  for (const t of tasks ?? []) if (t.ladder_key) existing.set(t.ladder_key, { id: t.id, done: t.done });
+  const existing = new Map<string, { id: string; done: boolean; resolved: boolean }>();
+  for (const t of tasks ?? [])
+    if (t.ladder_key) existing.set(t.ladder_key, { id: t.id, done: t.done, resolved: t.done || t.archived });
   const pre = buildLadder(ctx, existing);
   const inserted = await ensureLadderTasks(admin, brand.id, pre, new Set(existing.keys()));
-  for (const r of inserted) if (r.ladder_key) existing.set(r.ladder_key, { id: r.id, done: r.done });
+  for (const r of inserted)
+    if (r.ladder_key) existing.set(r.ladder_key, { id: r.id, done: r.done, resolved: r.done || r.archived });
   return { ladder: buildLadder(ctx, existing), primaryPrompt: ctx.primaryPrompt, competitorsAhead: ctx.competitorsAhead };
 }
 

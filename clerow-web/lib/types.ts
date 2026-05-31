@@ -182,4 +182,6 @@ export type DashboardData = {
   xp?: DashboardXp;
   trend?: DashboardTrend;
   citations?: { url: string; title: string }[];
+  scansLeft?: number; // scans remaining this billing period (budget)
+  budget?: { spent: number; ceiling: number };
 };

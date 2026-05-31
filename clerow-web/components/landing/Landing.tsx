@@ -14,6 +14,7 @@ export function Landing() {
       <LandingHero />
       <LandingExample />
       <LandingHow />
+      <LandingClimb />
       <LandingPricing />
       <LandingFAQ />
       <LandingFinalCTA />
@@ -447,6 +448,69 @@ function LandingHow() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Teaser for the new gamified learn-path dashboard — a light-themed preview of
+// "The Climb" so the landing reflects the product's Duolingo-style experience.
+function LandingClimb() {
+  const nodes: { ico: string; cap: string; state: "done" | "current" | "locked" }[] = [
+    { ico: "🤖", cap: "Allow AI crawlers", state: "done" },
+    { ico: "🗺️", cap: "Add llms.txt", state: "done" },
+    { ico: "①", cap: "One clear H1", state: "current" },
+    { ico: "🔒", cap: "Level 2 · Structure", state: "locked" },
+  ];
+  const fixes: { t: string; xp: number; done?: boolean }[] = [
+    { t: "Allow AI crawlers (robots.txt)", xp: 20, done: true },
+    { t: "Add llms.txt", xp: 25, done: true },
+    { t: "Give your homepage one clear H1", xp: 20 },
+    { t: "Publish a comparison page", xp: 80 },
+  ];
+  const color = (s: string) => (s === "done" ? "var(--success)" : s === "current" ? "var(--accent-2)" : "var(--ink-3)");
+  return (
+    <section id="climb" className="section">
+      <div className="shell">
+        <div className="section-head">
+          <div className="section-eyebrow"><GameIcon name="trophy" size={16} /> The Clerow path</div>
+          <h2 className="h2">Ranking in AI feels like <span className="muted">a game, not a chore.</span></h2>
+          <p className="lede">Every gap becomes one bite-size quest. Quick wins first, XP and streaks as you climb — or let your AI agent ship the fixes for you.</p>
+        </div>
+        <div
+          style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, maxWidth: 880, margin: "0 auto",
+            background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 22,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--ink-2)", marginBottom: 14 }}>Your climb</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {nodes.map((n, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ width: 38, height: 38, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#fff", background: color(n.state), boxShadow: `0 4px 0 color-mix(in oklab, ${color(n.state)} 60%, #000)` }}>{n.ico}</span>
+                  <span style={{ fontWeight: 800, fontSize: 14, color: n.state === "locked" ? "var(--ink-3)" : "var(--ink)" }}>{n.cap}</span>
+                  {n.state === "current" && <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 900, color: "var(--accent-2)" }}>YOU</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--ink-2)", marginBottom: 14 }}>Your next fixes</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {fixes.map((f, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, background: "var(--bg-soft)", border: "1px solid var(--border-soft)" }}>
+                  <span style={{ width: 20, height: 20, borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff", background: f.done ? "var(--success)" : "var(--bg-soft-2)" }}>{f.done ? "✓" : ""}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)", flex: 1 }}>{f.t}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 800, color: "#5A4200", background: "var(--xp)", padding: "3px 7px", borderRadius: 6 }}>+{f.xp}</span>
+                </div>
+              ))}
+            </div>
+            <a href="/onboarding" className="btn btn--primary btn--sm" style={{ marginTop: 16, display: "inline-flex" }}>
+              <GameIcon name="bolt" size={14} /> Start your climb
+            </a>
+          </div>
         </div>
       </div>
     </section>

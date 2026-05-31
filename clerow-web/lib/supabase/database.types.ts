@@ -357,6 +357,7 @@ export type Database = {
           brand_id: string
           engines: string[]
           error: string | null
+          est_cost: number
           finished_at: string | null
           id: string
           started_at: string
@@ -367,6 +368,7 @@ export type Database = {
           brand_id: string
           engines?: string[]
           error?: string | null
+          est_cost?: number
           finished_at?: string | null
           id?: string
           started_at?: string
@@ -377,6 +379,7 @@ export type Database = {
           brand_id?: string
           engines?: string[]
           error?: string | null
+          est_cost?: number
           finished_at?: string | null
           id?: string
           started_at?: string

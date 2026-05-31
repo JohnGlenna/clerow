@@ -3,19 +3,7 @@ import { PerplexityEngine } from "./perplexity";
 import { OpenAIEngine } from "./openai";
 import { AnthropicEngine } from "./anthropic";
 import { GeminiEngine } from "./gemini";
-
-// Locked stub — interface-ready engines that aren't wired yet. They appear in
-// the dashboard as "upgrade to unlock" and throw if a scan tries to run them.
-function lockedEngine(id: EngineId, label: string): AIEngine {
-  return {
-    id,
-    label,
-    enabled: false,
-    async query() {
-      throw new Error(`${label} engine is not enabled yet (paid tier).`);
-    },
-  };
-}
+import { GrokEngine } from "./grok";
 
 // Each real engine reports `enabled` from whether its API key is present, so a
 // missing key surfaces as a locked model in the UI rather than a runtime crash.
@@ -24,7 +12,7 @@ export const ENGINES: Record<EngineId, AIEngine> = {
   chatgpt: OpenAIEngine,
   claude: AnthropicEngine,
   gemini: GeminiEngine,
-  grok: lockedEngine("grok", "Grok"),
+  grok: GrokEngine,
 };
 
 export function getEngine(id: EngineId): AIEngine {
@@ -48,7 +36,7 @@ export const FREE_ENGINES: EngineId[] = ["perplexity"];
 
 // Engines the paid scan runs across, in display order. Filtered to whichever
 // currently have a configured API key via `enabledEngines`.
-export const PAID_ENGINES: EngineId[] = ["chatgpt", "claude", "perplexity", "gemini"];
+export const PAID_ENGINES: EngineId[] = ["chatgpt", "claude", "perplexity", "gemini", "grok"];
 
 // Of the given engine ids, those that are actually runnable right now (key set).
 export function enabledEngines(ids: EngineId[]): EngineId[] {

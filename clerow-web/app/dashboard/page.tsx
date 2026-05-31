@@ -1,10 +1,6 @@
-import { AppShell } from "@/components/dashboard/AppShell";
-import { PageOverview } from "@/components/dashboard/PageOverview";
+import "./learn.css";
+import { LearnDashboard } from "@/components/dashboard/learn/LearnDashboard";
 
 export default function DashboardOverviewPage() {
-  return (
-    <AppShell page="overview">
-      <PageOverview />
-    </AppShell>
-  );
+  return <LearnDashboard />;
 }
