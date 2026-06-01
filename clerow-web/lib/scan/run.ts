@@ -71,7 +71,7 @@ async function persistEngineResult(
   // Emit per-engine progress as we go. Under the concurrent Promise.allSettled in
   // runPromptScan each engine drives its own events independently.
   const emit = (status: "querying" | "detecting" | "done" | "failed", extra?: { position?: number | null; visibility?: number; error?: string }) =>
-    onEvent?.({ type: "engine", engine: engineId, label: engine.label, status, ...extra });
+    onEvent?.({ type: "engine", engine: engineId, label: engine.label, status, promptId: prompt.id, ...extra });
 
   try {
     emit("querying");
@@ -291,7 +291,7 @@ export async function runPromptScan(
   // Show every engine as "queued" before any resolves, so all model rows render
   // up front and then tick independently as each one progresses.
   for (const id of engines) {
-    onEvent?.({ type: "engine", engine: id, label: getEngine(id).label, status: "queued" });
+    onEvent?.({ type: "engine", engine: id, label: getEngine(id).label, status: "queued", promptId: prompt.id });
   }
 
   const profile = toProfile(brand);

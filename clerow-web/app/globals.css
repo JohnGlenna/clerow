@@ -1909,6 +1909,19 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   margin: 0 auto;
   text-align: left;
 }
+/* Per-prompt grouping for the level scan: one query, its row of models below. */
+.scan-prompt {
+  max-width: 420px;
+  margin: 0 auto 14px;
+  text-align: left;
+}
+.scan-prompt-q {
+  font-size: 13px; font-weight: 800;
+  color: color-mix(in oklab, currentColor 78%, transparent);
+  margin: 0 0 7px;
+  padding-left: 2px;
+}
+.scan-prompt .scan-models { max-width: none; margin: 0; }
 .scan-model {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 12px;

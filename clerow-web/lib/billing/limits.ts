@@ -16,7 +16,7 @@ export function planFromSub(sub: SubscriptionRow | null): PlanKey | null {
 }
 
 // The engines a plan is entitled to scan — a prefix of PAID_ENGINES order
-// (chatgpt, claude, perplexity, [gemini]). Founder gets the first 3.
+// (chatgpt, claude, perplexity, gemini, grok). All paid plans now get all 5.
 export function enginesForPlan(plan: PlanKey | null): EngineId[] {
   const max = plan ? PLANS[plan].maxEngines : PAID_ENGINES.length;
   return PAID_ENGINES.slice(0, max);

@@ -7,7 +7,7 @@
 
 import React from "react";
 import { ENGINE_META } from "@/lib/engines";
-import type { EngineProgress } from "@/lib/useScanStream";
+import type { EngineProgress, PromptProgress } from "@/lib/useScanStream";
 import { MascotClerow } from "../Mascot";
 
 export type ScanStep = { label: string; state: "pending" | "active" | "done" };
@@ -15,15 +15,21 @@ export type ScanStep = { label: string; state: "pending" | "active" | "done" };
 export function ScanProgress({
   steps,
   engines,
+  prompts,
   elapsedMs,
   showOrbit = true,
 }: {
   steps?: ScanStep[];
   engines: EngineProgress[];
+  // When supplied with more than one group, render a section per prompt (the
+  // per-level scan). Otherwise fall back to the flat `engines` list.
+  prompts?: PromptProgress[];
   elapsedMs: number;
   showOrbit?: boolean;
 }) {
   const secs = Math.max(0, Math.floor(elapsedMs / 1000));
+  const grouped = (prompts ?? []).filter((p) => p.text);
+  const multi = grouped.length > 1;
   return (
     <div className="scanning">
       {showOrbit && (
@@ -47,15 +53,30 @@ export function ScanProgress({
         </div>
       )}
 
-      {engines.length > 0 && (
-        <div className="scan-models">
-          {engines.map((e) => (
-            <ModelRow key={e.engine} e={e} />
-          ))}
-        </div>
+      {multi ? (
+        grouped
+          .sort((a, b) => a.index - b.index)
+          .map((p) => (
+            <div key={p.promptId} className="scan-prompt">
+              <div className="scan-prompt-q">“{p.text}”</div>
+              <div className="scan-models">
+                {p.engines.map((e) => (
+                  <ModelRow key={e.engine} e={e} />
+                ))}
+              </div>
+            </div>
+          ))
+      ) : (
+        engines.length > 0 && (
+          <div className="scan-models">
+            {engines.map((e) => (
+              <ModelRow key={e.engine} e={e} />
+            ))}
+          </div>
+        )
       )}
 
-      {engines.length > 0 && (
+      {(engines.length > 0 || multi) && (
         <div className="scan-elapsed" aria-live="polite">
           Scanning… {secs}s
         </div>

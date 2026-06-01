@@ -15,11 +15,18 @@ export type ScanScore = { overall: number; visibility: number; position: number 
 
 export type ScanEvent =
   | { type: "phase"; phase: "reading" | "discovering" | "scanning" }
+  // Announce a prompt before its engines run, so a multi-prompt scan (the per-level
+  // scan) can render each query's row of models up front. Single-prompt scans
+  // (free scan, re-scan) simply never emit this and the client stays flat.
+  | { type: "prompt"; promptId: string; text: string; index: number; total: number }
   | {
       type: "engine";
       engine: EngineId;
       label: string;
       status: EngineStatus;
+      // Set on multi-prompt scans so the client can attribute each engine tick to
+      // its prompt group; absent on single-prompt scans.
+      promptId?: string;
       position?: number | null;
       visibility?: number;
       error?: string;

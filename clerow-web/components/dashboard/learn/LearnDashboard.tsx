@@ -19,6 +19,7 @@ type SheetTask = {
   kind: "task" | "mcp" | "checkpoint";
   id: string | null;
   promptId?: string | null; // when the lesson is for a tracked prompt (Prompts page → Fix)
+  level?: number; // which level a checkpoint scan is for (informational)
   title: string;
   why: string;
   xp: number;
@@ -186,9 +187,9 @@ function LearnPath({ data, subscribed, onOpen, onUpgrade }: {
         const tailNodes = active ? [
           <PathNode key="__mcp" kind="mcp" icon="🤖" cap="Auto-fix the rest with Clerow MCP"
             onClick={() => onOpen({ kind: "mcp", id: null, title: "Let Clerow MCP fix everything", why: "Connect Clerow to Claude Code, Cursor, or any agent. It reads your open quests, ships the fixes as a PR, and Clerow re-checks every model.", xp: 0 })} />,
-          <PathNode key="__scan" kind="scanbtn" icon={<LDIcon name="lock" />} cap="Scan & unlock Level 2" xp={null}
+          <PathNode key="__scan" kind="scanbtn" icon={<LDIcon name="scan" />} cap={`Scan & unlock Level ${lvl.level + 1}`} xp={null}
             onClick={subscribed
-              ? () => onOpen({ kind: "checkpoint", id: null, title: "Re-scan across your AI models", why: "Re-scan to bank your gains and reveal the next fixes. This is the part one chatbot can't do — Clerow queries every model.", xp: 0 })
+              ? () => onOpen({ kind: "checkpoint", id: null, level: lvl.level, title: "Re-scan across your AI models", why: "Re-scan to bank your gains and reveal the next fixes. This is the part one chatbot can't do — Clerow queries every model.", xp: 0 })
               : onUpgrade} />,
         ] : [];
         const nodes = [...taskNodes, ...tailNodes];
@@ -202,7 +203,9 @@ function LearnPath({ data, subscribed, onOpen, onUpgrade }: {
                 <h3>{lvl.title}</h3>
               </div>
               {locked
-                ? <button className="unit-guide" onClick={onUpgrade}><LDIcon name="lock" /> Locked</button>
+                ? subscribed
+                  ? <button className="unit-guide" onClick={() => onOpen({ kind: "checkpoint", id: null, level: lvl.level, title: "Scan across your AI models", why: "Re-scan to bank your gains and measure progress across every AI model — then finish this level's tasks to unlock it.", xp: 0 })}><LDIcon name="scan" /> Scan &amp; unlock</button>
+                  : <button className="unit-guide" onClick={onUpgrade}><LDIcon name="lock" /> Locked</button>
                 : <button className="unit-guide" disabled><LDIcon name="book" /> Guide</button>}
             </div>
             {active
@@ -219,20 +222,26 @@ function LearnPath({ data, subscribed, onOpen, onUpgrade }: {
 function LearnRail({ data, onUpgrade }: { data: DashboardData; onUpgrade: () => void }) {
   const router = useRouter();
   const models = data.models ?? [];
+  // Perplexity is the only model scanned on the free tier — surface it first and
+  // lock the rest, since none of them have been scanned.
+  const orderedModels = [...models].sort((a, b) =>
+    (a.id === "perplexity" ? 0 : 1) - (b.id === "perplexity" ? 0 : 1));
   return (
     <aside className="ld-rail">
       <div className="rail-card">
         <h4>Scanned across {models.length} AIs</h4>
         <p className="sub">Each model cites differently. One chatbot can&apos;t see the others — Clerow watches all of them.</p>
         <div className="rail-models">
-          {models.map((m: DashboardModel) => (
-            <div key={m.id} className="rail-model">
-              <span className="mc" style={{ background: "#fff" }}><AiIcon id={m.id} size={16} letter={m.letter} /></span>{m.label}
-              <span className={`st ${m.visibility ? "ok" : "no"}`}>{m.locked ? "🔒" : m.visibility != null ? `${m.visibility}%` : "—"}</span>
-            </div>
-          ))}
+          {orderedModels.map((m: DashboardModel) => {
+            const locked = m.locked || m.id !== "perplexity";
+            return (
+              <div key={m.id} className="rail-model">
+                <span className="mc" style={{ background: "#fff" }}><AiIcon id={m.id} size={16} letter={m.letter} /></span>{m.label}
+                <span className={`st ${!locked && m.visibility ? "ok" : "no"}`}>{locked ? "🔒" : m.visibility != null ? `${m.visibility}%` : "—"}</span>
+              </div>
+            );
+          })}
         </div>
-        <div className="rail-note"><b>Why Clerow &gt; just asking Claude:</b> Claude can&apos;t tell you how ChatGPT or Perplexity rank you. Clerow can.</div>
       </div>
 
       {!data.subscribed && (
@@ -244,7 +253,7 @@ function LearnRail({ data, onUpgrade }: { data: DashboardData; onUpgrade: () => 
           <h4>Unlock every level &amp; all 5 models</h4>
           <ul className="upg-list">
             <li>✓ All quest levels &amp; re-scans</li>
-            <li>✓ Gemini + Grok tracking</li>
+            <li>✓ All AI models tracked</li>
             <li>✓ Leaderboard &amp; weekly reports</li>
           </ul>
           <button className="btn-upg" onClick={onUpgrade}>Upgrade — $29/mo</button>
@@ -357,9 +366,13 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
   };
 
   const rescan = async () => {
-    // Switch to the live view and stream per-model progress as each AI model runs.
+    // Switch to the live view and stream per-model progress as each AI model runs
+    // through this level's prompts.
     setView("scanning");
-    const outcome = await scan.run("/api/scan/rescan");
+    const outcome = await scan.run("/api/scan/level", {
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ level: task.level ?? null }),
+    });
     if (!outcome.ok) {
       if (outcome.status === 402) alert(outcome.error || "You're out of scans this month.");
       else if (outcome.status === 429) alert(outcome.error || "A scan is already running — give it a moment.");
@@ -372,10 +385,12 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
 
   const close = () => { onChanged(); onClose(); };
 
-  // Live re-scan: every model ticks queued → querying → reading → result in parallel.
+  // Live re-scan: every model ticks queued → querying → reading → result in
+  // parallel, grouped by the level's prompts. Progress spans all prompt×model cells.
   if (view === "scanning") {
-    const total = scan.engines.length || 1;
-    const finished = scan.engines.filter((e) => e.status === "done" || e.status === "failed").length;
+    const cells = scan.prompts.flatMap((p) => p.engines);
+    const total = cells.length || 1;
+    const finished = cells.filter((e) => e.status === "done" || e.status === "failed").length;
     const pct = Math.round((finished / total) * 100);
     return (
       <div className="sheet-back">
@@ -383,8 +398,8 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
         <div className="lesson-body"><div className="lesson-inner">
           <div className="lesson-tag"><span className="dot">🚩</span>Re-scanning</div>
           <h1 className="lesson-h">Querying your AI models…</h1>
-          <p className="lesson-why">Watch each model answer in real time — your score updates the moment they all finish.</p>
-          <ScanProgress engines={scan.engines} elapsedMs={scan.elapsedMs} showOrbit={false} />
+          <p className="lesson-why">Watch every model work through your queries in real time — your score updates the moment they all finish.</p>
+          <ScanProgress engines={scan.engines} prompts={scan.prompts} elapsedMs={scan.elapsedMs} showOrbit={false} />
         </div></div>
       </div>
     );
@@ -399,7 +414,7 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
           <div className="done-check">✓</div>
           <div>
             <div className="dt-t">{task.kind === "checkpoint" ? "Models re-scanned ✓" : "Nice! Quest cleared"}</div>
-            <div className="dt-s">{task.kind === "checkpoint" ? (overall != null ? `Your visibility score is now ${overall}.` : "Your score has been updated across every model.") : `+${task.xp || 20} XP · streak kept 🔥`}</div>
+            <div className="dt-s">{task.kind === "checkpoint" ? (overall != null ? `Your visibility score is now ${overall}. Finish this level's tasks to unlock the next one.` : "Your score's updated across every model. Finish this level's tasks to unlock the next one.") : `+${task.xp || 20} XP · streak kept 🔥`}</div>
           </div>
           <button className="btn-check" onClick={close}>Continue</button>
         </div></div>

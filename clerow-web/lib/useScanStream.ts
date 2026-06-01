@@ -21,13 +21,23 @@ export type EngineProgress = {
   finishedAt?: number;
 };
 
+// A multi-prompt scan (the per-level scan) groups its engine rows by prompt, so
+// the UI can show each query with its own row of models ticking. Single-prompt
+// scans (free scan, re-scan) collapse to a single group.
+export type PromptProgress = {
+  promptId: string;
+  text: string;
+  index: number;
+  engines: EngineProgress[];
+};
+
 export type ScanResult = RunResponse | { scanId: string; score: ScanScore };
 
 type Status = "idle" | "running" | "done" | "error";
 
 export type ScanStreamState = {
   status: Status;
-  engines: EngineProgress[];
+  prompts: PromptProgress[];
   result: ScanResult | null;
   error: string | null;
   elapsedMs: number;
@@ -39,7 +49,11 @@ export type RunOutcome =
   | { ok: true; result: ScanResult | null }
   | { ok: false; status: number; error: string; budget?: unknown };
 
-const IDLE: ScanStreamState = { status: "idle", engines: [], result: null, error: null, elapsedMs: 0 };
+const IDLE: ScanStreamState = { status: "idle", prompts: [], result: null, error: null, elapsedMs: 0 };
+
+// Engine events that never announce a prompt (free scan, re-scan) all land in one
+// implicit group keyed here, so the flat `engines` view stays correct.
+const SOLO = "__solo";
 
 export function useScanStream() {
   const [state, setState] = React.useState<ScanStreamState>(IDLE);
@@ -59,9 +73,26 @@ export function useScanStream() {
   const apply = React.useCallback((e: ScanEvent) => {
     setState((s) => {
       switch (e.type) {
+        case "prompt": {
+          // Seed (or update the label of) a prompt group up front.
+          const prompts = [...s.prompts];
+          const gi = prompts.findIndex((p) => p.promptId === e.promptId);
+          if (gi >= 0) prompts[gi] = { ...prompts[gi], text: e.text, index: e.index };
+          else prompts.push({ promptId: e.promptId, text: e.text, index: e.index, engines: [] });
+          return { ...s, prompts };
+        }
         case "engine": {
           const now = Date.now();
-          const engines = [...s.engines];
+          const key = e.promptId ?? SOLO;
+          const prompts = [...s.prompts];
+          let gi = prompts.findIndex((p) => p.promptId === key);
+          if (gi < 0) {
+            // Engine tick arrived before its prompt frame (or a single-prompt scan
+            // that never announces) — create the group with a blank label.
+            prompts.push({ promptId: key, text: "", index: prompts.length, engines: [] });
+            gi = prompts.length - 1;
+          }
+          const engines = [...prompts[gi].engines];
           const i = engines.findIndex((x) => x.engine === e.engine);
           const prev = i >= 0 ? engines[i] : undefined;
           const next: EngineProgress = {
@@ -76,7 +107,8 @@ export function useScanStream() {
           };
           if (i >= 0) engines[i] = next;
           else engines.push(next);
-          return { ...s, engines };
+          prompts[gi] = { ...prompts[gi], engines };
+          return { ...s, prompts };
         }
         case "done":
           return { ...s, status: "done", result: e.result };
@@ -145,5 +177,10 @@ export function useScanStream() {
     [apply],
   );
 
-  return { ...state, run, reset };
+  // Flat view across all groups — single-prompt scans (free scan, re-scan) have
+  // exactly one group, so this is their model list; multi-prompt callers read
+  // `prompts` for the grouped view instead.
+  const engines = React.useMemo(() => state.prompts.flatMap((p) => p.engines), [state.prompts]);
+
+  return { ...state, engines, run, reset };
 }

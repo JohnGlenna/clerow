@@ -256,7 +256,7 @@ function PaywallOverlay({
           <PaywallPlan
             name="Founder"
             price={29}
-            desc="1 domain · 3 AI models"
+            desc="1 domain · all 5 AI models"
             cta="Subscribe"
             onCta={() => startCheckout("founder")}
           />
