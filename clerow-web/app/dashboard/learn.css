@@ -53,15 +53,33 @@
 .unit-banner h3 { margin: 2px 0 0; font-size: 19px; font-weight: 900; letter-spacing: -.01em; }
 .unit-find { margin: 3px 0 0; font-size: 12.5px; font-weight: 700; opacity: .82; }
 
-/* "All 5 models unlocked" — the prominent full-scan CTA above the path. */
-.scan-cta { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: linear-gradient(135deg, var(--blue-2), var(--blue-deep)); color: #fff; border-radius: 16px; padding: 16px 20px; box-shadow: 0 4px 0 var(--blue-deep); margin: 4px 0 12px; }
-.scan-cta-txt { display: flex; flex-direction: column; gap: 3px; }
+/* "All 5 models unlocked" — the full-scan CTA, shown as a card in the right rail.
+   Stacks vertically (text over a full-width button) to fit the narrow rail. */
+.scan-cta { display: flex; flex-direction: column; align-items: stretch; gap: 4px; background: linear-gradient(135deg, var(--blue-2), var(--blue-deep)); color: #fff; border-radius: 16px; padding: 16px 18px; box-shadow: 0 4px 0 var(--blue-deep); }
+.scan-cta-txt { display: flex; flex-direction: column; gap: 4px; }
 .scan-cta-txt b { font-size: 15px; font-weight: 900; }
-.scan-cta-txt span { font-size: 12.5px; font-weight: 600; opacity: .9; }
-.scan-cta-btn { flex: 0 0 auto; background: #fff; color: var(--blue-deep); border: 0; font-weight: 900; font-size: 13.5px; padding: 11px 18px; border-radius: 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.18); }
-.scan-cta-btn:hover { transform: translateY(-1px); }
-.scan-cta-add { align-self: flex-start; margin-top: 9px; background: rgba(255,255,255,.14); color: #fff; border: 0; font-weight: 800; font-size: 12px; padding: 6px 11px; border-radius: 10px; cursor: pointer; }
+.scan-cta-txt span { font-size: 12.5px; font-weight: 600; opacity: .9; line-height: 1.45; }
+.scan-cta-add { align-self: flex-start; margin: 4px 0 0; background: rgba(255,255,255,.14); color: #fff; border: 0; font-weight: 800; font-size: 12px; padding: 6px 11px; border-radius: 10px; cursor: pointer; }
 .scan-cta-add:hover { background: rgba(255,255,255,.26); }
+.scan-cta-btn { width: 100%; margin-top: 12px; background: #fff; color: var(--blue-deep); border: 0; font-weight: 900; font-size: 13.5px; padding: 12px 18px; border-radius: 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.18); animation: scan-cta-pulse 2.4s ease-in-out infinite; }
+.scan-cta-btn:hover { transform: translateY(-1px); animation: none; }
+.scan-cta-btn:disabled { opacity: .55; cursor: not-allowed; animation: none; transform: none; }
+.scan-cta-note { margin-top: 8px; font-size: 11.5px; font-weight: 700; opacity: .82; text-align: center; }
+@keyframes scan-cta-pulse {
+  0%, 100% { box-shadow: 0 3px 0 rgba(0,0,0,.18), 0 0 0 0 rgba(255,255,255,.45); }
+  50% { box-shadow: 0 3px 0 rgba(0,0,0,.18), 0 0 0 9px rgba(255,255,255,0); }
+}
+@media (prefers-reduced-motion: reduce) { .scan-cta-btn { animation: none; } }
+
+/* Just-subscribed celebration toast (after Stripe checkout returns to /dashboard?checkout=success). */
+.sub-toast { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; align-items: flex-start; gap: 12px; max-width: 440px; width: calc(100% - 32px); background: linear-gradient(135deg, var(--blue-2), var(--blue-deep)); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 16px; padding: 14px 16px; box-shadow: 0 18px 44px rgba(0,0,0,.45); animation: sub-toast-in .4s cubic-bezier(.2,.9,.3,1.4); }
+.sub-toast-ic { font-size: 26px; line-height: 1; }
+.sub-toast-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sub-toast-txt b { font-size: 14.5px; font-weight: 900; }
+.sub-toast-txt span { font-size: 12.5px; font-weight: 600; opacity: .92; line-height: 1.4; }
+.sub-toast-x { margin-left: auto; flex: 0 0 auto; background: rgba(255,255,255,.16); color: #fff; border: 0; width: 24px; height: 24px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+.sub-toast-x:hover { background: rgba(255,255,255,.3); }
+@keyframes sub-toast-in { from { opacity: 0; transform: translate(-50%, -16px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* Business-context sheet (screenshots + about text for the full scan). */
 .ctx-sheet { position: relative; width: 100%; max-width: 460px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 26px 24px; box-shadow: 0 24px 60px rgba(0,0,0,.5); text-align: center; }
@@ -229,10 +247,13 @@
 .lesson-content { background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 16px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: pre-wrap; word-break: break-word; line-height: 1.55; max-height: 360px; overflow: auto; margin: 0; }
 
 /* Copy-ready fix: the code box flexes to fill the sheet down to the footer */
-.lesson-body--steps { overflow: hidden; padding-bottom: 104px; }
-.lesson-inner--steps { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.lesson-code { position: relative; flex: 1; min-height: 0; display: flex; }
-.lesson-code .lesson-content { flex: 1; width: 100%; max-height: none; padding-top: 46px; }
+/* Steps/results view: the body scrolls, and the code box sizes to its content —
+   a short robots.txt no longer stretches to fill the viewport, while long content
+   grows up to a responsive max-height (then scrolls inside the box). */
+.lesson-body--steps { overflow-y: auto; padding-bottom: 104px; }
+.lesson-inner--steps { display: block; }
+.lesson-code { position: relative; }
+.lesson-code .lesson-content { width: 100%; max-height: max(240px, calc(100vh - 290px)); padding-top: 46px; }
 .lesson-copy { position: absolute; top: 10px; right: 10px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 2px solid var(--line); color: var(--ink-2); font-family: var(--ldfont); font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding: 7px 13px; border-radius: 10px; box-shadow: 0 3px 0 var(--line); transition: border-color .12s, transform .08s, color .12s; }
 .lesson-copy:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
 .lesson-copy:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }

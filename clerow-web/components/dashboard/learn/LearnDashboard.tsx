@@ -270,8 +270,17 @@ function LearnPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlocking, h
 }
 
 /* ---------------- right rail ---------------- */
-function LearnRail({ data, onUpgrade }: { data: DashboardData; onUpgrade: () => void }) {
+function LearnRail({ data, onUpgrade, onScan }: { data: DashboardData; onUpgrade: () => void; onScan: () => void }) {
   const router = useRouter();
+  // Re-scan CTA appears once every currently-seeded task is resolved (the active/
+  // open levels are cleared). Locked levels aren't seeded, so we ignore their
+  // empty totals — otherwise this would never fire until the whole climb is done.
+  const lv = data.ladder?.levels ?? [];
+  const allTasksDone =
+    !!data.hasFullScan &&
+    lv.some((l) => l.total > 0) &&
+    lv.every((l) => l.total === 0 || l.doneCount === l.total);
+  const outOfScans = (data.scansLeft ?? 0) <= 0;
   const models = data.models ?? [];
   // Perplexity sits at the bottom of the model list.
   const orderedModels = [...models].sort((a, b) =>
@@ -291,6 +300,22 @@ function LearnRail({ data, onUpgrade }: { data: DashboardData; onUpgrade: () => 
 
   return (
     <aside className="ld-rail">
+      {data.subscribed && !data.hasFullScan && (
+        <div className="scan-cta">
+          <div className="scan-cta-txt"><b>Scan all 5 AI models</b></div>
+          <button className="scan-cta-btn" onClick={onScan}>🔄 Run full scan</button>
+        </div>
+      )}
+      {data.subscribed && allTasksDone && (
+        <div className="scan-cta">
+          <div className="scan-cta-txt">
+            <b>You&apos;ve cleared every task 🎉</b>
+            <span>Re-scan to see your new score across all 5 models.</span>
+          </div>
+          <button className="scan-cta-btn" onClick={onScan} disabled={outOfScans}>🔄 Re-scan now</button>
+          {outOfScans && <span className="scan-cta-note">No scans left this month</span>}
+        </div>
+      )}
       {data.synthesis?.verdict && (
         <div className="rail-card">
           <h4>🧠 What the AIs think</h4>
@@ -386,6 +411,25 @@ function LearnRail({ data, onUpgrade }: { data: DashboardData; onUpgrade: () => 
   );
 }
 
+/* ---------------- just-subscribed toast ---------------- */
+// Shown when Stripe Checkout redirects back to /dashboard?checkout=success.
+function SubscribedToast({ onClose }: { onClose: () => void }) {
+  React.useEffect(() => {
+    const t = setTimeout(onClose, 7000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+  return (
+    <div className="sub-toast" role="status">
+      <span className="sub-toast-ic">⭐</span>
+      <div className="sub-toast-txt">
+        <b>You&apos;re on Founder! 🎉</b>
+        <span>All 5 AI models &amp; every level are unlocked. Run your first full scan to light them up.</span>
+      </div>
+      <button className="sub-toast-x" onClick={onClose} aria-label="Dismiss">✕</button>
+    </div>
+  );
+}
+
 /* ---------------- upgrade popup ---------------- */
 function UpgradeSheet({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = React.useState(false);
@@ -414,7 +458,7 @@ function UpgradeSheet({ onClose }: { onClose: () => void }) {
 }
 
 /* ---------------- lesson sheet ---------------- */
-function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask; modelCount: number; onClose: () => void; onChanged: () => void }) {
+function LessonSheet({ task, modelCount, onClose, onChanged, onAddContext }: { task: SheetTask; modelCount: number; onClose: () => void; onChanged: () => void; onAddContext: () => void }) {
   const [sel, setSel] = React.useState<"diy" | "mcp" | "rescan" | null>(
     task.kind === "mcp" ? "mcp" : task.kind === "checkpoint" ? "rescan" : task.channel === "offsite" ? "diy" : null,
   );
@@ -645,10 +689,13 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
         <p className="lesson-why">{task.why}</p>
 
         {task.kind === "checkpoint" ? (
-          <button className={`opt ${sel === "rescan" ? "on" : ""}`} onClick={() => setSel("rescan")}>
-            <span className="oic">🚩</span>
-            <div><div className="ot">Re-scan now</div><div className="od">Clerow re-queries all your AI models and recomputes your score. ~60s.</div></div>
-          </button>
+          <>
+            <button className={`opt ${sel === "rescan" ? "on" : ""}`} onClick={() => setSel("rescan")}>
+              <span className="oic">🚩</span>
+              <div><div className="ot">Re-scan now</div><div className="od">Clerow re-queries all your AI models and recomputes your score. ~60s.</div></div>
+            </button>
+            <button className="scan-cta-add" style={{ marginTop: 12 }} onClick={onAddContext}>✨ Add business context to sharpen results</button>
+          </>
         ) : task.kind === "mcp" ? (
           <button className="opt violet on" onClick={() => setSel("mcp")}>
             <span className="oic">🤖</span>
@@ -788,8 +835,26 @@ function LearnInner({ initialPage = "learn" }: { initialPage?: Page }) {
   const [upgrade, setUpgrade] = React.useState(false);
   const [context, setContext] = React.useState(false);
   const [unlocking, setUnlocking] = React.useState<number | null>(null);
+  const [justSubscribed, setJustSubscribed] = React.useState(false);
+  const seenCheckout = React.useRef(false);
   const toLearn = () => setPage("learn");
   const hasRail = page === "learn";
+
+  // Stripe Checkout returns to /dashboard?checkout=success — celebrate it once,
+  // strip the param so a refresh won't re-fire, and pull fresh access state.
+  React.useEffect(() => {
+    if (seenCheckout.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      seenCheckout.current = true;
+      setJustSubscribed(true);
+      playCheck();
+      params.delete("checkout");
+      const qs = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+      refresh();
+    }
+  }, [refresh]);
 
   // Open the comprehensive scan flow (re-crawl + AI-grade site + query all 5 models).
   const openScan = () =>
@@ -836,16 +901,6 @@ function LearnInner({ initialPage = "learn" }: { initialPage?: Page }) {
             <div className="ld-path" style={{ color: "var(--ink-2)" }}>Loading…</div>
           ) : data ? (
             <>
-              {page === "learn" && data.subscribed && !data.hasFullScan && (
-                <div className="scan-cta">
-                  <div className="scan-cta-txt">
-                    <b>All 5 AI models unlocked.</b>
-                    <span>Run your first full scan — Clerow reads &amp; AI-grades your site and queries ChatGPT, Claude, Perplexity, Gemini &amp; Grok. This is what unlocks your levels.</span>
-                    <button className="scan-cta-add" onClick={() => setContext(true)}>✨ Add business context to sharpen results</button>
-                  </div>
-                  <button className="scan-cta-btn" onClick={openScan}>🔄 Scan all 5 models</button>
-                </div>
-              )}
               {page === "learn" && <LearnPath data={data} subscribed={!!data.subscribed} onOpen={setTask} onUpgrade={() => setUpgrade(true)} onUnlock={unlock} unlocking={unlocking} hasFullScan={!!data.hasFullScan} onNeedFullScan={openScan} />}
               {page === "prompts" && (
                 <DashPrompts
@@ -869,11 +924,12 @@ function LearnInner({ initialPage = "learn" }: { initialPage?: Page }) {
             </>
           ) : null}
         </div>
-        {data && hasRail && <LearnRail data={data} onUpgrade={() => setUpgrade(true)} />}
+        {data && hasRail && <LearnRail data={data} onUpgrade={() => setUpgrade(true)} onScan={openScan} />}
       </div>
-      {task && <LessonSheet task={task} modelCount={data?.models?.length ?? 0} onClose={() => setTask(null)} onChanged={refresh} />}
+      {task && <LessonSheet task={task} modelCount={data?.models?.length ?? 0} onClose={() => setTask(null)} onChanged={refresh} onAddContext={() => setContext(true)} />}
       {upgrade && <UpgradeSheet onClose={() => setUpgrade(false)} />}
       {context && <ContextSheet onClose={() => setContext(false)} />}
+      {justSubscribed && <SubscribedToast onClose={() => setJustSubscribed(false)} />}
     </div>
   );
 }
