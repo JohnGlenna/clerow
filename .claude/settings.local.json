@@ -3,8 +3,3 @@
     "supabase"
   ]
 }
- {
-    "permissions": {
-      "allow": ["mcp__supabase__apply_migration"]
-    }
-  }
