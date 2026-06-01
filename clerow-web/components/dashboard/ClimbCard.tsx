@@ -15,11 +15,13 @@ export function ClimbCard({
   onNavigate,
   onChanged,
   onRescan,
+  rescanning = false,
 }: {
   ladder: Ladder;
   onNavigate: (k: string) => void;
   onChanged?: () => void;
   onRescan: () => void;
+  rescanning?: boolean;
 }) {
   const active = ladder.levels.find((l) => l.state === "active") ?? null;
   const isRescanLevel = !!active && active.level === ladder.levels.length;
@@ -123,6 +125,20 @@ export function ClimbCard({
           <button className="btn btn--ghost btn--sm" style={{ alignSelf: "flex-start" }} onClick={() => onNavigate("quests")}>
             See the full climb →
           </button>
+
+          {/* Optional checkpoint: every task in this level is done but the path
+              hasn't advanced yet. Re-scan to measure progress — never required to
+              unlock the next level (that happens automatically). */}
+          {local.length > 0 && doneCount === local.length && (
+            <div className="climb-checkpoint">
+              <span>
+                <b>Level {active.level} complete.</b> Re-scan to see if it moved your AI visibility — optional.
+              </span>
+              <button className="btn btn--primary btn--sm" onClick={onRescan} disabled={rescanning}>
+                <Icon name="bolt" size={14} /> {rescanning ? "Re-scanning…" : "Re-scan"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -133,8 +149,8 @@ export function ClimbCard({
             <b>{active ? "You've reached the summit of this climb." : "Every level complete — incredible."}</b>
             <p>Re-scan to measure how far you&apos;ve moved in AI search, and unlock your next climb.</p>
           </div>
-          <button className="btn btn--primary btn--sm" onClick={onRescan}>
-            <Icon name="bolt" size={14} /> Re-scan now
+          <button className="btn btn--primary btn--sm" onClick={onRescan} disabled={rescanning}>
+            <Icon name="bolt" size={14} /> {rescanning ? "Re-scanning…" : "Re-scan now"}
           </button>
         </div>
       )}

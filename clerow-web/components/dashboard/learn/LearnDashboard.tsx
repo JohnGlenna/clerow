@@ -186,11 +186,7 @@ function LearnRail({ data }: { data: DashboardData }) {
         <span className="mcp-tag">⚡ Clerow MCP</span>
         <h4>Let your AI do the work</h4>
         <p>Plug Clerow into Claude Code, Cursor or any agent. It ships the fixes — Clerow verifies across every model.</p>
-        {data.subscribed ? (
-          <button className="btn-violet" onClick={() => router.push("/dashboard/settings")}>Connect MCP</button>
-        ) : (
-          <button className="btn-violet" style={{ opacity: 0.6 }} onClick={() => router.push("/dashboard/settings")}>Subscribe to use</button>
-        )}
+        <button className="btn-violet" onClick={() => router.push("/connect")}>Connect MCP</button>
       </div>
 
       <div className="rail-card">

@@ -2234,6 +2234,30 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 }
 .climb-rescan b { font-size: 14px; color: var(--ink); }
 .climb-rescan p { font-size: 12.5px; color: var(--ink-2); margin-top: 3px; font-weight: 600; }
+/* Optional per-level checkpoint banner — shown when the active level is fully
+   done but the path hasn't advanced yet. Measurement reward, never a gate. */
+.climb-checkpoint {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 12px; padding: 10px 14px; border-radius: 12px;
+  border: 1px dashed color-mix(in oklab, var(--accent-2) 35%, var(--border));
+  background: color-mix(in oklab, var(--accent-2) 6%, var(--surface));
+}
+.climb-checkpoint span { font-size: 12.5px; color: var(--ink-2); font-weight: 700; }
+.climb-checkpoint b { color: var(--ink); }
+/* Master-AI synthesis card */
+.synth-block {
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--bg-soft);
+}
+.synth-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--ink-2); margin-bottom: 6px; }
+.synth-block p { font-size: 13px; line-height: 1.5; color: var(--ink); }
+.synth-bestfix {
+  margin-top: 14px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--accent-2) 30%, var(--border));
+  background: color-mix(in oklab, var(--accent-2) 8%, var(--surface));
+}
+.synth-bestfix-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; color: var(--accent-2); text-transform: uppercase; letter-spacing: 0.02em; }
+.synth-bestfix p { font-size: 13.5px; line-height: 1.5; color: var(--ink); margin-top: 5px; font-weight: 600; }
 /* Full Climb (Quests page): each level expanded */
 .climb-lvl { margin-bottom: 12px; }
 .climb-lvl:last-child { margin-bottom: 0; }

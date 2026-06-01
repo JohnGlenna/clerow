@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { runPromptScan } from "@/lib/scan/run";
+import { synthesizeAndStore } from "@/lib/scan/synthesize";
 import { loadBrandSnapshot } from "@/lib/scan/snapshot";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
 import { planFromSub, enginesForPlan, BudgetExceededError } from "@/lib/billing/limits";
@@ -55,8 +57,10 @@ export async function POST() {
     return NextResponse.json({ error: "A scan is already running — give it a moment." }, { status: 429 });
   }
 
+  let scanId: string | null = null;
   try {
-    await runPromptScan(supabase, brand.id, primary.id, engines);
+    const result = await runPromptScan(supabase, brand.id, primary.id, engines);
+    scanId = result.scanId;
   } catch (err) {
     if (err instanceof BudgetExceededError) {
       return NextResponse.json(
@@ -66,6 +70,19 @@ export async function POST() {
     }
     const message = err instanceof Error ? err.message : "Re-scan failed";
     return NextResponse.json({ error: message }, { status: 502 });
+  }
+
+  // Master-AI synthesis runs in the background so the user gets their score
+  // immediately; the collective verdict fills in for the next dashboard load.
+  if (scanId) {
+    const id = scanId;
+    after(async () => {
+      try {
+        await synthesizeAndStore(createAdminClient(), id);
+      } catch {
+        // Service role not configured — verdict simply stays null.
+      }
+    });
   }
 
   const snapshot = await loadBrandSnapshot(supabase, brand.id);

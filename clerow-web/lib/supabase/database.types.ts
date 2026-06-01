@@ -62,6 +62,77 @@ export type Database = {
           },
         ]
       }
+      oauth_clients: {
+        Row: {
+          client_id: string
+          client_name: string | null
+          created_at: string
+          redirect_uris: string[]
+          token_endpoint_auth_method: string
+        }
+        Insert: {
+          client_id: string
+          client_name?: string | null
+          created_at?: string
+          redirect_uris?: string[]
+          token_endpoint_auth_method?: string
+        }
+        Update: {
+          client_id?: string
+          client_name?: string | null
+          created_at?: string
+          redirect_uris?: string[]
+          token_endpoint_auth_method?: string
+        }
+        Relationships: []
+      }
+      oauth_codes: {
+        Row: {
+          client_id: string
+          code: string
+          code_challenge: string | null
+          code_challenge_method: string | null
+          created_at: string
+          expires_at: string
+          redirect_uri: string
+          resource: string | null
+          scope: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          code: string
+          code_challenge?: string | null
+          code_challenge_method?: string | null
+          created_at?: string
+          expires_at: string
+          redirect_uri: string
+          resource?: string | null
+          scope?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          code?: string
+          code_challenge?: string | null
+          code_challenge_method?: string | null
+          created_at?: string
+          expires_at?: string
+          redirect_uri?: string
+          resource?: string | null
+          scope?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_codes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "oauth_clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       brand_snapshots: {
         Row: {
           brand_id: string
@@ -362,6 +433,7 @@ export type Database = {
           id: string
           started_at: string
           status: Database["public"]["Enums"]["scan_status"]
+          synthesis: Json | null
           tier: Database["public"]["Enums"]["scan_tier"]
         }
         Insert: {
@@ -373,6 +445,7 @@ export type Database = {
           id?: string
           started_at?: string
           status?: Database["public"]["Enums"]["scan_status"]
+          synthesis?: Json | null
           tier?: Database["public"]["Enums"]["scan_tier"]
         }
         Update: {
@@ -384,6 +457,7 @@ export type Database = {
           id?: string
           started_at?: string
           status?: Database["public"]["Enums"]["scan_status"]
+          synthesis?: Json | null
           tier?: Database["public"]["Enums"]["scan_tier"]
         }
         Relationships: [
@@ -473,6 +547,8 @@ export type Database = {
           archived_at: string | null
           brand_id: string
           completed_at: string | null
+          content: string | null
+          content_at: string | null
           created_at: string
           done: boolean
           for_date: string | null
@@ -490,6 +566,8 @@ export type Database = {
           archived_at?: string | null
           brand_id: string
           completed_at?: string | null
+          content?: string | null
+          content_at?: string | null
           created_at?: string
           done?: boolean
           for_date?: string | null
@@ -507,6 +585,8 @@ export type Database = {
           archived_at?: string | null
           brand_id?: string
           completed_at?: string | null
+          content?: string | null
+          content_at?: string | null
           created_at?: string
           done?: boolean
           for_date?: string | null

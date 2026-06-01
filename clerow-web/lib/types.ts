@@ -166,11 +166,24 @@ export type PromptDetail = {
   steps: GeoStep[];
 };
 
+// Master-AI synthesis over the engines: the collective read on how AI sees the
+// brand for its primary prompt, plus the single highest-leverage next move.
+// Stored on scans.synthesis; produced by lib/scan/synthesize.ts.
+export type ScanSynthesis = {
+  verdict: string;
+  consensus: string;
+  divergence: string;
+  bestFix: string;
+};
+
 export type DashboardData = {
   hasScan: boolean;
   brand: { company: string; url: string } | null;
   scannedAt?: string | null;
   engine?: string;
+  // Master-AI synthesis of the latest multi-engine scan (null until the
+  // background job fills it in, or for single-engine free scans).
+  synthesis?: ScanSynthesis | null;
   primaryPrompt?: string | null;
   score?: { overall: number; visibility: number; position: number | null; sentiment: number | null };
   models?: DashboardModel[];

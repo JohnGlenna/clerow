@@ -56,11 +56,14 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const { data: task } = await supabase
     .from("tasks")
-    .select("title, meta, ladder_key")
+    .select("title, meta, ladder_key, content")
     .eq("id", id)
     .eq("brand_id", brand.id)
     .maybeSingle();
   if (!task) return NextResponse.json({ error: "Quest not found" }, { status: 404 });
+
+  // --- Cache hit: pre-warmed (or previously generated) content, served instantly ---
+  if (task.content) return NextResponse.json({ content: task.content });
 
   // --- FREE Level-1 fixes (no LLM) ---
   const key = task.ladder_key ?? "";
@@ -78,6 +81,8 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   }
   try {
     const { content } = await generateFixContent({ brand: toProfile(brand), title: task.title, detail: task.meta });
+    // Write through to the cache so the next open is instant.
+    await supabase.from("tasks").update({ content, content_at: new Date().toISOString() }).eq("id", id);
     return NextResponse.json({ content });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Content generation failed";

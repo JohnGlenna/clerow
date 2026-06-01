@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { prewarmActiveLevel } from "@/lib/content/prewarm";
 import { ENGINES, type EngineId } from "@/lib/engines";
 import { loadBrandSnapshot, captureDailySnapshot, loadSnapshotHistory } from "@/lib/scan/snapshot";
 import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/streak";
@@ -198,6 +200,20 @@ export async function GET(req: Request) {
   const plan = planFromSub(sub);
   const budget = await budgetStatus(supabase, user.id, plan, now);
 
+  // Pre-warm the active level's "Make content" drafts in the background so the
+  // boxes open instantly. Subscribers only (LLM drafts are plan-gated), and
+  // best-effort: a service-role client keeps writing after the response flushes,
+  // and the helper skips anything already cached. Never blocks this request.
+  if (isSubscribed(sub)) {
+    after(async () => {
+      try {
+        await prewarmActiveLevel(createAdminClient(), brand, ladder);
+      } catch {
+        // Service role not configured or warm failed — boxes fall back to live gen.
+      }
+    });
+  }
+
   // Score movement vs the previous daily snapshot, for the Overview score card.
   const history = await loadSnapshotHistory(supabase, brand.id, 7);
   const trend = {
@@ -219,6 +235,8 @@ export async function GET(req: Request) {
     brand: brandHead,
     scannedAt: snapshot.scannedAt ?? scan.finished_at,
     engine: engineLabel,
+    // Master-AI synthesis of the latest scan (null until the background job fills it in).
+    synthesis: scan.synthesis ?? null,
     primaryPrompt: snapshot.primaryPromptText,
     score: snapshot.score,
     streak,

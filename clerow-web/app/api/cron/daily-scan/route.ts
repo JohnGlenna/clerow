@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runPromptScan } from "@/lib/scan/run";
+import { synthesizeAndStore } from "@/lib/scan/synthesize";
 import { loadBrandSnapshot, captureDailySnapshot } from "@/lib/scan/snapshot";
 import { dayKey } from "@/lib/streak";
 import { isPlanKey } from "@/lib/billing/plans";
@@ -73,9 +74,11 @@ export async function GET(req: Request) {
 
       const plan = planByUser.get(brand.user_id);
       const engines = enginesForPlan(isPlanKey(plan) ? plan : null);
-      await runPromptScan(admin, brand.id, primary.id, engines);
+      const scan = await runPromptScan(admin, brand.id, primary.id, engines);
       const snapshot = await loadBrandSnapshot(admin, brand.id);
       await captureDailySnapshot(admin, brand.id, snapshot, dayKey(now, brand.timezone));
+      // Background master-AI synthesis — never delays the next brand's scan.
+      after(() => synthesizeAndStore(admin, scan.scanId));
       results.push({ brandId: brand.id, ok: true });
     } catch (err) {
       results.push({ brandId: brand.id, ok: false, detail: err instanceof Error ? err.message : "failed" });

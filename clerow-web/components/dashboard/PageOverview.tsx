@@ -13,6 +13,7 @@ import type {
   DashboardData,
   DashboardModel,
   DashboardCompetitor,
+  ScanSynthesis,
 } from "@/lib/types";
 import type { SourceRow } from "@/app/api/sources/route";
 
@@ -33,6 +34,31 @@ export function PageOverview() {
   const navigate = (k: string) =>
     router.push(k === "overview" ? "/dashboard" : `/dashboard/${k}`);
   const { data, loading, error, refresh } = useDashboard();
+
+  // In-place re-scan: re-query the models from the dashboard instead of bouncing
+  // back through onboarding. Subscription/budget gated by the API (402).
+  const [rescanning, setRescanning] = React.useState(false);
+  const rescan = async () => {
+    if (rescanning) return;
+    setRescanning(true);
+    try {
+      const res = await fetch("/api/scan/rescan", { method: "POST" });
+      if (res.status === 402) {
+        const j = await res.json().catch(() => ({}));
+        alert(j.error || "You're out of scans this month. Upgrade for more.");
+        return;
+      }
+      if (!res.ok) {
+        alert("Re-scan failed. Try again in a moment.");
+        return;
+      }
+      refresh();
+    } catch {
+      alert("Re-scan failed. Try again in a moment.");
+    } finally {
+      setRescanning(false);
+    }
+  };
 
   // The Sources page derives its own data from /api/sources (citations across
   // scans), so it isn't in the shared dashboard payload — pull a roll-up here
@@ -75,10 +101,11 @@ export function PageOverview() {
             </button>
             <button
               className="btn btn--primary btn--sm"
-              onClick={() => router.push("/onboarding")}
+              onClick={rescan}
+              disabled={rescanning}
             >
               <Icon name="bolt" size={14} />
-              Re-scan now
+              {rescanning ? "Re-scanning…" : "Re-scan now"}
             </button>
           </>
         }
@@ -99,10 +126,12 @@ export function PageOverview() {
               ladder={data.ladder}
               onNavigate={navigate}
               onChanged={refresh}
-              onRescan={() => router.push("/onboarding")}
+              onRescan={rescan}
+              rescanning={rescanning}
             />
           )}
           <ScoreCard score={data.score} trend={data.trend} />
+          {data.synthesis && <SynthesisCard synthesis={data.synthesis} />}
           <PageSummary data={data} sources={sources} onNavigate={navigate} />
           <div className="app-grid">
             <ModelsCard models={data.models ?? []} onNavigate={navigate} />
@@ -251,6 +280,43 @@ function SummaryCard({
         ))}
       </div>
     </button>
+  );
+}
+
+// "What all the AIs collectively think" — the master-AI synthesis over every
+// engine's answer. A narrative layer above the numeric score: the collective
+// verdict, where engines agree/diverge, and the single highest-leverage move.
+function SynthesisCard({ synthesis }: { synthesis: ScanSynthesis }) {
+  return (
+    <div className="app-card">
+      <div className="app-card-head">
+        <h4>
+          <span className="climb-title-ico"><GameIcon name="brain" size={18} /></span> What the AIs collectively think
+        </h4>
+        <span className="sub">across every model that scanned you</span>
+      </div>
+      {synthesis.verdict && <p style={{ margin: "4px 0 14px", lineHeight: 1.5 }}>{synthesis.verdict}</p>}
+      <div className="app-grid">
+        {synthesis.consensus && (
+          <div className="synth-block">
+            <div className="synth-label"><Icon name="check" size={13} /> They agree on</div>
+            <p>{synthesis.consensus}</p>
+          </div>
+        )}
+        {synthesis.divergence && (
+          <div className="synth-block">
+            <div className="synth-label"><Icon name="target" size={13} /> Where they differ</div>
+            <p>{synthesis.divergence}</p>
+          </div>
+        )}
+      </div>
+      {synthesis.bestFix && (
+        <div className="synth-bestfix">
+          <span className="synth-bestfix-tag"><Icon name="bolt" size={13} /> Your highest-leverage move</span>
+          <p>{synthesis.bestFix}</p>
+        </div>
+      )}
+    </div>
   );
 }
 
