@@ -117,6 +117,9 @@ function LearnTop({ data }: { data: DashboardData }) {
           {models.map((m) => <span key={m.id} className="mc" style={{ background: "#fff" }}><AiIcon id={m.id} size={16} letter={m.letter} /></span>)}
         </span>
       </div>
+      {data.score && (
+        <span className="stat-pill score" title="Your AI visibility score (from your latest scan)"><span className="ic">📈</span>{data.score.overall}</span>
+      )}
       <span className="stat-pill streak"><span className="ic">🔥</span>{data.streak?.current ?? 0}</span>
       <span className="stat-pill xp"><span className="ic">💎</span>{data.xp?.total ?? 0}</span>
       <span className="stat-pill heart" title="Scans left this month"><span className="ic">📊</span>{data.scansLeft ?? 0}</span>
@@ -191,9 +194,10 @@ function PathGrid({ nodeCount, children }: { nodeCount: number; children: React.
   );
 }
 
-function LearnPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlocking }: {
+function LearnPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlocking, hasFullScan, onNeedFullScan }: {
   data: DashboardData; subscribed: boolean; onOpen: (t: SheetTask) => void; onUpgrade: () => void;
   onUnlock: (level: number) => void; unlocking: number | null;
+  hasFullScan: boolean; onNeedFullScan: () => void;
 }) {
   const ladder = data.ladder;
   if (!ladder) return <div className="ld-path" style={{ color: "var(--ink-2)" }}>Run a scan to start your climb.</div>;
@@ -249,7 +253,7 @@ function LearnPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlocking }:
               </div>
               {locked
                 ? subscribed
-                  ? <button className="unit-guide" disabled={unlocking === lvl.level} onClick={() => onUnlock(lvl.level)}>
+                  ? <button className="unit-guide" disabled={unlocking === lvl.level} onClick={() => (hasFullScan ? onUnlock(lvl.level) : onNeedFullScan())}>
                       {unlocking === lvl.level ? "Unlocking…" : <><LDIcon name="scan" /> Unlock</>}
                     </button>
                   : <button className="unit-guide" onClick={onUpgrade}><LDIcon name="lock" /> Locked</button>
@@ -269,10 +273,11 @@ function LearnPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlocking }:
 function LearnRail({ data, onUpgrade }: { data: DashboardData; onUpgrade: () => void }) {
   const router = useRouter();
   const models = data.models ?? [];
-  // Perplexity is the only model scanned on the free tier — surface it first and
-  // lock the rest, since none of them have been scanned.
+  // Perplexity sits at the bottom of the model list.
   const orderedModels = [...models].sort((a, b) =>
-    (a.id === "perplexity" ? 0 : 1) - (b.id === "perplexity" ? 0 : 1));
+    (a.id === "perplexity" ? 1 : 0) - (b.id === "perplexity" ? 1 : 0));
+  // How many models actually have a result (real scanned count, not the 5 listed).
+  const scannedCount = models.filter((m) => !m.locked && m.visibility != null).length;
 
   // Top prompt placement: the standings for the brand's biggest (primary) prompt
   // from the latest scan — top 3 brands, then the user's own row if they're not
@@ -286,12 +291,24 @@ function LearnRail({ data, onUpgrade }: { data: DashboardData; onUpgrade: () => 
 
   return (
     <aside className="ld-rail">
+      {data.synthesis?.verdict && (
+        <div className="rail-card">
+          <h4>🧠 What the AIs think</h4>
+          <p className="sub">{data.synthesis.verdict}</p>
+          {data.synthesis.bestFix && (
+            <div className="rail-note" style={{ marginTop: 10 }}>⚡ <b>Your best move:</b> {data.synthesis.bestFix}</div>
+          )}
+        </div>
+      )}
       <div className="rail-card">
-        <h4>Scanned across {models.length} AIs</h4>
+        <h4>Scanned across {scannedCount || models.length} {(scannedCount || models.length) === 1 ? "AI" : "AIs"}</h4>
         <p className="sub">Each model cites differently. One chatbot can&apos;t see the others — Clerow watches all of them.</p>
         <div className="rail-models">
           {orderedModels.map((m: DashboardModel) => {
-            const locked = m.locked || m.id !== "perplexity";
+            // Locked = no key, or not yet scanned (free tier scans one engine; a
+            // full scan fills the rest). Engine-agnostic so it works with the
+            // ChatGPT free scan, not just Perplexity.
+            const locked = m.locked || m.visibility == null;
             return (
               <div key={m.id} className="rail-model">
                 <span className="mc" style={{ background: "#fff" }}><AiIcon id={m.id} size={16} letter={m.letter} /></span>{m.label}
@@ -478,14 +495,25 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
     const total = cells.length || 1;
     const finished = cells.filter((e) => e.status === "done" || e.status === "failed").length;
     const pct = Math.round((finished / total) * 100);
+    // Show the scan working through its phases, so it's clearly more than "just prompts".
+    const PHASES = [
+      { key: "reading-site", label: "Reading your site" },
+      { key: "grading-pages", label: "AI-grading your pages" },
+      { key: "scanning", label: "Testing buyer queries on 5 models" },
+    ];
+    const curPhase = PHASES.findIndex((p) => p.key === scan.phase);
+    const steps = PHASES.map((p, i) => ({
+      label: p.label,
+      state: (curPhase < 0 || i < curPhase ? "done" : i === curPhase ? "active" : "pending") as "done" | "active" | "pending",
+    }));
     return (
       <div className="sheet-back">
         <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={pct} /></div><span className="lesson-heart">📡 Live</span></div>
         <div className="lesson-body"><div className="lesson-inner">
-          <div className="lesson-tag"><span className="dot">🚩</span>Re-scanning</div>
-          <h1 className="lesson-h">Querying your AI models…</h1>
-          <p className="lesson-why">Watch every model work through your queries in real time — your score updates the moment they all finish.</p>
-          <ScanProgress engines={scan.engines} prompts={scan.prompts} elapsedMs={scan.elapsedMs} showOrbit={false} />
+          <div className="lesson-tag"><span className="dot">🚩</span>Scanning</div>
+          <h1 className="lesson-h">Reading your site &amp; querying 5 models…</h1>
+          <p className="lesson-why">Clerow reads your site, AI-grades your pages, then watches every model answer your buyer queries — your score updates the moment they finish.</p>
+          <ScanProgress steps={steps} engines={scan.engines} prompts={scan.prompts} elapsedMs={scan.elapsedMs} showOrbit={false} />
         </div></div>
       </div>
     );
@@ -493,16 +521,72 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
 
   if (view === "done") {
     const overall = scan.result && "score" in scan.result ? scan.result.score.overall : null;
+
+    // A completed task/MCP quest keeps the simple celebratory toast.
+    if (task.kind !== "checkpoint") {
+      return (
+        <div className="sheet-back">
+          <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={100} /></div></div>
+          <div className="done-toast"><div className="done-toast-in">
+            <div className="done-check">✓</div>
+            <div>
+              <div className="dt-t">Nice! Quest cleared</div>
+              <div className="dt-s">+{task.xp || 20} XP · streak kept 🔥</div>
+            </div>
+            <button className="btn-check" onClick={close}>Continue</button>
+          </div></div>
+        </div>
+      );
+    }
+
+    // A full scan → a real results screen: website scan (most important) on top,
+    // then what each model said per query. (Replaces the old blank page.)
+    const groups = scan.prompts.filter((p) => p.text).sort((a, b) => a.index - b.index);
+    const siteGaps = scan.site.filter((c) => c.status !== "pass" && c.status !== "unknown");
+    const mark = (s: string) => (s === "pass" ? "✓" : s === "warn" ? "⚠" : s === "unknown" ? "–" : "✕");
     return (
       <div className="sheet-back">
-        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={100} /></div></div>
-        <div className="done-toast"><div className="done-toast-in">
-          <div className="done-check">✓</div>
-          <div>
-            <div className="dt-t">{task.kind === "checkpoint" ? "Models re-scanned ✓" : "Nice! Quest cleared"}</div>
-            <div className="dt-s">{task.kind === "checkpoint" ? (overall != null ? `Your visibility score is now ${overall}. Finish this level's tasks to unlock the next one.` : "Your score's updated across every model. Finish this level's tasks to unlock the next one.") : `+${task.xp || 20} XP · streak kept 🔥`}</div>
+        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={100} /></div><span className="lesson-heart">✓ Done</span></div>
+        <div className="lesson-body lesson-body--steps"><div className="lesson-inner lesson-inner--steps">
+          <div className="results-head">
+            <div className="results-score">{overall ?? "—"}</div>
+            <div>
+              <div className="results-h">Scan complete</div>
+              <div className="results-sub">Your AI visibility score{overall != null ? ` is ${overall}` : ""} · finish this level&apos;s tasks to unlock the next.</div>
+            </div>
           </div>
-          <button className="btn-check" onClick={close}>Continue</button>
+
+          {scan.site.length > 0 && (
+            <div className="results-card">
+              <div className="results-card-h">🔎 Your website scan {siteGaps.length > 0 && <span>{siteGaps.length} to fix</span>}</div>
+              <div className="results-checks">
+                {scan.site.map((c) => (
+                  <div key={c.id} className={`results-check ${c.status}`}>
+                    <span className="rc-mark">{mark(c.status)}</span>
+                    <span>{c.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {groups.length > 0 && (
+            <div className="results-card">
+              <div className="results-card-h">💬 What each model said</div>
+              <ScanProgress done engines={scan.engines} prompts={scan.prompts} elapsedMs={0} showOrbit={false} />
+            </div>
+          )}
+
+          <div className="results-card results-next">
+            <div className="results-card-h">✅ We turned this into your tasks</div>
+            <p className="results-next-p">
+              Everything to make your site rank higher is now in your tasks. Work through them top to bottom —
+              <b> copy Clerow&apos;s ready-made fix</b> for each, or let the <b>Clerow MCP</b> ship them for you automatically.
+            </p>
+          </div>
+        </div></div>
+        <div className="lesson-foot"><div className="lesson-foot-in">
+          <button className="btn-check" onClick={close}>See my tasks</button>
         </div></div>
       </div>
     );
@@ -707,13 +791,15 @@ function LearnInner({ initialPage = "learn" }: { initialPage?: Page }) {
   const toLearn = () => setPage("learn");
   const hasRail = page === "learn";
 
-  // Open the comprehensive scan flow (re-crawl site + query all 5 models).
+  // Open the comprehensive scan flow (re-crawl + AI-grade site + query all 5 models).
   const openScan = () =>
     setTask({
       kind: "checkpoint",
       id: null,
-      title: "Re-scan across your AI models",
-      why: "Clerow re-crawls your site and queries all 5 AI models, then refreshes every level. ~1–2 min.",
+      title: data?.hasFullScan ? "Re-scan across your AI models" : "Scan all 5 AI models",
+      why: data?.hasFullScan
+        ? "Clerow re-reads your site and queries all 5 AI models, then refreshes every level. ~1–2 min."
+        : "All 5 models read your site, AI-grade your pages, and test your top buyer queries — then your levels unlock. ~1–2 min.",
       xp: 0,
     });
 
@@ -750,17 +836,17 @@ function LearnInner({ initialPage = "learn" }: { initialPage?: Page }) {
             <div className="ld-path" style={{ color: "var(--ink-2)" }}>Loading…</div>
           ) : data ? (
             <>
-              {page === "learn" && data.subscribed && (
+              {page === "learn" && data.subscribed && !data.hasFullScan && (
                 <div className="scan-cta">
                   <div className="scan-cta-txt">
                     <b>All 5 AI models unlocked.</b>
-                    <span>Run one full scan — Clerow re-checks your site and queries ChatGPT, Claude, Perplexity, Gemini &amp; Grok, then refreshes every level.</span>
+                    <span>Run your first full scan — Clerow reads &amp; AI-grades your site and queries ChatGPT, Claude, Perplexity, Gemini &amp; Grok. This is what unlocks your levels.</span>
                     <button className="scan-cta-add" onClick={() => setContext(true)}>✨ Add business context to sharpen results</button>
                   </div>
                   <button className="scan-cta-btn" onClick={openScan}>🔄 Scan all 5 models</button>
                 </div>
               )}
-              {page === "learn" && <LearnPath data={data} subscribed={!!data.subscribed} onOpen={setTask} onUpgrade={() => setUpgrade(true)} onUnlock={unlock} unlocking={unlocking} />}
+              {page === "learn" && <LearnPath data={data} subscribed={!!data.subscribed} onOpen={setTask} onUpgrade={() => setUpgrade(true)} onUnlock={unlock} unlocking={unlocking} hasFullScan={!!data.hasFullScan} onNeedFullScan={openScan} />}
               {page === "prompts" && (
                 <DashPrompts
                   data={data}

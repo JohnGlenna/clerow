@@ -123,7 +123,8 @@ export async function runFreeScan(
   brandId: string,
   onEvent?: (e: ScanEvent) => void,
 ): Promise<RunResponse> {
-  const engineId = FREE_ENGINES[0];
+  // First configured free engine (ChatGPT preferred; Perplexity fallback).
+  const engineId = FREE_ENGINES.find((id) => getEngine(id).enabled) ?? FREE_ENGINES[FREE_ENGINES.length - 1];
 
   const { brand, prompts } = await ensurePrompts(db, brandId);
   const primary = prompts.find((p) => p.is_primary) ?? prompts[0];
@@ -151,7 +152,7 @@ export async function runFreeScan(
       onEvent,
     );
 
-    await seedTeaserTasks(db, brandId, profile, primary.text, detection.you.mentioned);
+    await seedTeaserTasks(db, brandId, profile, primary.text, detection.you.mentioned, detection.brands, citations);
 
     await db
       .from("scans")
@@ -344,6 +345,8 @@ async function seedTeaserTasks(
   profile: BrandProfile,
   primaryPrompt: string,
   mentioned: boolean,
+  brands: RankedBrand[],
+  citations: Citation[],
 ) {
   const { count } = await db
     .from("tasks")
@@ -352,26 +355,51 @@ async function seedTeaserTasks(
     .eq("source", "scan");
   if (count && count > 0) return;
 
-  const topCompetitor = profile.competitors[0];
-  const tasks = [
-    {
+  // The actual brand the AI led with (first ranked competitor), and a real domain
+  // it cited — so the teaser tasks reference what the scan actually found.
+  const topAhead = brands.find((b) => !b.isYou)?.name || profile.competitors[0] || "";
+  const brandHost = profile.url.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  const citedDomain = citations
+    .map((c) => {
+      try {
+        return new URL(c.url).hostname.replace(/^www\./, "");
+      } catch {
+        return "";
+      }
+    })
+    .find((d) => d && !d.includes(brandHost) && !brandHost.includes(d));
+
+  type T = { brand_id: string; title: string; meta: string; xp: number; impact: string; source: string };
+  const tasks: T[] = [];
+  if (!mentioned) {
+    tasks.push({
       brand_id: brandId,
-      title: topCompetitor
-        ? `Publish a comparison page: ${profile.company} vs ${topCompetitor}`
+      title: topAhead
+        ? `Publish a comparison page: ${profile.company} vs ${topAhead}`
         : `Publish a "best ${profile.industry || "tools"}" comparison page`,
       meta: "≈ 45 min · impact: very high",
       xp: 200,
       impact: "very high",
       source: "scan",
-    },
-    {
+    });
+  }
+  tasks.push({
+    brand_id: brandId,
+    title: `Add an FAQ answering "${primaryPrompt}"`,
+    meta: "≈ 10 min · impact: high",
+    xp: 50,
+    impact: "high",
+    source: "scan",
+  });
+  if (citedDomain) {
+    tasks.push({
       brand_id: brandId,
-      title: `Add an FAQ answering "${primaryPrompt}"`,
-      meta: "≈ 10 min · impact: high",
-      xp: 50,
+      title: `Get ${profile.company} cited on ${citedDomain}`,
+      meta: `≈ 30 min · impact: high · AI cited it for "${primaryPrompt}"`,
+      xp: 80,
       impact: "high",
       source: "scan",
-    },
-  ];
-  await db.from("tasks").insert(mentioned ? [tasks[1]] : tasks);
+    });
+  }
+  await db.from("tasks").insert(tasks);
 }

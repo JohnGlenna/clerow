@@ -106,6 +106,17 @@ function auditSpecs(audit: SiteAudit | null, ids: Set<string>): Spec[] {
     .map((c) => spec(`audit-${c.id}`, c.fix!.title, c.fix!.detail, c.fix!.minutes, c.fix!.impact));
 }
 
+// Level-2 content criteria graded by the AI page-grader (lib/scan/pageGrade.ts),
+// keyed by the SAME spec keys as the generic fallbacks below so a full scan turns
+// them into page-specific tasks in place. Only failing criteria become tasks.
+const L2_CONTENT_IDS = ["l2-answer-first", "l2-h2-queries", "l2-comparison-table", "l2-eeat", "l2-freshness"];
+function gradedContentSpecs(audit: SiteAudit | null): Spec[] {
+  if (!audit) return [];
+  return audit.checks
+    .filter((c) => L2_CONTENT_IDS.includes(c.id) && c.status !== "pass" && c.fix)
+    .map((c) => spec(c.id, c.fix!.title, c.fix!.detail, c.fix!.minutes, c.fix!.impact));
+}
+
 // If we've never crawled the site, Level 1 still needs content — fall back to the
 // universal foundations as prescriptive (self-reported) tasks.
 const L1_FALLBACK: Spec[] = [
@@ -127,7 +138,8 @@ function level1(ctx: LadderContext): Spec[] {
 
 function level2(ctx: LadderContext): Spec[] {
   const q = ctx.primaryPrompt?.text;
-  const content: Spec[] = [
+  // Generic content specs — the fallback when the AI page-grade hasn't run yet.
+  const generic: Spec[] = [
     spec(
       "l2-answer-first",
       "Lead your key page with a direct answer",
@@ -164,6 +176,9 @@ function level2(ctx: LadderContext): Spec[] {
       "low",
     ),
   ];
+  // Prefer the AI page-grader's page-specific findings; else the generic specs.
+  const graded = gradedContentSpecs(ctx.audit);
+  const content = graded.length ? graded : generic;
   return [...auditSpecs(ctx.audit, L2_AUDIT), ...content];
 }
 
@@ -345,4 +360,30 @@ export async function ensureLadderTasks(
   const { data, error } = await db.from("tasks").insert(rows).select();
   if (error) throw new Error(`Failed to seed ladder tasks: ${error.message}`);
   return data ?? [];
+}
+
+// Rewrite already-seeded ladder tasks in place when a re-scan changed their spec
+// (matched by stable ladder_key). This is what makes a full scan visibly update
+// tasks — e.g. a generic "Lead with a direct answer" becomes the AI page-grader's
+// page-specific version. Only writes rows whose title/meta/impact actually changed.
+export async function refreshLadderTaskContent(
+  db: DB,
+  ladder: Ladder,
+  rows: { id: string; ladder_key: string | null; title: string; meta: string; impact: string }[],
+): Promise<number> {
+  const specByKey = new Map<string, LadderTask>();
+  for (const l of ladder.levels) for (const t of l.tasks) specByKey.set(t.key, t);
+
+  const changed = rows.filter((r) => {
+    if (!r.ladder_key) return false;
+    const t = specByKey.get(r.ladder_key);
+    return !!t && (t.title !== r.title || t.meta !== r.meta || t.impact !== r.impact);
+  });
+  await Promise.all(
+    changed.map((r) => {
+      const t = specByKey.get(r.ladder_key as string)!;
+      return db.from("tasks").update({ title: t.title, meta: t.meta, impact: t.impact }).eq("id", r.id);
+    }),
+  );
+  return changed.length;
 }

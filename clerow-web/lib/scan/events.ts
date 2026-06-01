@@ -14,7 +14,10 @@ export type EngineStatus = "queued" | "querying" | "detecting" | "done" | "faile
 export type ScanScore = { overall: number; visibility: number; position: number | null; sentiment: number | null };
 
 export type ScanEvent =
-  | { type: "phase"; phase: "reading" | "discovering" | "scanning" }
+  | { type: "phase"; phase: "reading" | "discovering" | "scanning" | "reading-site" | "grading-pages" }
+  // The website-scan result (audit + AI page-grade checks) so the results screen
+  // can show what we found on the user's own site — the most important section.
+  | { type: "site"; checks: { id: string; label: string; status: string }[] }
   // Announce a prompt before its engines run, so a multi-prompt scan (the per-level
   // scan) can render each query's row of models up front. Single-prompt scans
   // (free scan, re-scan) simply never emit this and the client stays flat.

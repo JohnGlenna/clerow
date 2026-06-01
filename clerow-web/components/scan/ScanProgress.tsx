@@ -9,6 +9,7 @@ import React from "react";
 import { ENGINE_META } from "@/lib/engines";
 import type { EngineProgress, PromptProgress } from "@/lib/useScanStream";
 import { MascotClerow } from "../Mascot";
+import { AiIcon } from "../ui/AiIcon";
 
 export type ScanStep = { label: string; state: "pending" | "active" | "done" };
 
@@ -18,6 +19,7 @@ export function ScanProgress({
   prompts,
   elapsedMs,
   showOrbit = true,
+  done = false,
 }: {
   steps?: ScanStep[];
   engines: EngineProgress[];
@@ -26,6 +28,7 @@ export function ScanProgress({
   prompts?: PromptProgress[];
   elapsedMs: number;
   showOrbit?: boolean;
+  done?: boolean; // final results view — hide the "Scanning… Xs" ticker
 }) {
   const secs = Math.max(0, Math.floor(elapsedMs / 1000));
   const grouped = (prompts ?? []).filter((p) => p.text);
@@ -76,7 +79,7 @@ export function ScanProgress({
         )
       )}
 
-      {(engines.length > 0 || multi) && (
+      {!done && (engines.length > 0 || multi) && (
         <div className="scan-elapsed" aria-live="polite">
           Scanning… {secs}s
         </div>
@@ -110,8 +113,8 @@ function ModelRow({ e }: { e: EngineProgress }) {
 
   return (
     <div className={`scan-model ${stateClass}`}>
-      <span className="sm-swatch" style={{ background: meta.swatch }}>
-        {meta.letter}
+      <span className="sm-swatch sm-logo">
+        <AiIcon id={e.engine} size={20} letter={meta.letter} />
       </span>
       <span className="sm-label">{e.label}</span>
       <span className="sm-status">{text}</span>

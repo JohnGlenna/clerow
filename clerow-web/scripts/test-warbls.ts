@@ -7,6 +7,7 @@ import { loadBrandSnapshot } from "../lib/scan/snapshot";
 import { assembleLadderContext } from "../lib/scan/ladderContext";
 import { buildLadder } from "../lib/ladder";
 import { refreshSiteAudit } from "../lib/audit/ensure";
+import { gradeSite } from "../lib/scan/pageGrade";
 import { enabledEngines, PAID_ENGINES } from "../lib/engines";
 
 const EMAIL = "john.7bc@hotmail.com";
@@ -93,7 +94,31 @@ async function main() {
   console.log("engines:", engines.join(", "));
 
   const audit = await refreshSiteAudit(admin, brand.id, brand.url);
-  console.log("site audit:", audit.checks.map((c) => `${c.id}:${c.status}`).join("  "));
+  console.log("site audit (regex):", audit.checks.map((c) => `${c.id}:${c.status}`).join("  "));
+
+  // AI page-grade (mirrors /api/scan/full step 1b)
+  const profile = {
+    url: brand.url, company: brand.company, industry: brand.industry, description: brand.description,
+    location: brand.location, audience: brand.audience, competitors: brand.competitors,
+    differentiators: brand.differentiators, geos: brand.geos, enrichNotes: brand.enrich_notes,
+  };
+  try {
+    const homeRes = await fetch(brand.url.startsWith("http") ? brand.url : `https://${brand.url}`, {
+      headers: { "user-agent": "Mozilla/5.0 (compatible; ClerowAudit/1.0)" },
+    });
+    const html = homeRes.ok ? await homeRes.text() : "";
+    const graded = await gradeSite({ brand: profile, html, images: [] });
+    console.log("AI page-grade:", graded.map((c) => `${c.id}:${c.status}`).join("  ") || "(none)");
+    // Merge into the stored audit (mirrors /api/scan/full) so the ladder below
+    // reflects page-specific L2 tasks.
+    if (graded.length) {
+      const byId = new Map(audit.checks.map((c) => [c.id, c]));
+      for (const g of graded) byId.set(g.id, g);
+      await admin.from("brands").update({ site_audit: { ...audit, checks: [...byId.values()] } }).eq("id", brand.id);
+    }
+  } catch (e) {
+    console.log("AI page-grade failed:", e instanceof Error ? e.message : e);
+  }
 
   const { data: prompts } = await admin
     .from("prompts")
@@ -101,7 +126,7 @@ async function main() {
     .eq("brand_id", brand.id)
     .order("is_primary", { ascending: false })
     .order("volume", { ascending: false })
-    .limit(5);
+    .limit(3);
 
   for (const p of prompts ?? []) {
     const r = await runPromptScan(admin, brand.id, p.id, engines);
@@ -118,7 +143,10 @@ async function main() {
   console.log("engines scanned:", snap.enginesScanned.join(", "));
   console.log("cited domains:", snap.citedDomains.slice(0, 8).join(", ") || "(none)");
 
-  const { ctx } = await assembleLadderContext(admin, brand);
+  // Re-fetch the brand so assembleLadderContext sees the merged page-grade audit.
+  const { data: freshBrand } = await admin.from("brands").select("*").eq("id", brand.id).single();
+  const { ctx } = await assembleLadderContext(admin, freshBrand ?? brand);
+  console.log("brand name (stored):", (freshBrand ?? brand).company);
   const { data: tasks } = await admin.from("tasks").select("*").eq("brand_id", brand.id);
   const existing = new Map<string, { id: string; done: boolean; resolved: boolean }>();
   for (const t of tasks ?? []) if (t.ladder_key) existing.set(t.ladder_key, { id: t.id, done: t.done, resolved: t.done || t.archived });

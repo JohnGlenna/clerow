@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { runFreeScan, loadLatestFreeResult } from "@/lib/scan/run";
 import { streamScan, STREAM_HEADERS } from "@/lib/scan/events";
+import { synthesizeAndStore } from "@/lib/scan/synthesize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +58,15 @@ export async function POST(req: Request) {
   return new Response(
     streamScan(async (emit) => {
       const result = await runFreeScan(supabase, brandId, emit);
+      // Summarize the free scan in the background so the dashboard shows "what the
+      // AI thinks" + the best move (lands on the next load). Best-effort.
+      after(async () => {
+        try {
+          await synthesizeAndStore(createAdminClient(), result.scanId);
+        } catch {
+          // service role not configured — synthesis simply stays null.
+        }
+      });
       emit({ type: "done", result });
     }),
     { headers: STREAM_HEADERS },

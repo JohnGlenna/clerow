@@ -1,6 +1,7 @@
 import { perplexityChat, parseJsonLoose } from "../perplexity/client";
 import type { BrandProfile, DiscoveredPrompt } from "../types";
 import type { PromptIntent, PromptVolume } from "../supabase/database.types";
+import { discoverViaGrok } from "./discoverGrok";
 
 // "We don't ask random prompts. We discover yours." — generate the buyer
 // prompts a real customer in this brand's category would ask an AI, tagged by
@@ -55,7 +56,21 @@ function coerceVolume(v: string): PromptVolume {
   return (VOLUMES as string[]).includes(v) ? (v as PromptVolume) : "medium";
 }
 
+// Discover the brand's buyer prompts. Prefer Grok's live web search (the most
+// faithful "what do buyers actually ask" signal); fall back to the Perplexity
+// generator if xAI isn't configured or the call fails.
 export async function discoverPrompts(brand: BrandProfile): Promise<DiscoveredPrompt[]> {
+  if (process.env.XAI_API_KEY) {
+    try {
+      return await discoverViaGrok(brand);
+    } catch {
+      // fall through to Perplexity
+    }
+  }
+  return discoverViaPerplexity(brand);
+}
+
+async function discoverViaPerplexity(brand: BrandProfile): Promise<DiscoveredPrompt[]> {
   const { content } = await perplexityChat({
     model: "sonar",
     temperature: 0.3,

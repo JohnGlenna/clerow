@@ -7,7 +7,7 @@ import { loadBrandSnapshot, captureDailySnapshot, loadSnapshotHistory } from "@/
 import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/streak";
 import { levelFromXp } from "@/lib/xp";
 import { ensureSiteAudit } from "@/lib/audit/ensure";
-import { buildLadder, ensureLadderTasks } from "@/lib/ladder";
+import { buildLadder, ensureLadderTasks, refreshLadderTaskContent } from "@/lib/ladder";
 import { buildLadderContext } from "@/lib/scan/ladderContext";
 import { budgetStatus, planFromSub } from "@/lib/billing/limits";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
@@ -153,6 +153,9 @@ export async function GET(req: Request) {
   for (const r of inserted)
     if (r.ladder_key) ladderExisting.set(r.ladder_key, { id: r.id, done: r.done, resolved: r.done || r.archived });
   const ladder = buildLadder(ladderCtx, ladderExisting, unlockedThrough);
+  // Rewrite seeded tasks whose spec changed since last scan (e.g. generic L2 →
+  // the AI page-grader's page-specific version), so a full scan visibly updates them.
+  await refreshLadderTaskContent(supabase, ladder, (tasks ?? []).filter((t) => t.source === "ladder"));
   const allTasks = [...(tasks ?? []), ...inserted];
 
   // A prompt is "scanned" if ANY done scan produced a result for it — including
@@ -223,8 +226,18 @@ export async function GET(req: Request) {
       return ad - bd;
     });
 
+  // Has the user ever run a full (multi-model) scan? Gates level-unlocking and
+  // hides the "Scan all 5 models" CTA once done.
+  const { count: fullScans } = await supabase
+    .from("scans")
+    .select("id", { count: "exact", head: true })
+    .eq("brand_id", brand.id)
+    .eq("tier", "full")
+    .eq("status", "done");
+
   return NextResponse.json({
     hasScan: true,
+    hasFullScan: (fullScans ?? 0) > 0,
     brand: brandHead,
     scannedAt: snapshot.scannedAt ?? scan.finished_at,
     engine: engineLabel,

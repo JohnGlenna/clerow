@@ -1938,6 +1938,8 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   display: inline-flex; align-items: center; justify-content: center;
   color: #fff; font-size: 11px; font-weight: 800;
 }
+/* When the swatch holds a real provider SVG, sit it on a white tile for contrast. */
+.scan-model .sm-logo { background: #fff; }
 .scan-model .sm-label { font-size: 13.5px; font-weight: 800; }
 .scan-model .sm-status {
   margin-left: auto;

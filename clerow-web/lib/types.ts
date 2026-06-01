@@ -147,6 +147,8 @@ export type PromptEngineResult = {
   yourVisibility: number;
   yourSentiment: number | null;
   brands: DashboardCompetitor[];
+  recommends: string[]; // top names this model led with (not you)
+  rawAnswer: string | null; // the model's full answer text (for "show full answer")
   citations: Citation[];
 };
 
@@ -178,6 +180,7 @@ export type ScanSynthesis = {
 
 export type DashboardData = {
   hasScan: boolean;
+  hasFullScan?: boolean; // a tier='full' multi-model scan has completed
   brand: { company: string; url: string } | null;
   scannedAt?: string | null;
   engine?: string;

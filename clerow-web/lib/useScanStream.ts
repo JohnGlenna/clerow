@@ -35,8 +35,12 @@ export type ScanResult = RunResponse | { scanId: string; score: ScanScore };
 
 type Status = "idle" | "running" | "done" | "error";
 
+export type SiteCheckLite = { id: string; label: string; status: string };
+
 export type ScanStreamState = {
   status: Status;
+  phase: string | null; // latest phase event (reading-site / grading-pages / scanning…)
+  site: SiteCheckLite[]; // website-scan result (audit + AI page-grade)
   prompts: PromptProgress[];
   result: ScanResult | null;
   error: string | null;
@@ -49,7 +53,7 @@ export type RunOutcome =
   | { ok: true; result: ScanResult | null }
   | { ok: false; status: number; error: string; budget?: unknown };
 
-const IDLE: ScanStreamState = { status: "idle", prompts: [], result: null, error: null, elapsedMs: 0 };
+const IDLE: ScanStreamState = { status: "idle", phase: null, site: [], prompts: [], result: null, error: null, elapsedMs: 0 };
 
 // Engine events that never announce a prompt (free scan, re-scan) all land in one
 // implicit group keyed here, so the flat `engines` view stays correct.
@@ -115,6 +119,9 @@ export function useScanStream() {
         case "error":
           return { ...s, status: "error", error: e.message };
         case "phase":
+          return { ...s, phase: e.phase };
+        case "site":
+          return { ...s, site: e.checks };
         default:
           return s;
       }

@@ -38,7 +38,7 @@ export async function loadPromptDetail(
   const { data: results } = await db
     .from("scan_results")
     .select(
-      "id, engine, created_at, citations, your_position, your_visibility, your_sentiment, scans!inner(brand_id, finished_at, status)",
+      "id, engine, created_at, raw_answer, citations, your_position, your_visibility, your_sentiment, scans!inner(brand_id, finished_at, status)",
     )
     .eq("prompt_id", promptId)
     .eq("scans.brand_id", brandId)
@@ -81,6 +81,7 @@ export async function loadPromptDetail(
     const r = latestByEngine.get(id);
     const meta = ENGINE_META[id];
     const citations = (r?.citations as Citation[] | undefined) ?? [];
+    const list = r ? brandsByResult.get(r.id) ?? [] : [];
     return {
       engine: id,
       label: ENGINES[id].label,
@@ -91,7 +92,10 @@ export async function loadPromptDetail(
       yourPosition: r?.your_position != null ? Number(r.your_position) : null,
       yourVisibility: r ? Math.round(Number(r.your_visibility)) : 0,
       yourSentiment: r?.your_sentiment != null ? Math.round(Number(r.your_sentiment)) : null,
-      brands: r ? brandsByResult.get(r.id) ?? [] : [],
+      brands: list,
+      // What the model led with (top-ranked names that aren't you) + its full answer.
+      recommends: list.filter((b) => !b.isYou).slice(0, 3).map((b) => b.name),
+      rawAnswer: typeof r?.raw_answer === "string" ? r.raw_answer : null,
       citations,
     };
   });

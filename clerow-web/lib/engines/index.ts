@@ -31,8 +31,10 @@ export const ENGINE_META: Record<EngineId, { swatch: string; letter: string }> =
   grok: { swatch: "#111827", letter: "X" },
 };
 
-// Engines that run on the free scan (one prompt, one engine).
-export const FREE_ENGINES: EngineId[] = ["perplexity"];
+// Engines the free scan may run (one prompt, one engine), in preference order.
+// ChatGPT is the recognizable hook ("ChatGPT doesn't recommend you"); falls back
+// to Perplexity when its key is missing. runFreeScan picks the first enabled one.
+export const FREE_ENGINES: EngineId[] = ["chatgpt", "perplexity"];
 
 // Engines the paid scan runs across, in display order. Filtered to whichever
 // currently have a configured API key via `enabledEngines`.

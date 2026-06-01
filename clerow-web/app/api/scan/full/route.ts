@@ -7,6 +7,27 @@ import { synthesizeAndStore } from "@/lib/scan/synthesize";
 import { loadBrandSnapshot } from "@/lib/scan/snapshot";
 import { refreshSiteAudit } from "@/lib/audit/ensure";
 import { enrichFromUpload, mergeUploadEnrichment } from "@/lib/scan/enrichFromUpload";
+import { gradeSite } from "@/lib/scan/pageGrade";
+import type { Json } from "@/lib/supabase/database.types";
+
+// Fetch the homepage HTML for the AI page-grader (best-effort; "" when blocked,
+// in which case the grader works from uploaded screenshots).
+async function fetchHomepageHtml(url: string): Promise<string> {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const u = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    const res = await fetch(u, {
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: { "user-agent": "Mozilla/5.0 (compatible; ClerowAudit/1.0; +https://clerow.com/bot)", accept: "text/html" },
+    });
+    clearTimeout(timer);
+    return res.ok ? await res.text() : "";
+  } catch {
+    return "";
+  }
+}
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
 import { planFromSub, enginesForPlan, assertBudget, BudgetExceededError } from "@/lib/billing/limits";
 import { enabledEngines } from "@/lib/engines";
@@ -16,9 +37,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-// How many of the brand's prompts a full scan runs across every model. Bounds
-// COGS and wall-clock: prompts run sequentially, each across all engines.
-const MAX_SCAN_PROMPTS = 5;
+// How many of the brand's prompts a full scan runs across every model — the top 3
+// most-popular buyer queries (primary first, then volume). Bounds COGS/wall-clock.
+const MAX_SCAN_PROMPTS = 3;
 
 // The comprehensive "Scan all 5 models" action — refreshes data for the WHOLE
 // ladder in one pass: (1) re-crawl the site audit (cheap → Levels 1-2 data),
@@ -93,32 +114,32 @@ export async function POST() {
 
   return new Response(
     streamScan(async (emit) => {
-      // (0) Distill the user's uploaded business context (screenshots + about
-      // text) into the brand profile, when present and not yet applied. Sharpens
-      // detection + the AI-fix content this scan's tasks will generate, and is the
-      // fallback when the crawl can't read a site. Best-effort — a vision/Storage
-      // failure must not abort the scan. (Re-runs only when context changed:
-      // POST /api/brand/context bumps updated_at past context_enriched_at.)
+      const admin = createAdminClient();
+      const profile = {
+        url: brand.url, company: brand.company, industry: brand.industry, description: brand.description,
+        location: brand.location, audience: brand.audience, competitors: brand.competitors,
+        differentiators: brand.differentiators, geos: brand.geos, enrichNotes: brand.enrich_notes,
+      };
+
+      // Download the user's uploaded screenshots once — shared by enrichment + the
+      // AI page-grade (and they're the fallback when the site can't be crawled).
+      const images: { mediaType: string; data: string }[] = [];
+      for (const path of (brand.screenshots ?? []).slice(0, 6)) {
+        try {
+          const { data: blob } = await admin.storage.from("brand-uploads").download(path);
+          if (blob) images.push({ mediaType: blob.type || "image/jpeg", data: Buffer.from(await blob.arrayBuffer()).toString("base64") });
+        } catch {
+          // skip an unreadable object
+        }
+      }
+
+      // (0) Distill uploaded business context into the brand profile when it
+      // changed (sharpens detection + generated fixes). Best-effort.
       try {
-        const hasContext = (brand.screenshots?.length ?? 0) > 0 || (brand.about ?? "").trim().length > 0;
+        const hasContext = images.length > 0 || (brand.about ?? "").trim().length > 0;
         const stale = !brand.context_enriched_at || new Date(brand.context_enriched_at) < new Date(brand.updated_at);
         if (hasContext && stale) {
-          const admin = createAdminClient();
-          const images: { mediaType: string; data: string }[] = [];
-          for (const path of (brand.screenshots ?? []).slice(0, 6)) {
-            const { data: blob } = await admin.storage.from("brand-uploads").download(path);
-            if (!blob) continue;
-            images.push({ mediaType: blob.type || "image/jpeg", data: Buffer.from(await blob.arrayBuffer()).toString("base64") });
-          }
-          const e = await enrichFromUpload({
-            profile: {
-              url: brand.url, company: brand.company, industry: brand.industry, description: brand.description,
-              location: brand.location, audience: brand.audience, competitors: brand.competitors,
-              differentiators: brand.differentiators, geos: brand.geos, enrichNotes: brand.enrich_notes,
-            },
-            about: brand.about ?? "",
-            images,
-          });
+          const e = await enrichFromUpload({ profile, about: brand.about ?? "", images });
           const patch = mergeUploadEnrichment(
             { industry: brand.industry, description: brand.description, audience: brand.audience, differentiators: brand.differentiators, competitors: brand.competitors },
             e,
@@ -129,16 +150,45 @@ export async function POST() {
         // best-effort — scan proceeds on the existing profile.
       }
 
-      // (1) Re-crawl the site audit so Levels 1-2 reflect the current site. Cheap
-      // and best-effort — a crawl failure must not abort the paid AI scan.
+      // (1) Re-crawl the site audit so Levels 1-2 reflect the current site.
+      emit({ type: "phase", phase: "reading-site" });
+      let audit = null as Awaited<ReturnType<typeof refreshSiteAudit>> | null;
       try {
-        await refreshSiteAudit(supabase, brand.id, brand.url);
+        audit = await refreshSiteAudit(supabase, brand.id, brand.url);
       } catch {
         // keep going; the dashboard falls back to the prior audit.
       }
 
+      // (1b) AI page-grade: an LLM reads the homepage HTML + screenshots and grades
+      // the on-page/content criteria the regex audit can't (answer-first, EEAT, …).
+      // Merge its findings into the stored audit so Levels 1-2 become page-specific.
+      // Best-effort — failure leaves the regex audit intact.
+      emit({ type: "phase", phase: "grading-pages" });
+      try {
+        if (audit) {
+          const html = await fetchHomepageHtml(brand.url);
+          if (html || images.length) {
+            const graded = await gradeSite({ brand: profile, html, images });
+            if (graded.length) {
+              const byId = new Map(audit.checks.map((c) => [c.id, c]));
+              for (const g of graded) byId.set(g.id, g); // AI overrides/append by id
+              audit = { ...audit, checks: [...byId.values()] };
+              await supabase.from("brands").update({ site_audit: audit as unknown as Json }).eq("id", brand.id);
+            }
+          }
+        }
+      } catch {
+        // best-effort — keep the regex audit.
+      }
+
+      // Surface the website-scan result to the client (the results screen leads with it).
+      if (audit) {
+        emit({ type: "site", checks: audit.checks.map((c) => ({ id: c.id, label: c.label, status: c.status })) });
+      }
+
       // (2) Scan prompts one at a time so progress reads cleanly; engines within
       // each prompt run concurrently inside runPromptScan.
+      emit({ type: "phase", phase: "scanning" });
       const scanIds: string[] = [];
       for (let i = 0; i < prompts.length; i++) {
         const p = prompts[i];

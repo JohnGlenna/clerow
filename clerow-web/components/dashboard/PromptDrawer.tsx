@@ -313,32 +313,76 @@ function EngineStanding({
   busy: boolean;
   onScan: () => void;
 }) {
+  const [open, setOpen] = React.useState(false);
+  const cited = e.citations
+    .slice(0, 3)
+    .map((c) => {
+      try {
+        return new URL(c.url).hostname.replace(/^www\./, "");
+      } catch {
+        return c.title;
+      }
+    })
+    .filter(Boolean);
+
   return (
-    <div className={`drawer-engine ${e.scannedAt ? "" : "is-idle"}`}>
-      <span className="drawer-engine-id">
-        <span className="model-icon" style={{ background: e.swatch }}>
-          {e.letter}
+    <div className={`drawer-engine ${e.scannedAt ? "" : "is-idle"}`} style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span className="drawer-engine-id">
+          <span className="model-icon" style={{ background: e.swatch }}>
+            {e.letter}
+          </span>
+          {e.label}
         </span>
-        {e.label}
-      </span>
-      {!e.enabled ? (
-        <span className="drawer-engine-stat is-locked">
-          <GameIcon name="locked" size={12} /> No key
-        </span>
-      ) : e.scannedAt ? (
-        <span className="drawer-engine-stat">
-          <b className="pos-pill">{e.yourPosition != null ? `#${e.yourPosition}` : "Absent"}</b>
-          <span>{e.yourVisibility}% vis</span>
-        </span>
-      ) : (
-        <button
-          className="btn btn--ghost btn--sm drawer-engine-scan"
-          onClick={onScan}
-          disabled={busy}
-        >
-          <Icon name="bolt" size={12} />
-          {scanning ? "Scanning…" : "Scan"}
-        </button>
+        {!e.enabled ? (
+          <span className="drawer-engine-stat is-locked">
+            <GameIcon name="locked" size={12} /> No key
+          </span>
+        ) : e.scannedAt ? (
+          <span className="drawer-engine-stat">
+            <b className="pos-pill">{e.yourPosition != null ? `#${e.yourPosition}` : "Absent"}</b>
+            <span>{e.yourVisibility}% vis</span>
+          </span>
+        ) : (
+          <button className="btn btn--ghost btn--sm drawer-engine-scan" onClick={onScan} disabled={busy}>
+            <Icon name="bolt" size={12} />
+            {scanning ? "Scanning…" : "Scan"}
+          </button>
+        )}
+      </div>
+
+      {e.scannedAt && (
+        <div style={{ fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
+          <div>
+            <b style={{ color: "var(--ink)" }}>
+              {e.recommends.length ? `Recommends ${e.recommends.join(", ")}` : "Named no specific brands"}
+            </b>
+            {" · "}
+            {e.yourPosition != null ? `you #${e.yourPosition}` : "you not named"}
+            {cited.length ? ` · cites ${cited.join(", ")}` : ""}
+          </div>
+          {e.rawAnswer && (
+            <>
+              <button
+                onClick={() => setOpen((o) => !o)}
+                style={{ marginTop: 6, background: "none", border: 0, color: "var(--accent)", fontWeight: 700, fontSize: 12, cursor: "pointer", padding: 0 }}
+              >
+                {open ? "Hide full answer ▴" : "Show full answer ▾"}
+              </button>
+              {open && (
+                <pre
+                  style={{
+                    marginTop: 6, maxHeight: 240, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word",
+                    fontSize: 12, lineHeight: 1.55, fontFamily: "inherit",
+                    background: "color-mix(in oklab, var(--ink) 5%, transparent)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px",
+                  }}
+                >
+                  {e.rawAnswer}
+                </pre>
+              )}
+            </>
+          )}
+        </div>
       )}
     </div>
   );
