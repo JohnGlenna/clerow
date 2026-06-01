@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { runFreeScan, loadLatestFreeResult } from "@/lib/scan/run";
+import { streamScan, STREAM_HEADERS } from "@/lib/scan/events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,15 +37,27 @@ export async function POST(req: Request) {
     .eq("status", "done");
   if (done && done > 0) {
     const existing = await loadLatestFreeResult(supabase, brandId);
-    if (existing) return NextResponse.json(existing);
+    if (existing) {
+      // Cached reveal — emit one terminal event so the client's stream reader
+      // gets the same RunResponse shape it would from a live scan.
+      return new Response(
+        streamScan(async (emit) => {
+          emit({ type: "done", result: existing });
+        }),
+        { headers: STREAM_HEADERS },
+      );
+    }
     // Nothing reconstructable (rare) — fall through and run a fresh scan.
   }
 
-  try {
-    const result = await runFreeScan(supabase, brandId);
-    return NextResponse.json(result);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Scan failed";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+  // Stream the scan so the client can show the model querying in real time. The
+  // scan writes to Supabase as it goes, so a client disconnect doesn't lose work.
+  // Failures arrive in-band as a final {type:"error"} event (HTTP 200).
+  return new Response(
+    streamScan(async (emit) => {
+      const result = await runFreeScan(supabase, brandId, emit);
+      emit({ type: "done", result });
+    }),
+    { headers: STREAM_HEADERS },
+  );
 }

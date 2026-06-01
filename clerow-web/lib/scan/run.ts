@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEngine, enabledEngines, ENGINES, FREE_ENGINES, PAID_ENGINES, type EngineId } from "../engines";
 import { discoverPrompts } from "./discover";
 import { detectRanking } from "./detect";
+import type { ScanEvent } from "./events";
 import { costForEngines, roundUsd } from "../billing/cost";
 import { assertBudget, planFromSub } from "../billing/limits";
 import { getSubscription } from "../billing/subscription";
@@ -64,51 +65,72 @@ async function persistEngineResult(
   prompt: PromptRow,
   engineId: EngineId,
   signal?: AbortSignal,
+  onEvent?: (e: ScanEvent) => void,
 ) {
   const engine = getEngine(engineId);
-  const answer = await engine.query(prompt.text, signal);
-  const detection = await detectRanking(answer.text, profile, signal);
+  // Emit per-engine progress as we go. Under the concurrent Promise.allSettled in
+  // runPromptScan each engine drives its own events independently.
+  const emit = (status: "querying" | "detecting" | "done" | "failed", extra?: { position?: number | null; visibility?: number; error?: string }) =>
+    onEvent?.({ type: "engine", engine: engineId, label: engine.label, status, ...extra });
 
-  const { data: result, error: re } = await db
-    .from("scan_results")
-    .insert({
-      scan_id: scanId,
-      prompt_id: prompt.id,
-      engine: engineId,
-      raw_answer: answer.text,
-      citations: answer.citations,
-      your_position: detection.you.position,
-      your_visibility: detection.you.visibility,
-      your_sentiment: SENTIMENT_SCORE[detection.you.sentiment],
-    })
-    .select()
-    .single();
-  if (re || !result) throw new Error(`Failed to save scan result: ${re?.message}`);
+  try {
+    emit("querying");
+    const answer = await engine.query(prompt.text, signal);
+    emit("detecting");
+    const detection = await detectRanking(answer.text, profile, signal);
 
-  const brandRows = detection.brands.map((b) => ({
-    scan_result_id: result.id,
-    rank: b.rank,
-    name: b.name,
-    is_you: b.isYou,
-    visibility: b.visibility,
-    sentiment: b.sentiment,
-    position: b.position,
-  }));
-  const { error: rbe } = await db.from("result_brands").insert(brandRows);
-  if (rbe) throw new Error(`Failed to save result brands: ${rbe.message}`);
+    const { data: result, error: re } = await db
+      .from("scan_results")
+      .insert({
+        scan_id: scanId,
+        prompt_id: prompt.id,
+        engine: engineId,
+        raw_answer: answer.text,
+        citations: answer.citations,
+        your_position: detection.you.position,
+        your_visibility: detection.you.visibility,
+        your_sentiment: SENTIMENT_SCORE[detection.you.sentiment],
+      })
+      .select()
+      .single();
+    if (re || !result) throw new Error(`Failed to save scan result: ${re?.message}`);
 
-  return { engine: engineId, label: engine.label, detection, citations: answer.citations };
+    const brandRows = detection.brands.map((b) => ({
+      scan_result_id: result.id,
+      rank: b.rank,
+      name: b.name,
+      is_you: b.isYou,
+      visibility: b.visibility,
+      sentiment: b.sentiment,
+      position: b.position,
+    }));
+    const { error: rbe } = await db.from("result_brands").insert(brandRows);
+    if (rbe) throw new Error(`Failed to save result brands: ${rbe.message}`);
+
+    emit("done", { position: detection.you.position, visibility: detection.you.visibility });
+    return { engine: engineId, label: engine.label, detection, citations: answer.citations };
+  } catch (err) {
+    emit("failed", { error: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
 }
 
 // Run the free scan: pick the primary prompt, query one engine, detect the
 // ranking, persist everything. Fails loudly — on any error the scan row is
 // marked 'error' and no half-written success is left behind.
-export async function runFreeScan(db: DB, brandId: string): Promise<RunResponse> {
+export async function runFreeScan(
+  db: DB,
+  brandId: string,
+  onEvent?: (e: ScanEvent) => void,
+): Promise<RunResponse> {
   const engineId = FREE_ENGINES[0];
 
   const { brand, prompts } = await ensurePrompts(db, brandId);
   const primary = prompts.find((p) => p.is_primary) ?? prompts[0];
   if (!primary) throw new Error("No prompt available to scan");
+
+  // Surface the single engine as "queued" up front so its row appears immediately.
+  onEvent?.({ type: "engine", engine: engineId, label: getEngine(engineId).label, status: "queued" });
 
   const { data: scan, error: se } = await db
     .from("scans")
@@ -125,6 +147,8 @@ export async function runFreeScan(db: DB, brandId: string): Promise<RunResponse>
       profile,
       primary,
       engineId,
+      undefined,
+      onEvent,
     );
 
     await seedTeaserTasks(db, brandId, profile, primary.text, detection.you.mentioned);
@@ -234,6 +258,7 @@ export async function runPromptScan(
   brandId: string,
   promptId: string,
   engineIds: EngineId[] = PAID_ENGINES,
+  onEvent?: (e: ScanEvent) => void,
 ): Promise<PromptScanResult> {
   const engines = enabledEngines(engineIds);
   if (engines.length === 0) {
@@ -263,9 +288,15 @@ export async function runPromptScan(
     .single();
   if (se || !scan) throw new Error(`Failed to create scan: ${se?.message}`);
 
+  // Show every engine as "queued" before any resolves, so all model rows render
+  // up front and then tick independently as each one progresses.
+  for (const id of engines) {
+    onEvent?.({ type: "engine", engine: id, label: getEngine(id).label, status: "queued" });
+  }
+
   const profile = toProfile(brand);
   const settled = await Promise.allSettled(
-    engines.map((id) => persistEngineResult(db, scan.id, profile, prompt, id)),
+    engines.map((id) => persistEngineResult(db, scan.id, profile, prompt, id, undefined, onEvent)),
   );
 
   const outcomes: EngineRunOutcome[] = settled.map((s, i) => {

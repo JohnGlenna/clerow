@@ -1901,6 +1901,63 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   50% { box-shadow: 0 0 0 6px transparent; }
 }
 
+/* Per-model live rows. Colors derive from currentColor so the block adapts to
+   both the light onboarding scope and the dark .ld-root dashboard scope. */
+.scan-models {
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: 380px;
+  margin: 0 auto;
+  text-align: left;
+}
+.scan-model {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: color-mix(in oklab, currentColor 6%, transparent);
+  border: 1px solid color-mix(in oklab, currentColor 12%, transparent);
+  transition: background var(--t-base), border-color var(--t-base);
+}
+.scan-model.failed { opacity: 0.72; }
+.scan-model .sm-swatch {
+  flex: 0 0 auto;
+  width: 22px; height: 22px;
+  border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 11px; font-weight: 800;
+}
+.scan-model .sm-label { font-size: 13.5px; font-weight: 800; }
+.scan-model .sm-status {
+  margin-left: auto;
+  font-size: 12.5px; font-weight: 600;
+  color: color-mix(in oklab, currentColor 62%, transparent);
+}
+.scan-model.done .sm-status { color: #3CA300; }
+.scan-model.warn .sm-status { color: #C77700; }
+.scan-model.failed .sm-status { color: #E5484D; }
+.scan-model .sm-mark {
+  flex: 0 0 auto;
+  width: 18px; text-align: center;
+  font-size: 13px; font-weight: 800;
+}
+.scan-model.done .sm-mark { color: #58CC02; }
+.scan-model.warn .sm-mark { color: #FFB020; }
+.scan-model.failed .sm-mark { color: #E5484D; }
+.scan-model .sm-dot {
+  display: inline-block;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: currentColor; opacity: 0.55;
+  animation: smpulse 1.1s ease-in-out infinite;
+}
+@keyframes smpulse {
+  0%, 100% { transform: scale(0.75); opacity: 0.35; }
+  50% { transform: scale(1); opacity: 0.9; }
+}
+.scan-elapsed {
+  margin-top: 14px;
+  font-size: 12.5px; font-weight: 700;
+  color: color-mix(in oklab, currentColor 55%, transparent);
+}
+
 /* ============ Dashboard (in-app) ============ */
 .app-shell {
   min-height: 100vh;

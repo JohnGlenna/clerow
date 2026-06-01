@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { MascotClerow } from "../Mascot";
 import { DiscoverCard } from "../scan/DiscoverCard";
 import { ResultTable } from "../scan/ResultTable";
+import { ScanProgress, type ScanStep } from "../scan/ScanProgress";
+import { useScanStream, type EngineProgress } from "@/lib/useScanStream";
 import type { DiscoverResponse, RunResponse } from "@/lib/types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -23,6 +25,7 @@ export function Onboarding() {
   const [result, setResult] = React.useState<RunResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const started = React.useRef(false);
+  const scan = useScanStream();
 
   const run = React.useCallback(async (siteUrl: string) => {
     const clean = siteUrl.trim();
@@ -52,22 +55,20 @@ export function Onboarding() {
       setPhase("discovered");
       await sleep(1800); // let the user read Step 1
 
-      // 3. Run the primary prompt through Perplexity (Step 2 result).
+      // 3. Stream the primary prompt through Perplexity, showing it query live.
       setPhase("scanning");
-      const rRes = await fetch("/api/scan/run", {
-        method: "POST",
+      const outcome = await scan.run("/api/scan/run", {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ brandId }),
       });
-      if (!rRes.ok) throw new Error((await rRes.json()).error ?? "Scan failed");
-      const r: RunResponse = await rRes.json();
-      setResult(r);
+      if (!outcome.ok) throw new Error(outcome.error || "Scan failed");
+      setResult(outcome.result as RunResponse);
       setPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setPhase("error");
     }
-  }, []);
+  }, [scan]);
 
   // Auto-start when the landing page handed us a URL via ?url=.
   React.useEffect(() => {
@@ -120,6 +121,8 @@ export function Onboarding() {
             discover={discover}
             result={result}
             error={error}
+            engines={scan.engines}
+            elapsedMs={scan.elapsedMs}
             onRetry={retry}
             onContinue={() => router.push("/dashboard")}
           />
@@ -185,6 +188,8 @@ function ScanStep({
   discover,
   result,
   error,
+  engines,
+  elapsedMs,
   onRetry,
   onContinue,
 }: {
@@ -194,10 +199,22 @@ function ScanStep({
   discover: DiscoverResponse | null;
   result: RunResponse | null;
   error: string | null;
+  engines: EngineProgress[];
+  elapsedMs: number;
   onRetry: () => void;
   onContinue: () => void;
 }) {
   const busy = phase === "reading" || phase === "discovering" || phase === "scanning";
+
+  // First two steps are pre-stream fetches; the "scanning" step is now shown as
+  // a live model row, so the checklist only covers reading + discovering.
+  const steps: ScanStep[] = [
+    { label: "Reading your site & building your profile", state: phase === "reading" ? "active" : "done" },
+    {
+      label: "Discovering the prompts your customers ask",
+      state: phase === "discovering" ? "active" : discover ? "done" : "pending",
+    },
+  ];
 
   return (
     <div className="onboard-card onboard-card--wide">
@@ -223,30 +240,10 @@ function ScanStep({
         </div>
       )}
 
-      {/* In-progress spinner */}
+      {/* In-progress: live per-model scan progress */}
       {busy && (
-        <div className="scanning" style={{ marginTop: 16 }}>
-          <div className="scan-orbit" aria-hidden="true">
-            <div className="spin1"><span className="dot" /></div>
-            <div className="spin2"><span className="dot d2" /></div>
-            <div className="ring" />
-            <div className="ring r2" />
-            <div className="center"><MascotClerow size={64} float /></div>
-          </div>
-          <div className="scan-tasks">
-            <div className={`scan-task ${phase === "reading" ? "active" : "done"}`}>
-              <span className="tick">{phase === "reading" ? "•" : "✓"}</span>
-              <span>Reading your site &amp; building your profile</span>
-            </div>
-            <div className={`scan-task ${phase === "discovering" ? "active" : discover ? "done" : "pending"}`}>
-              <span className="tick">{phase === "discovering" ? "•" : discover ? "✓" : ""}</span>
-              <span>Discovering the prompts your customers ask</span>
-            </div>
-            <div className={`scan-task ${phase === "scanning" ? "active" : "pending"}`}>
-              <span className="tick">{phase === "scanning" ? "•" : ""}</span>
-              <span>Running your top prompt through Perplexity</span>
-            </div>
-          </div>
+        <div style={{ marginTop: 16 }}>
+          <ScanProgress steps={steps} engines={engines} elapsedMs={elapsedMs} />
         </div>
       )}
 

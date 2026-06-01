@@ -2,10 +2,13 @@ import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runPromptScan } from "@/lib/scan/run";
+import { streamScan, STREAM_HEADERS } from "@/lib/scan/events";
 import { synthesizeAndStore } from "@/lib/scan/synthesize";
 import { loadBrandSnapshot } from "@/lib/scan/snapshot";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
-import { planFromSub, enginesForPlan, BudgetExceededError } from "@/lib/billing/limits";
+import { planFromSub, enginesForPlan, assertBudget, BudgetExceededError } from "@/lib/billing/limits";
+import { enabledEngines } from "@/lib/engines";
+import { costForEngines } from "@/lib/billing/cost";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,10 +60,15 @@ export async function POST() {
     return NextResponse.json({ error: "A scan is already running — give it a moment." }, { status: 429 });
   }
 
-  let scanId: string | null = null;
+  // Budget guard up front (before we commit to a streamed 200) so "out of scans"
+  // still surfaces as a clean 402 the client can act on. runPromptScan re-checks
+  // internally; this just lets us answer with the right status before streaming.
+  const runnable = enabledEngines(engines);
+  if (runnable.length === 0) {
+    return NextResponse.json({ error: "No AI engines are configured." }, { status: 502 });
+  }
   try {
-    const result = await runPromptScan(supabase, brand.id, primary.id, engines);
-    scanId = result.scanId;
+    await assertBudget(supabase, user.id, planFromSub(sub), costForEngines(runnable), new Date());
   } catch (err) {
     if (err instanceof BudgetExceededError) {
       return NextResponse.json(
@@ -68,23 +76,29 @@ export async function POST() {
         { status: 402 },
       );
     }
-    const message = err instanceof Error ? err.message : "Re-scan failed";
-    return NextResponse.json({ error: message }, { status: 502 });
+    throw err;
   }
 
-  // Master-AI synthesis runs in the background so the user gets their score
-  // immediately; the collective verdict fills in for the next dashboard load.
-  if (scanId) {
-    const id = scanId;
-    after(async () => {
-      try {
-        await synthesizeAndStore(createAdminClient(), id);
-      } catch {
-        // Service role not configured — verdict simply stays null.
-      }
-    });
-  }
+  // Stream per-model progress while the scan runs. Each engine ticks
+  // queued → querying → detecting → done|failed independently.
+  return new Response(
+    streamScan(async (emit) => {
+      const result = await runPromptScan(supabase, brand.id, primary.id, engines, emit);
+      const scanId = result.scanId;
 
-  const snapshot = await loadBrandSnapshot(supabase, brand.id);
-  return NextResponse.json({ ok: true, score: snapshot.score });
+      // Master-AI synthesis runs in the background so the score lands immediately;
+      // the collective verdict fills in for the next dashboard load.
+      after(async () => {
+        try {
+          await synthesizeAndStore(createAdminClient(), scanId);
+        } catch {
+          // Service role not configured — verdict simply stays null.
+        }
+      });
+
+      const snapshot = await loadBrandSnapshot(supabase, brand.id);
+      emit({ type: "done", result: { scanId, score: snapshot.score } });
+    }),
+    { headers: STREAM_HEADERS },
+  );
 }
