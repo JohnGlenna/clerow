@@ -179,9 +179,9 @@ function LearnRail({ data }: { data: DashboardData }) {
 
       {!data.subscribed && (
         <div className="upgrade-card">
-          <span className="up-tag">Founder · $29/mo</span>
+          <span className="up-tag">🔓 Founder · $29/mo</span>
           <h4>Unlock the full climb</h4>
-          <p>Level 1 is free. Upgrade to scan all 5 AI models, re-scan anytime, and let Clerow MCP ship your fixes.</p>
+          <p>Scan all 5 AI models, re-scan anytime, and let Clerow MCP ship every fix.</p>
           <button
             className="btn-upgrade"
             disabled={billingBusy}
