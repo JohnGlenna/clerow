@@ -223,8 +223,11 @@ export type Database = {
       }
       brands: {
         Row: {
+          about: string
           audience: string[]
           company: string
+          context_enriched_at: string | null
+          screenshots: string[]
           competitors: string[]
           created_at: string
           description: string
@@ -243,8 +246,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          about?: string
           audience?: string[]
           company?: string
+          context_enriched_at?: string | null
+          screenshots?: string[]
           competitors?: string[]
           created_at?: string
           description?: string
@@ -263,8 +269,11 @@ export type Database = {
           user_id: string
         }
         Update: {
+          about?: string
           audience?: string[]
           company?: string
+          context_enriched_at?: string | null
+          screenshots?: string[]
           competitors?: string[]
           created_at?: string
           description?: string

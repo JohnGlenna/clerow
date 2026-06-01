@@ -1,12 +1,14 @@
 import type { AIEngine, EngineAnswer } from "./types";
 
-// Grok via the xAI API (OpenAI-compatible chat completions) with Live Search on,
-// so the answer reflects what Grok actually recommends with web/X search — not a
-// stale training-data guess. Model is env-overridable (XAI_MODEL).
-// Docs: https://docs.x.ai/docs/guides/live-search
+// Grok via the xAI API (OpenAI-compatible chat completions). Model is
+// env-overridable (XAI_MODEL); default is a current grok-4.20 id (xAI retired the
+// older dated ids and the legacy Live Search `search_parameters`, which now 410s
+// and requires the Agent Tools API — a future upgrade if we want live web
+// grounding for Grok). For now Grok answers from its own knowledge.
+// Docs: https://docs.x.ai/docs/guides/tools/overview
 
 const API_URL = "https://api.x.ai/v1/chat/completions";
-const MODEL = process.env.XAI_MODEL || "grok-3";
+const MODEL = process.env.XAI_MODEL || "grok-4.20-0309-non-reasoning";
 
 const SYSTEM =
   "You are a helpful assistant answering a real person's question. " +
@@ -56,9 +58,6 @@ export const GrokEngine: AIEngine = {
           { role: "system", content: SYSTEM },
           { role: "user", content: prompt },
         ],
-        // Force Live Search so the answer reflects Grok-with-search (incl. X),
-        // returning citations we can attribute.
-        search_parameters: { mode: "on", return_citations: true },
       }),
       signal,
     });

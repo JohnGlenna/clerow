@@ -11,7 +11,7 @@ import { DashboardProvider, useDashboard } from "@/lib/useDashboard";
 import { useScanStream } from "@/lib/useScanStream";
 import { startCheckout } from "@/lib/useSubscription";
 import { playCheck } from "@/lib/sound";
-import type { DashboardData, DashboardModel, LadderLevel, LadderTask } from "@/lib/types";
+import type { DashboardData, DashboardModel, LadderLevel, LadderTask, Channel } from "@/lib/types";
 
 type Page = "learn" | "prompts" | "models" | "leaderboard" | "profile" | "connect";
 
@@ -19,7 +19,7 @@ type SheetTask = {
   kind: "task" | "mcp" | "checkpoint";
   id: string | null;
   promptId?: string | null; // when the lesson is for a tracked prompt (Prompts page → Fix)
-  level?: number; // which level a checkpoint scan is for (informational)
+  channel?: Channel; // onsite (MCP-doable) vs offsite (manual — Clerow drafts the copy)
   title: string;
   why: string;
   xp: number;
@@ -67,6 +67,43 @@ function LearnNav({ page, onNav }: { page: Page; onNav: (p: Page) => void }) {
 function domainOf(url?: string) {
   if (!url) return "your site";
   return url.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+}
+
+// Deterministic chip color for a competitor in the placement card — stable across
+// renders (the scan doesn't carry per-brand colors, so we hash the name).
+const RANK_SWATCHES = ["#FF7A45", "#3D7BFF", "#7C3AED", "#10A37F", "#E0457B", "#D97706", "#0EA5E9", "#475569"];
+function swatchFor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return RANK_SWATCHES[h % RANK_SWATCHES.length];
+}
+
+// Best-effort domain for a brand's logo. We have the exact URL for the user's own
+// brand; for competitors the scan only stores a name, so we guess `<name>.com`.
+function logoDomain(name: string, isYou: boolean, ownUrl?: string): string | null {
+  if (isYou) return ownUrl ? domainOf(ownUrl) : null;
+  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return slug ? `${slug}.com` : null;
+}
+
+// A brand's logo via Clearbit, falling back to a colored initial chip when the
+// logo 404s (unknown/guessed domain) — so the row always renders cleanly.
+function BrandLogo({ name, domain, color }: { name: string; domain: string | null; color: string }) {
+  const [ok, setOk] = React.useState(false);
+  return (
+    <span className="mc" style={{ background: ok ? "#fff" : color }}>
+      {domain && (
+        <img
+          src={`https://logo.clearbit.com/${domain}`}
+          alt=""
+          onLoad={() => setOk(true)}
+          onError={() => setOk(false)}
+          style={{ display: ok ? "block" : "none" }}
+        />
+      )}
+      {!ok && name.charAt(0).toUpperCase()}
+    </span>
+  );
 }
 
 function LearnTop({ data }: { data: DashboardData }) {
@@ -154,8 +191,9 @@ function PathGrid({ nodeCount, children }: { nodeCount: number; children: React.
   );
 }
 
-function LearnPath({ data, subscribed, onOpen, onUpgrade }: {
+function LearnPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlocking }: {
   data: DashboardData; subscribed: boolean; onOpen: (t: SheetTask) => void; onUpgrade: () => void;
+  onUnlock: (level: number) => void; unlocking: number | null;
 }) {
   const ladder = data.ladder;
   if (!ladder) return <div className="ld-path" style={{ color: "var(--ink-2)" }}>Run a scan to start your climb.</div>;
@@ -164,12 +202,20 @@ function LearnPath({ data, subscribed, onOpen, onUpgrade }: {
     <div className="ld-path">
       {ladder.levels.map((lvl: LadderLevel, li: number) => {
         const active = lvl.state === "active";
+        const open = lvl.state === "open"; // unlocked ahead — tasks visible/actionable
         const locked = lvl.state === "locked";
-        // First unresolved task in the active level is "current".
+        const showTasks = active || open;
+        // First unresolved task in the active level is "current" (the one nudge).
         const firstCurrent = active ? lvl.tasks.findIndex((t) => !t.resolved) : -1;
-        // Active level gets dotted connectors + the MCP / scan nodes; locked levels stay a plain grid.
+        // Active + open levels get dotted connectors + clickable tasks; done/locked stay a plain grid.
         const taskNodes = lvl.tasks.map((t: LadderTask, ti: number) => {
-          const kind = t.resolved ? "done" : active && ti === firstCurrent ? "current" : "locked";
+          const kind = t.resolved
+            ? "done"
+            : active && ti === firstCurrent
+              ? "current"
+              : open
+                ? "current" // every unresolved task in an unlocked-ahead level is actionable
+                : "locked"; // active level's later tasks stay greyed (one-thing-at-a-time)
           const clickable = (kind === "done" || kind === "current") && !!t.id;
           return (
             <PathNode
@@ -180,17 +226,15 @@ function LearnPath({ data, subscribed, onOpen, onUpgrade }: {
               xp={t.xp}
               start={kind === "current" && ti === firstCurrent}
               mascot={kind === "current" && ti === firstCurrent}
-              onClick={clickable ? () => onOpen({ kind: "task", id: t.id, title: t.title, why: t.detail, xp: t.xp }) : undefined}
+              onClick={clickable ? () => onOpen({ kind: "task", id: t.id, channel: t.channel, title: t.title, why: t.detail, xp: t.xp }) : undefined}
             />
           );
         });
+        // The full-scan action lives in the prominent top CTA (see LearnInner), so the
+        // active level only carries the MCP auto-fix entry as a tail node.
         const tailNodes = active ? [
           <PathNode key="__mcp" kind="mcp" icon="🤖" cap="Auto-fix the rest with Clerow MCP"
             onClick={() => onOpen({ kind: "mcp", id: null, title: "Let Clerow MCP fix everything", why: "Connect Clerow to Claude Code, Cursor, or any agent. It reads your open quests, ships the fixes as a PR, and Clerow re-checks every model.", xp: 0 })} />,
-          <PathNode key="__scan" kind="scanbtn" icon={<LDIcon name="scan" />} cap={`Scan & unlock Level ${lvl.level + 1}`} xp={null}
-            onClick={subscribed
-              ? () => onOpen({ kind: "checkpoint", id: null, level: lvl.level, title: "Re-scan across your AI models", why: "Re-scan to bank your gains and reveal the next fixes. This is the part one chatbot can't do — Clerow queries every model.", xp: 0 })
-              : onUpgrade} />,
         ] : [];
         const nodes = [...taskNodes, ...tailNodes];
 
@@ -199,16 +243,19 @@ function LearnPath({ data, subscribed, onOpen, onUpgrade }: {
             {li > 0 && <div className="unit-sep">Level {lvl.level}</div>}
             <div className={`unit-banner ${locked ? "locked" : ""}`}>
               <div>
-                <div className="k">Level {lvl.level}{active ? " · in progress" : locked ? " · locked" : " · done"}</div>
+                <div className="k">Level {lvl.level}{active ? " · in progress" : open ? " · unlocked" : locked ? " · locked" : " · done"}</div>
                 <h3>{lvl.title}</h3>
+                <div className="unit-find">{lvl.findings}</div>
               </div>
               {locked
                 ? subscribed
-                  ? <button className="unit-guide" onClick={() => onOpen({ kind: "checkpoint", id: null, level: lvl.level, title: "Scan across your AI models", why: "Re-scan to bank your gains and measure progress across every AI model — then finish this level's tasks to unlock it.", xp: 0 })}><LDIcon name="scan" /> Scan &amp; unlock</button>
+                  ? <button className="unit-guide" disabled={unlocking === lvl.level} onClick={() => onUnlock(lvl.level)}>
+                      {unlocking === lvl.level ? "Unlocking…" : <><LDIcon name="scan" /> Unlock</>}
+                    </button>
                   : <button className="unit-guide" onClick={onUpgrade}><LDIcon name="lock" /> Locked</button>
                 : <button className="unit-guide" disabled><LDIcon name="book" /> Guide</button>}
             </div>
-            {active
+            {showTasks
               ? <PathGrid nodeCount={nodes.length}>{nodes}</PathGrid>
               : <div className="path-wrap">{nodes}</div>}
           </React.Fragment>
@@ -226,6 +273,17 @@ function LearnRail({ data, onUpgrade }: { data: DashboardData; onUpgrade: () => 
   // lock the rest, since none of them have been scanned.
   const orderedModels = [...models].sort((a, b) =>
     (a.id === "perplexity" ? 0 : 1) - (b.id === "perplexity" ? 0 : 1));
+
+  // Top prompt placement: the standings for the brand's biggest (primary) prompt
+  // from the latest scan — top 3 brands, then the user's own row if they're not
+  // already in the top 3. On the free Perplexity scan this is the headline result.
+  const competitors = data.competitors ?? [];
+  const ranked = [...competitors].sort((a, b) => a.rank - b.rank);
+  const top3 = ranked.slice(0, 3);
+  const you = ranked.find((c) => c.isYou) ?? null;
+  const placementRows = you && !top3.some((c) => c.isYou) ? [...top3, you] : top3;
+  const showPlacement = !!data.primaryPrompt && ranked.length > 0;
+
   return (
     <aside className="ld-rail">
       <div className="rail-card">
@@ -243,6 +301,32 @@ function LearnRail({ data, onUpgrade }: { data: DashboardData; onUpgrade: () => 
           })}
         </div>
       </div>
+
+      {showPlacement && (
+        <div className="rail-card">
+          <h4>Top prompt placement</h4>
+          <p className="sub" style={{ marginBottom: 10 }}>&ldquo;{data.primaryPrompt}&rdquo;</p>
+          <div className="rail-rank">
+            {placementRows.map((row) => (
+              <div key={`${row.rank}-${row.name}`} className={`rr-row ${row.isYou ? "me" : ""}`}>
+                <span className="rr-rank">#{row.rank}</span>
+                <BrandLogo
+                  name={row.name}
+                  domain={logoDomain(row.name, row.isYou, data.brand?.url)}
+                  color={row.isYou ? "var(--blue)" : swatchFor(row.name)}
+                />
+                <span className="rr-name">{row.name}{row.isYou && <span className="rr-you">YOU</span>}</span>
+                <span className={`rr-v ${row.isYou && !row.visibility ? "no" : ""}`}>{row.visibility}%</span>
+              </div>
+            ))}
+          </div>
+          <div className="rail-note" style={{ marginTop: 10 }}>
+            {you
+              ? <>📍 You&apos;re <b>#{you.rank} of {ranked.length}</b> for your biggest prompt. Clear Level 1 to climb.</>
+              : <>📍 You&apos;re <b>not cited yet</b> for your biggest prompt. Clear Level 1 to break in.</>}
+          </div>
+        </div>
+      )}
 
       {!data.subscribed && (
         <div className="upg-card">
@@ -314,7 +398,9 @@ function UpgradeSheet({ onClose }: { onClose: () => void }) {
 
 /* ---------------- lesson sheet ---------------- */
 function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask; modelCount: number; onClose: () => void; onChanged: () => void }) {
-  const [sel, setSel] = React.useState<"diy" | "mcp" | "rescan" | null>(task.kind === "mcp" ? "mcp" : task.kind === "checkpoint" ? "rescan" : null);
+  const [sel, setSel] = React.useState<"diy" | "mcp" | "rescan" | null>(
+    task.kind === "mcp" ? "mcp" : task.kind === "checkpoint" ? "rescan" : task.channel === "offsite" ? "diy" : null,
+  );
   const [view, setView] = React.useState<"choose" | "steps" | "share" | "scanning" | "done">("choose");
   const [content, setContent] = React.useState<string>("");
   const [busy, setBusy] = React.useState(false);
@@ -367,11 +453,11 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
 
   const rescan = async () => {
     // Switch to the live view and stream per-model progress as each AI model runs
-    // through this level's prompts.
+    // through the brand's prompts (the comprehensive scan also re-crawls the site).
     setView("scanning");
-    const outcome = await scan.run("/api/scan/level", {
+    const outcome = await scan.run("/api/scan/full", {
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ level: task.level ?? null }),
+      body: JSON.stringify({}),
     });
     if (!outcome.ok) {
       if (outcome.status === 402) alert(outcome.error || "You're out of scans this month.");
@@ -459,7 +545,7 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
     </div>
   ) : null;
 
-  const footLabel = sel === "diy" ? "See the fix" : sel === "mcp" ? "Share with AI" : sel === "rescan" ? "Re-scan now" : "Continue";
+  const footLabel = sel === "diy" ? (task.channel === "offsite" ? "Write my post" : "See the fix") : sel === "mcp" ? "Share with AI" : sel === "rescan" ? "Re-scan now" : "Continue";
   const onFoot = () => {
     if (sel === "diy") loadContent();
     else if (sel === "mcp") setView("share");
@@ -485,6 +571,16 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
             <div><div className="ot">Connect Clerow MCP</div><div className="od">Your agent reads every open quest and ships the fixes. Clerow verifies across all models.</div></div>
             <span className="obadge">Autopilot</span>
           </button>
+        ) : task.channel === "offsite" ? (
+          // Off-site authority (Reddit, a directory, a newspaper): an AI agent can't
+          // post this for you, so we skip the MCP option and just draft the copy.
+          <>
+            <div className="lesson-choose">This one lives off your site — here&apos;s the easy way:</div>
+            <button className={`opt ${sel === "diy" ? "on" : ""}`} onClick={() => setSel("diy")}>
+              <span className="onum">1</span><span className="oic">✍️</span>
+              <div><div className="ot">Get the draft + where to post it</div><div className="od">Clerow writes the exact post/listing copy for your brand. Paste it where AI already looks, then mark it done — an AI agent can&apos;t post this for you.</div></div>
+            </button>
+          </>
         ) : (
           <>
             <div className="lesson-choose">How do you want to fix this?</div>
@@ -509,14 +605,140 @@ function LessonSheet({ task, modelCount, onClose, onChanged }: { task: SheetTask
   );
 }
 
+/* ---------------- business-context sheet ---------------- */
+// Optional, attached to the full scan: upload site screenshots + a description so
+// the vision step sharpens the brand profile (and covers sites Clerow can't crawl).
+function ContextSheet({ onClose }: { onClose: () => void }) {
+  const [about, setAbout] = React.useState("");
+  const [shots, setShots] = React.useState<{ path: string; url: string | null }[]>([]);
+  const [busy, setBusy] = React.useState(false);
+  const [drag, setDrag] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  const load = React.useCallback(async () => {
+    const r = await fetch("/api/brand/context").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    if (r) { setAbout(r.about ?? ""); setShots(r.screenshots ?? []); }
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+
+  const upload = async (files: FileList | File[]) => {
+    const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (!list.length) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      for (const f of list) fd.append("images", f);
+      const res = await fetch("/api/brand/context", { method: "POST", body: fd });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error || "Upload failed."); }
+      else await load();
+    } finally { setBusy(false); }
+  };
+
+  const remove = async (path: string) => {
+    setBusy(true);
+    try { await fetch(`/api/brand/context?path=${encodeURIComponent(path)}`, { method: "DELETE" }); await load(); }
+    finally { setBusy(false); }
+  };
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("about", about);
+      await fetch("/api/brand/context", { method: "POST", body: fd });
+      setSaved(true);
+      setTimeout(onClose, 700);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="share-pop-back" onClick={onClose}>
+      <div className="ctx-sheet" onClick={(e) => e.stopPropagation()}>
+        <button className="lesson-x upg-x" onClick={onClose}>✕</button>
+        <div className="ctx-ic">✨</div>
+        <h2>Add business context</h2>
+        <p className="ctx-sub">Screenshots of your site plus a few sentences about your business make all 5 models describe you accurately — and it&apos;s how Clerow reads sites it can&apos;t crawl.</p>
+
+        <div
+          className={`ctx-drop ${drag ? "on" : ""}`}
+          onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={(e) => { e.preventDefault(); setDrag(false); upload(e.dataTransfer.files); }}
+          onClick={() => fileRef.current?.click()}
+        >
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden
+            onChange={(e) => { if (e.target.files) upload(e.target.files); e.target.value = ""; }} />
+          <span className="ctx-drop-ic">🖼️</span>
+          <span className="ctx-drop-t">Drop screenshots or <u>browse</u></span>
+          <span className="ctx-drop-h">PNG / JPG / WebP · up to 6 · 6&nbsp;MB each</span>
+        </div>
+
+        {shots.length > 0 && (
+          <div className="ctx-thumbs">
+            {shots.map((s) => (
+              <div key={s.path} className="ctx-thumb" style={{ backgroundImage: s.url ? `url(${s.url})` : undefined }}>
+                <button className="ctx-thumb-x" onClick={() => remove(s.path)} disabled={busy}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <textarea className="ctx-about" rows={4} value={about} onChange={(e) => setAbout(e.target.value)}
+          placeholder="What do you do, who's it for, and what makes you different? e.g. 'PR agency for B2B SaaS expanding into the US — known for landing tier-1 press in 60 days.'" />
+
+        <button className="btn-upg btn-upg--lg" disabled={busy} onClick={save}>
+          {saved ? "Saved ✓" : busy ? "…" : "Save context"}
+        </button>
+        <p className="ctx-foot">Applied on your next full scan across all 5 models.</p>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- shell ---------------- */
 function LearnInner({ initialPage = "learn" }: { initialPage?: Page }) {
   const { data, loading, refresh } = useDashboard();
   const [task, setTask] = React.useState<SheetTask | null>(null);
   const [page, setPage] = React.useState<Page>(initialPage);
   const [upgrade, setUpgrade] = React.useState(false);
+  const [context, setContext] = React.useState(false);
+  const [unlocking, setUnlocking] = React.useState<number | null>(null);
   const toLearn = () => setPage("learn");
   const hasRail = page === "learn";
+
+  // Open the comprehensive scan flow (re-crawl site + query all 5 models).
+  const openScan = () =>
+    setTask({
+      kind: "checkpoint",
+      id: null,
+      title: "Re-scan across your AI models",
+      why: "Clerow re-crawls your site and queries all 5 AI models, then refreshes every level. ~1–2 min.",
+      xp: 0,
+    });
+
+  // Free, instant unlock: reveal a level's tasks (no scan). Refresh to show them.
+  const unlock = async (level: number) => {
+    if (unlocking != null) return;
+    setUnlocking(level);
+    try {
+      const res = await fetch("/api/ladder/unlock", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ level }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert(j.error || "Couldn't unlock that level. Try again.");
+        return;
+      }
+      await refresh();
+    } catch {
+      alert("Couldn't unlock that level. Check your connection and try again.");
+    } finally {
+      setUnlocking(null);
+    }
+  };
 
   return (
     <div className="ld-root">
@@ -528,7 +750,17 @@ function LearnInner({ initialPage = "learn" }: { initialPage?: Page }) {
             <div className="ld-path" style={{ color: "var(--ink-2)" }}>Loading…</div>
           ) : data ? (
             <>
-              {page === "learn" && <LearnPath data={data} subscribed={!!data.subscribed} onOpen={setTask} onUpgrade={() => setUpgrade(true)} />}
+              {page === "learn" && data.subscribed && (
+                <div className="scan-cta">
+                  <div className="scan-cta-txt">
+                    <b>All 5 AI models unlocked.</b>
+                    <span>Run one full scan — Clerow re-checks your site and queries ChatGPT, Claude, Perplexity, Gemini &amp; Grok, then refreshes every level.</span>
+                    <button className="scan-cta-add" onClick={() => setContext(true)}>✨ Add business context to sharpen results</button>
+                  </div>
+                  <button className="scan-cta-btn" onClick={openScan}>🔄 Scan all 5 models</button>
+                </div>
+              )}
+              {page === "learn" && <LearnPath data={data} subscribed={!!data.subscribed} onOpen={setTask} onUpgrade={() => setUpgrade(true)} onUnlock={unlock} unlocking={unlocking} />}
               {page === "prompts" && (
                 <DashPrompts
                   data={data}
@@ -555,6 +787,7 @@ function LearnInner({ initialPage = "learn" }: { initialPage?: Page }) {
       </div>
       {task && <LessonSheet task={task} modelCount={data?.models?.length ?? 0} onClose={() => setTask(null)} onChanged={refresh} />}
       {upgrade && <UpgradeSheet onClose={() => setUpgrade(false)} />}
+      {context && <ContextSheet onClose={() => setContext(false)} />}
     </div>
   );
 }

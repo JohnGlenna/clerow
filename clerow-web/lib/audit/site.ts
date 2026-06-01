@@ -291,6 +291,41 @@ function jsonLdTypes(html: string): string[] {
   return [...new Set(types)];
 }
 
+// Readable text remaining after scripts/styles/tags are stripped — i.e. what a
+// crawler that doesn't run JS actually sees.
+function visibleTextLen(html: string): number {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim().length;
+}
+
+function checkSsr(home: Fetched | null): SiteCheck {
+  if (!home || !home.ok) {
+    return { id: "ssr", label: "Server-rendered content", status: "unknown", detail: "Couldn't fetch your homepage HTML to check this.", fix: null };
+  }
+  const textLen = visibleTextLen(home.text);
+  const scriptCount = (home.text.match(/<script[\s>]/gi) || []).length;
+  // A JS shell: almost no readable text in the raw HTML, but plenty of scripts.
+  if (textLen < 300 && scriptCount >= 1) {
+    return {
+      id: "ssr",
+      label: "Server-rendered content",
+      status: "warn",
+      detail: `Your homepage's raw HTML has very little readable text (${textLen} chars) — it looks rendered client-side by JavaScript.`,
+      fix: fix(
+        "Server-render the content AI bots read",
+        "Several AI crawlers (notably GPTBot) don't run JavaScript — they see only your raw HTML. Server-side render or pre-render your key content (or return static HTML to bot user-agents) so the facts you want cited are in the initial response. Test with View Source: if the facts aren't there, the bot never sees them.",
+        60,
+        "high",
+      ),
+    };
+  }
+  return { id: "ssr", label: "Server-rendered content", status: "pass", detail: "Your homepage delivers readable content in the raw HTML.", fix: null };
+}
+
 function checkSchema(html: string): SiteCheck {
   const types = jsonLdTypes(html);
   if (types.length === 0) {
@@ -336,7 +371,7 @@ export async function auditSite(rawUrl: string): Promise<SiteAudit> {
 
   const html = home?.ok ? home.text : "";
   if (html) {
-    checks.push(checkTitle(html), checkH1(html), checkMetaDescription(html), checkSchema(html));
+    checks.push(checkTitle(html), checkH1(html), checkMetaDescription(html), checkSchema(html), checkSsr(home));
   } else {
     // Couldn't read the HTML — mark on-page checks unknown rather than failing.
     for (const [id, label] of [
@@ -344,6 +379,7 @@ export async function auditSite(rawUrl: string): Promise<SiteAudit> {
       ["h1", "H1 heading"],
       ["meta-description", "Meta description"],
       ["schema", "Structured data (schema)"],
+      ["ssr", "Server-rendered content"],
     ] as const) {
       checks.push({ id, label, status: "unknown", detail: "Couldn't fetch your homepage HTML to check this.", fix: null });
     }

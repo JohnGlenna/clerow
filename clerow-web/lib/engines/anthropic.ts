@@ -6,7 +6,7 @@ import type { AIEngine, EngineAnswer } from "./types";
 // Docs: https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search-tool
 
 const API_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
 const SYSTEM =
   "You are a helpful assistant answering a real person's question. " +

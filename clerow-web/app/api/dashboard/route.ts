@@ -7,7 +7,8 @@ import { loadBrandSnapshot, captureDailySnapshot, loadSnapshotHistory } from "@/
 import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/streak";
 import { levelFromXp } from "@/lib/xp";
 import { ensureSiteAudit } from "@/lib/audit/ensure";
-import { buildLadder, ensureLadderTasks, type LadderContext } from "@/lib/ladder";
+import { buildLadder, ensureLadderTasks } from "@/lib/ladder";
+import { buildLadderContext } from "@/lib/scan/ladderContext";
 import { budgetStatus, planFromSub } from "@/lib/billing/limits";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
 
@@ -133,33 +134,25 @@ export async function GET(req: Request) {
   // Build "The Climb": a leveled ladder from the brand's real gaps. Only the
   // active level's tasks are seeded (idempotent by ladder_key) — locked levels
   // are previewed, never written, which is what removes the old task flood.
-  const you = snapshot.competitors.find((c) => c.isYou);
-  const yourRank = you?.rank ?? Number.POSITIVE_INFINITY;
-  const primaryPromptRow = (prompts ?? []).find((p) => p.id === snapshot.primaryPromptId);
   const audit = await ensureSiteAudit(supabase, brand);
-  const ladderCtx: LadderContext = {
-    company: brand.company,
-    audit,
-    primaryPrompt:
-      snapshot.primaryPromptText && primaryPromptRow
-        ? { text: snapshot.primaryPromptText, intent: primaryPromptRow.intent }
-        : null,
-    competitorsAhead: snapshot.competitors.filter((c) => !c.isYou && c.rank < yourRank).map((c) => c.name),
-    sourceGaps: snapshot.citedDomains.slice(0, 5),
-    promptGaps: (prompts ?? [])
-      .filter((p) => p.is_tracked && p.id !== snapshot.primaryPromptId)
-      .map((p) => p.text)
-      .slice(0, 5),
-  };
+  const ladderCtx = buildLadderContext(brand, snapshot, prompts ?? [], audit);
+
+  // How far the user has unlocked the climb: the highest level any seeded ladder
+  // task belongs to. Unlocking a level seeds its tasks, so the tasks are the
+  // record — incomplete levels at/below this render "open" instead of "locked".
+  const unlockedThrough = (tasks ?? []).reduce(
+    (max, t) => (t.source === "ladder" && (t.level ?? 0) > max ? t.level ?? 0 : max),
+    0,
+  );
 
   const ladderExisting = new Map<string, { id: string; done: boolean; resolved: boolean }>();
   for (const t of tasks ?? [])
     if (t.ladder_key) ladderExisting.set(t.ladder_key, { id: t.id, done: t.done, resolved: t.done || t.archived });
-  const preLadder = buildLadder(ladderCtx, ladderExisting);
+  const preLadder = buildLadder(ladderCtx, ladderExisting, unlockedThrough);
   const inserted = await ensureLadderTasks(supabase, brand.id, preLadder, new Set(ladderExisting.keys()));
   for (const r of inserted)
     if (r.ladder_key) ladderExisting.set(r.ladder_key, { id: r.id, done: r.done, resolved: r.done || r.archived });
-  const ladder = buildLadder(ladderCtx, ladderExisting);
+  const ladder = buildLadder(ladderCtx, ladderExisting, unlockedThrough);
   const allTasks = [...(tasks ?? []), ...inserted];
 
   // A prompt is "scanned" if ANY done scan produced a result for it — including

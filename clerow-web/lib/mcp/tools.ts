@@ -10,7 +10,8 @@ import { createAdminClient } from "../supabase/admin";
 import type { Database } from "../supabase/database.types";
 import { loadBrandSnapshot } from "../scan/snapshot";
 import { ensureSiteAudit } from "../audit/ensure";
-import { buildLadder, ensureLadderTasks, type LadderContext, type LadderTask } from "../ladder";
+import { buildLadder, ensureLadderTasks, type LadderTask } from "../ladder";
+import { assembleLadderContext } from "../scan/ladderContext";
 import { generateFixContent } from "../content/generate";
 import { buildRobotsTxt, buildLlmsTxt } from "../content/files";
 import { getSubscription, isSubscribed } from "../billing/subscription";
@@ -62,39 +63,22 @@ async function isPaid(admin: Db, userId: string): Promise<boolean> {
   return isSubscribed(await getSubscription(admin, userId));
 }
 
-// Build the same ladder the dashboard shows (idempotently seeds the active level).
+// Build the same ladder the dashboard shows (idempotently seeds active/open levels).
 async function loadLadder(admin: Db, brand: BrandRow) {
-  const snapshot = await loadBrandSnapshot(admin, brand.id);
-  const [{ data: prompts }, { data: tasks }] = await Promise.all([
-    admin.from("prompts").select("*").eq("brand_id", brand.id),
-    admin.from("tasks").select("*").eq("brand_id", brand.id),
-  ]);
-  const audit = await ensureSiteAudit(admin, brand);
-  const you = snapshot.competitors.find((c) => c.isYou);
-  const yourRank = you?.rank ?? Number.POSITIVE_INFINITY;
-  const primaryPromptRow = (prompts ?? []).find((p) => p.id === snapshot.primaryPromptId);
-  const ctx: LadderContext = {
-    company: brand.company,
-    audit,
-    primaryPrompt:
-      snapshot.primaryPromptText && primaryPromptRow
-        ? { text: snapshot.primaryPromptText, intent: primaryPromptRow.intent }
-        : null,
-    competitorsAhead: snapshot.competitors.filter((c) => !c.isYou && c.rank < yourRank).map((c) => c.name),
-    sourceGaps: snapshot.citedDomains.slice(0, 5),
-    promptGaps: (prompts ?? [])
-      .filter((p) => p.is_tracked && p.id !== snapshot.primaryPromptId)
-      .map((p) => p.text)
-      .slice(0, 5),
-  };
+  const { data: tasks } = await admin.from("tasks").select("*").eq("brand_id", brand.id);
+  const { ctx } = await assembleLadderContext(admin, brand);
+  const unlockedThrough = (tasks ?? []).reduce(
+    (max, t) => (t.source === "ladder" && (t.level ?? 0) > max ? t.level ?? 0 : max),
+    0,
+  );
   const existing = new Map<string, { id: string; done: boolean; resolved: boolean }>();
   for (const t of tasks ?? [])
     if (t.ladder_key) existing.set(t.ladder_key, { id: t.id, done: t.done, resolved: t.done || t.archived });
-  const pre = buildLadder(ctx, existing);
+  const pre = buildLadder(ctx, existing, unlockedThrough);
   const inserted = await ensureLadderTasks(admin, brand.id, pre, new Set(existing.keys()));
   for (const r of inserted)
     if (r.ladder_key) existing.set(r.ladder_key, { id: r.id, done: r.done, resolved: r.done || r.archived });
-  return { ladder: buildLadder(ctx, existing), primaryPrompt: ctx.primaryPrompt, competitorsAhead: ctx.competitorsAhead };
+  return { ladder: buildLadder(ctx, existing, unlockedThrough), primaryPrompt: ctx.primaryPrompt, competitorsAhead: ctx.competitorsAhead };
 }
 
 export function registerTools(server: McpServer) {
@@ -190,6 +174,14 @@ export function registerTools(server: McpServer) {
         intent: primaryPrompt?.intent,
         competitorsAhead,
       });
+      // Off-site authority tasks (Reddit, directories, press) can't be shipped as a
+      // repo PR — make that explicit so the agent hands the draft to the user instead
+      // of claiming it published it.
+      if (match?.channel === "offsite") {
+        return text(
+          `> NOTE: This is an off-site task — you (the agent) cannot publish it. Give the draft below to the user to post manually at the relevant third-party site, then call complete_task once they confirm.\n\n${content}`,
+        );
+      }
       return text(content);
     },
   );

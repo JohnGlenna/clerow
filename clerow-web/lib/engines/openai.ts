@@ -6,7 +6,7 @@ import type { AIEngine, EngineAnswer } from "./types";
 // Docs: https://platform.openai.com/docs/guides/tools-web-search
 
 const API_URL = "https://api.openai.com/v1/responses";
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+const MODEL = process.env.OPENAI_MODEL || "gpt-5.4";
 
 const SYSTEM =
   "You are a helpful assistant answering a real person's question. " +

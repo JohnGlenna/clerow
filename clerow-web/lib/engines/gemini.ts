@@ -5,7 +5,7 @@ import type { AIEngine, EngineAnswer } from "./types";
 // env-overridable (GEMINI_MODEL); accepts GEMINI_API_KEY or GOOGLE_API_KEY.
 // Docs: https://ai.google.dev/gemini-api/docs/grounding
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 const SYSTEM =

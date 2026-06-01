@@ -31,6 +31,7 @@ export type LadderTask = {
   minutes: number;
   xp: number;
   impact: Impact;
+  channel: Channel; // onsite (MCP-doable) vs offsite (manual — Clerow drafts the copy)
   // Runtime, attached from existing tasks:
   id: string | null;
   done: boolean;
@@ -39,12 +40,18 @@ export type LadderTask = {
   resolved: boolean;
 };
 
-export type LevelState = "locked" | "active" | "done";
+// "open" = a subscriber unlocked this level ahead of finishing the active one:
+// its tasks are seeded and visible, but it isn't the highlighted "active" level
+// (the earliest incomplete one keeps the Start/mascot nudge for the habit loop).
+export type LevelState = "locked" | "active" | "open" | "done";
 
 export type LadderLevel = {
   level: number;
   title: string;
   blurb: string;
+  // One-line "what we found" for this level, derived from the brand's real data
+  // (audit fails, cited domains, competitors ahead). Shown under the level title.
+  findings: string;
   state: LevelState;
   tasks: LadderTask[];
   doneCount: number;
@@ -70,18 +77,25 @@ const metaFor = (minutes: number, impact: Impact) => `≈ ${MIN(minutes)} · imp
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 56);
 
+// Where a fix happens, and therefore who can do it:
+//   "onsite"  — a file/page on the user's own site → Clerow MCP can ship it (or DIY).
+//   "offsite" — a post/listing on a 3rd-party domain (Reddit, G2, a newspaper) →
+//               MCP can't post it; Clerow drafts the copy and the user pastes it.
+export type Channel = "onsite" | "offsite";
+
 // A task spec before runtime done/id are attached.
-type Spec = { key: string; title: string; detail: string; minutes: number; impact: Impact };
-const spec = (key: string, title: string, detail: string, minutes: number, impact: Impact): Spec => ({
+type Spec = { key: string; title: string; detail: string; minutes: number; impact: Impact; channel: Channel };
+const spec = (key: string, title: string, detail: string, minutes: number, impact: Impact, channel: Channel = "onsite"): Spec => ({
   key,
   title,
   detail,
   minutes,
   impact,
+  channel,
 });
 
 // Which audit checks belong to which level (by SiteCheck.id).
-const L1_AUDIT = new Set(["crawlable", "https", "robots-ai", "llms-txt", "title", "h1", "meta-description"]);
+const L1_AUDIT = new Set(["crawlable", "https", "robots-ai", "llms-txt", "title", "h1", "meta-description", "ssr"]);
 const L2_AUDIT = new Set(["schema", "sitemap"]);
 
 // Turn the audit's failing/warning checks (those carry a `fix`) into specs.
@@ -142,6 +156,13 @@ function level2(ctx: LadderContext): Spec[] {
       30,
       "high",
     ),
+    spec(
+      "l2-freshness",
+      "Show a visible \"Last updated\" date",
+      "Add a visible \"Last updated\" date to your key pages and refresh them regularly. Perplexity especially favors recent content — stale pages quietly lose their citations.",
+      10,
+      "low",
+    ),
   ];
   return [...auditSpecs(ctx.audit, L2_AUDIT), ...content];
 }
@@ -156,12 +177,14 @@ function level3(ctx: LadderContext): Spec[] {
         `AI cited ${d} when answering your prompts. Earn a presence there — a listing, a review, or a substantive contribution — to enter the model's source set.`,
         d.includes("reddit") ? 20 : 30,
         "high",
+        "offsite",
       ),
     );
   // Always-available authority moves so Level 3 is never empty.
   const evergreen: Spec[] = [
-    spec("l3-reddit", "Answer a relevant question on Reddit", "Find a thread where buyers ask what you solve and write a genuinely useful answer (no link-drops). Reddit is one of the most-cited sources, especially by Perplexity.", 15, "high"),
-    spec("l3-directory", `Claim and fill ${ctx.company}'s G2 / Capterra listing`, "Claim your directory profiles, complete every field, and gather a few recent reviews — AI quotes these directly for \"best\" queries.", 30, "high"),
+    spec("l3-reddit", "Answer buyers' questions in the right communities", "Find threads where buyers ask what you solve — on Reddit, Quora, or a niche forum — and write genuinely useful answers (no link-drops). These community posts are among the most-cited sources, especially by Perplexity.", 15, "high", "offsite"),
+    spec("l3-directory", `Claim and fill ${ctx.company}'s G2 / Capterra listing`, "Claim your directory profiles, complete every field, and gather a few recent reviews — AI quotes these directly for \"best\" queries.", 30, "high", "offsite"),
+    spec("l3-entity", `Make ${ctx.company} a recognized entity`, "Create or round out a Wikidata and Crunchbase entry, and add Organization JSON-LD with sameAs links to your profiles. This disambiguates your brand so AI engines treat you as a known, distinct entity.", 30, "medium", "offsite"),
   ];
   return [...fromSources, ...evergreen].slice(0, 6);
 }
@@ -221,66 +244,105 @@ function toTask(s: Spec, existing: Map<string, { id: string; done: boolean; reso
     minutes: s.minutes,
     xp: impactXp(s.impact),
     impact: s.impact,
+    channel: s.channel,
     id: e?.id ?? null,
     done: e?.done ?? false,
     resolved: e?.resolved ?? e?.done ?? false,
   };
 }
 
+// A one-line "what we found" for a level, from the brand's real data. Reflects the
+// remaining work so it reads as a finding ("3 gaps…") that resolves as tasks close.
+function levelFinding(level: number, ctx: LadderContext, remaining: number): string {
+  const n = remaining;
+  switch (level) {
+    case 1:
+      return !ctx.audit
+        ? "Scan your site to check the basics AI needs to read you."
+        : n > 0
+          ? `${n} technical ${n === 1 ? "gap" : "gaps"} keeping AI from trusting you.`
+          : "Your technical foundations look solid.";
+    case 2:
+      return n > 0
+        ? `${n} on-page ${n === 1 ? "improvement" : "improvements"} to make your pages quotable.`
+        : "Your key pages are structured for AI to quote.";
+    case 3:
+      return ctx.sourceGaps.length > 0
+        ? `AI cites ${ctx.sourceGaps.length} ${ctx.sourceGaps.length === 1 ? "source" : "sources"} you're not on yet.`
+        : "Build authority on the sites AI already trusts.";
+    case 4:
+      return ctx.competitorsAhead.length > 0
+        ? `Ranked behind ${ctx.competitorsAhead[0]}${ctx.competitorsAhead.length > 1 ? ` +${ctx.competitorsAhead.length - 1} more` : ""} for your top query.`
+        : "Win the buyer queries you don't own yet.";
+    default:
+      return "Re-scan to measure your climb across all 5 models.";
+  }
+}
+
 // Build the full ladder and resolve each level's state from the brand's existing
 // ladder tasks (keyed by ladder_key). A level with no tasks (e.g. a clean audit)
 // counts as complete so the user advances.
+// `unlockedThrough` is the highest level a subscriber has manually unlocked (0 =
+// none). Incomplete levels at or below it render as "open" (tasks visible) rather
+// than "locked", letting subscribers jump ahead without finishing earlier levels.
+// Default 0 preserves the strict sequential behavior (e.g. the MCP caller).
 export function buildLadder(
   ctx: LadderContext,
   existing: Map<string, { id: string; done: boolean; resolved: boolean }>,
+  unlockedThrough = 0,
 ): Ladder {
   const built = LEVEL_META.map((meta, i) => {
     const tasks = meta.build(ctx).map((s) => toTask(s, existing));
     const total = tasks.length;
     // Completion counts resolved (done or skipped); progress shown to the user.
     const doneCount = tasks.filter((t) => t.resolved).length;
-    return { level: i + 1, title: meta.title, blurb: meta.blurb, tasks, total, doneCount };
+    const findings = levelFinding(i + 1, ctx, total - doneCount);
+    return { level: i + 1, title: meta.title, blurb: meta.blurb, findings, tasks, total, doneCount };
   });
 
   const isComplete = (l: { total: number; doneCount: number }) => l.total === 0 || l.doneCount === l.total;
   const activeIdx = built.findIndex((l) => !isComplete(l));
 
-  const levels: LadderLevel[] = built.map((l, i) => ({
-    ...l,
-    state: activeIdx === -1 ? "done" : i < activeIdx ? "done" : i === activeIdx ? "active" : "locked",
-  }));
+  const levels: LadderLevel[] = built.map((l, i) => {
+    let state: LevelState;
+    if (activeIdx === -1 || isComplete(l)) state = "done";
+    else if (i === activeIdx) state = "active";
+    else state = l.level <= unlockedThrough ? "open" : "locked";
+    return { ...l, state };
+  });
 
   return { levels, currentLevel: activeIdx === -1 ? built.length : activeIdx + 1 };
 }
 
-// Insert the ACTIVE level's missing tasks (by ladder_key). Never seeds locked or
-// completed levels — that's the whole anti-flood guarantee. Returns inserted rows.
+// Insert missing tasks (by ladder_key) for every ACTIVE or OPEN level — i.e. the
+// active level plus any a subscriber unlocked ahead. Never seeds locked or
+// completed levels, preserving the anti-flood guarantee for the default path.
+// Returns inserted rows.
 export async function ensureLadderTasks(
   db: DB,
   brandId: string,
   ladder: Ladder,
   existingKeys: Set<string>,
 ): Promise<TaskRow[]> {
-  const active = ladder.levels.find((l) => l.state === "active");
-  if (!active) return [];
-  const toInsert = active.tasks.filter((t) => !existingKeys.has(t.key));
-  if (toInsert.length === 0) return [];
+  const rows = ladder.levels
+    .filter((l) => l.state === "active" || l.state === "open")
+    .flatMap((l) =>
+      l.tasks
+        .filter((t) => !existingKeys.has(t.key))
+        .map((t) => ({
+          brand_id: brandId,
+          title: t.title,
+          meta: t.meta,
+          xp: t.xp,
+          impact: t.impact,
+          source: "ladder",
+          level: l.level,
+          ladder_key: t.key,
+        })),
+    );
+  if (rows.length === 0) return [];
 
-  const { data, error } = await db
-    .from("tasks")
-    .insert(
-      toInsert.map((t) => ({
-        brand_id: brandId,
-        title: t.title,
-        meta: t.meta,
-        xp: t.xp,
-        impact: t.impact,
-        source: "ladder",
-        level: active.level,
-        ladder_key: t.key,
-      })),
-    )
-    .select();
+  const { data, error } = await db.from("tasks").insert(rows).select();
   if (error) throw new Error(`Failed to seed ladder tasks: ${error.message}`);
   return data ?? [];
 }

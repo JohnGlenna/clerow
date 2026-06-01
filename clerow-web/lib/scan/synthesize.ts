@@ -19,7 +19,7 @@ import { ENGINES, type EngineId } from "../engines";
 type DB = SupabaseClient<Database>;
 
 const API_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
 export type Synthesis = ScanSynthesis;
 

@@ -3,7 +3,7 @@ import type { PromptIntent, PromptVolume, BrandSentiment, Citation } from "./sup
 import type { GeoStep } from "./geoSteps";
 import type { Ladder } from "./ladder";
 
-export type { Ladder, LadderLevel, LadderTask, LevelState } from "./ladder";
+export type { Ladder, LadderLevel, LadderTask, LevelState, Channel } from "./ladder";
 
 // The brand profile the scan reasons about (subset of the `brands` row).
 export type BrandProfile = {
