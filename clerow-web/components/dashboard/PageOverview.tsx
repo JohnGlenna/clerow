@@ -7,12 +7,14 @@ import { GameIcon, type GameIconName } from "../GameIcon";
 import { MascotClerow } from "../Mascot";
 import { PageHead } from "./AppShell";
 import { ClimbCard } from "./ClimbCard";
+import { TaskModal, NextMoveHero, type NextMove } from "./TaskModal";
 import { useDashboard } from "@/lib/useDashboard";
 import { modelStatus, METRIC_HELP } from "@/lib/modelStatus";
 import type {
   DashboardData,
   DashboardModel,
   DashboardCompetitor,
+  DashboardTask,
   ScanSynthesis,
 } from "@/lib/types";
 import type { SourceRow } from "@/app/api/sources/route";
@@ -34,6 +36,42 @@ export function PageOverview() {
   const navigate = (k: string) =>
     router.push(k === "overview" ? "/dashboard" : `/dashboard/${k}`);
   const { data, loading, error, refresh } = useDashboard();
+
+  // Clicking a task (in the Climb card or the "next move" hero) opens a centered
+  // modal; `mcp` jumps straight into the Clerow MCP hand-off view.
+  const [selected, setSelected] = React.useState<{ task: DashboardTask; mcp: boolean } | null>(null);
+  const openTask = React.useCallback((task: DashboardTask, mcp = false) => setSelected({ task, mcp }), []);
+
+  // Toggle a task done/undone from the modal, then refresh so the ladder + hero
+  // recompute. (ClimbCard keeps its own optimistic tickbox toggle for inline use.)
+  const toggleTask = React.useCallback(
+    async (id: string) => {
+      const t = data?.tasks?.find((x) => x.id === id);
+      try {
+        await fetch("/api/tasks", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id, done: !(t?.done ?? false) }),
+        });
+        refresh();
+      } catch {
+        /* network error — leave state as-is */
+      }
+    },
+    [data?.tasks, refresh],
+  );
+
+  // "Your next move" — first unfinished task in the active Climb level.
+  const nextMove = React.useMemo<NextMove | null>(() => {
+    const lvl = data?.ladder?.levels.find((l) => l.state === "active");
+    const lt = lvl?.tasks.find((t) => t.id && !t.done);
+    if (!lvl || !lt) return null;
+    return {
+      task: { id: lt.id!, title: lt.title, meta: lt.meta, xp: lt.xp, done: lt.done, detail: lt.detail, channel: lt.channel },
+      levelLabel: `Level ${lvl.level} · ${lvl.title}`,
+      stepLabel: `Step ${lvl.tasks.filter((t) => t.done).length + 1} of ${lvl.total}`,
+    };
+  }, [data?.ladder]);
 
   // In-place re-scan: re-query the models from the dashboard instead of bouncing
   // back through onboarding. Subscription/budget gated by the API (402).
@@ -121,6 +159,7 @@ export function PageOverview() {
       {!loading && data && data.hasScan && (
         <>
           <AppHello company={domainName(data.brand?.url) ?? "founder"} streak={data.streak?.current ?? 0} />
+          {nextMove && <NextMoveHero move={nextMove} onOpen={openTask} />}
           {data.ladder && (
             <ClimbCard
               ladder={data.ladder}
@@ -128,6 +167,7 @@ export function PageOverview() {
               onChanged={refresh}
               onRescan={rescan}
               rescanning={rescanning}
+              onOpenTask={openTask}
             />
           )}
           <ScoreCard score={data.score} trend={data.trend} />
@@ -139,6 +179,16 @@ export function PageOverview() {
           </div>
           <AchievementsCard />
         </>
+      )}
+
+      {selected && (
+        <TaskModal
+          task={selected.task}
+          startMcp={selected.mcp}
+          brandUrl={data?.brand?.url ?? null}
+          onToggle={toggleTask}
+          onClose={() => setSelected(null)}
+        />
       )}
     </>
   );

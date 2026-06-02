@@ -2239,6 +2239,8 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   border-radius: 12px;
   border: 1px solid var(--border-soft);
 }
+.task--click { cursor: pointer; transition: border-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast); }
+.task--click:hover { border-color: color-mix(in oklab, var(--accent-2) 45%, var(--border)); transform: translateY(-1px); }
 .task .tickbox {
   width: 22px; height: 22px;
   border-radius: 6px;

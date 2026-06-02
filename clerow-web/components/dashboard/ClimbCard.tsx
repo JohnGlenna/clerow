@@ -4,7 +4,7 @@ import React from "react";
 import { Icon } from "../Icon";
 import { GameIcon } from "../GameIcon";
 import { playCheck } from "@/lib/sound";
-import type { Ladder, LadderTask } from "@/lib/types";
+import type { Ladder, LadderTask, DashboardTask } from "@/lib/types";
 
 // "The Climb" — the dashboard hero. Shows the whole 5-level path (done / active /
 // locked) and the ACTIVE level's checklist only, so the user always sees one
@@ -16,12 +16,15 @@ export function ClimbCard({
   onChanged,
   onRescan,
   rescanning = false,
+  onOpenTask,
 }: {
   ladder: Ladder;
   onNavigate: (k: string) => void;
   onChanged?: () => void;
   onRescan: () => void;
   rescanning?: boolean;
+  // Open a task's detail modal. When omitted, task rows aren't clickable.
+  onOpenTask?: (task: DashboardTask, mcp?: boolean) => void;
 }) {
   const active = ladder.levels.find((l) => l.state === "active") ?? null;
   const isRescanLevel = !!active && active.level === ladder.levels.length;
@@ -109,18 +112,36 @@ export function ClimbCard({
             </span>
           </div>
           <div className="task-list">
-            {local.map((t, i) => (
-              <div key={t.key} className={`task ${t.done ? "done" : ""}`}>
-                <span className="tickbox" onClick={() => toggle(i)}>
-                  {t.done && <Icon name="check" size={12} />}
-                </span>
-                <div>
-                  <div className="title">{t.title}</div>
-                  <div className="meta">{t.meta}</div>
+            {local.map((t, i) => {
+              const clickable = !!onOpenTask && !!t.id;
+              return (
+                <div
+                  key={t.key}
+                  className={`task ${t.done ? "done" : ""} ${clickable ? "task--click" : ""}`}
+                  onClick={
+                    clickable
+                      ? () => onOpenTask!({ id: t.id!, title: t.title, meta: t.meta, xp: t.xp, done: t.done, detail: t.detail, channel: t.channel })
+                      : undefined
+                  }
+                  title={clickable ? "Open this task" : undefined}
+                >
+                  <span
+                    className="tickbox"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggle(i);
+                    }}
+                  >
+                    {t.done && <Icon name="check" size={12} />}
+                  </span>
+                  <div>
+                    <div className="title">{t.title}</div>
+                    <div className="meta">{t.meta}</div>
+                  </div>
+                  <span className="xp">+{t.xp} XP</span>
                 </div>
-                <span className="xp">+{t.xp} XP</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <button className="btn btn--ghost btn--sm" style={{ alignSelf: "flex-start" }} onClick={() => onNavigate("quests")}>
             See the full climb →
