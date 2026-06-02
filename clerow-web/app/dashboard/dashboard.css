@@ -535,3 +535,60 @@
 .ld-root .cnx-mode-tags { display: flex; flex-wrap: wrap; gap: 7px; }
 .ld-root .cnx-mode-tags span { font-size: 11.5px; font-weight: 800; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
 @media (max-width: 900px) { .ld-root .cnx-modes { grid-template-columns: 1fr; } }
+
+/* ---- Profile: player card + trend side by side, account cards (dark) ---- */
+.ld-root .pf-top { display: grid; grid-template-columns: 340px 1fr; gap: 14px; align-items: stretch; margin-bottom: 6px; }
+.ld-root .pf-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 24px 22px; }
+.ld-root .pf-card .pf-avatar { margin-bottom: 8px; }
+.ld-root .pf-name { font-weight: 900; font-size: 20px; color: var(--ink); }
+.ld-root .pf-title { color: var(--ink-2); font-weight: 700; font-size: 13px; }
+.ld-root .pf-xpbar { width: 100%; max-width: 300px; margin-top: 14px; }
+.ld-root .pf-stats { display: flex; gap: 26px; margin-top: 16px; }
+.ld-root .pf-trend { display: flex; flex-direction: column; padding: 18px 20px; }
+.ld-root .pf-trend-h { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); margin-bottom: 14px; }
+.ld-root .pf-trend > :last-child { flex: 1; min-height: 0; }
+@media (max-width: 900px) { .ld-root .pf-top { grid-template-columns: 1fr; } }
+
+/* ---- Account/brand/billing cards moved from Settings — dark theme ---- */
+.ld-root .settings-stack { display: flex; flex-direction: column; gap: 14px; }
+.ld-root .app-card { background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 18px; color: var(--ink); box-shadow: none; }
+.ld-root .app-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.ld-root .app-card-head h4 { font-size: 15px; font-weight: 900; color: var(--ink); margin: 0; }
+.ld-root .app-card-head .sub { font-size: 12px; font-weight: 700; color: var(--ink-3); }
+.ld-root .form-stack { display: flex; flex-direction: column; gap: 14px; }
+.ld-root .form-row { display: flex; flex-direction: column; gap: 6px; }
+.ld-root .form-row label { font-size: 12.5px; font-weight: 800; color: var(--ink-2); }
+.ld-root .input { background: var(--surface-2); border: 2px solid var(--line); border-radius: 12px; padding: 11px 14px; color: var(--ink); font-family: inherit; font-size: 14px; font-weight: 600; box-shadow: none; }
+.ld-root .input:focus { outline: none; border-color: var(--blue); }
+.ld-root .input::placeholder { color: var(--ink-4); }
+.ld-root .input:disabled { color: var(--ink-3); opacity: .8; }
+.ld-root .settings-hint { font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.ld-root .settings-identity { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.ld-root .settings-avatar { width: 48px; height: 48px; border-radius: 14px; background: var(--surface-2); color: var(--ink); display: grid; place-items: center; font-weight: 900; font-size: 18px; flex: none; }
+.ld-root .settings-identity-name { font-weight: 900; font-size: 15px; color: var(--ink); }
+.ld-root .settings-identity-email { font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+.ld-root .settings-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.ld-root .settings-empty { text-align: center; padding: 20px 0; color: var(--ink-2); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ld-root .settings-meta-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.ld-root .settings-meta-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+.ld-root .settings-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ld-root .chip--ghost { font-size: 12px; font-weight: 700; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; }
+.ld-root .settings-plan { display: flex; align-items: center; gap: 14px; }
+.ld-root .settings-plan-icon { width: 48px; height: 48px; border-radius: 14px; background: var(--surface-2); display: grid; place-items: center; flex: none; }
+.ld-root .settings-plan-name { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 15px; color: var(--ink); }
+.ld-root .settings-plan-badge { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--green); background: rgba(56,169,224,.16); padding: 3px 9px; border-radius: 999px; }
+.ld-root .settings-plan-badge.is-warn { color: var(--streak); background: rgba(255,150,0,.16); }
+.ld-root .settings-plan-desc { font-size: 12.5px; color: var(--ink-2); font-weight: 600; margin-top: 3px; }
+.ld-root .settings-danger { border-color: rgba(255,75,75,.34); }
+.ld-root .settings-danger-rows { display: flex; flex-direction: column; gap: 14px; }
+.ld-root .settings-danger-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.ld-root .settings-toggle-title { font-weight: 800; font-size: 14px; color: var(--ink); }
+.ld-root .settings-toggle-desc { font-size: 12px; color: var(--ink-3); font-weight: 600; margin-top: 2px; }
+.ld-root .settings-btn-danger { background: var(--red); color: #fff; border: 0; box-shadow: 0 3px 0 #B0303A; }
+/* dashboard-scoped button skins for the ported cards */
+.ld-root .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-family: inherit; font-weight: 800; border: 0; cursor: pointer; border-radius: 12px; }
+.ld-root .btn--sm { font-size: 12.5px; padding: 9px 14px; }
+.ld-root .btn--primary { background: var(--blue); color: #04121b; box-shadow: 0 4px 0 var(--blue-deep); }
+.ld-root .btn--primary:disabled { background: var(--surface-3); color: var(--ink-4); box-shadow: 0 4px 0 var(--line); cursor: default; }
+.ld-root .btn--ghost { background: var(--surface-2); color: var(--ink-2); box-shadow: 0 4px 0 var(--line); }
+.ld-root .btn--ghost:hover { color: var(--ink); }

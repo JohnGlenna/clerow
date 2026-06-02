@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { PixelProgress } from "../../ui/PixelProgress";
 import { ScanProgress } from "../../scan/ScanProgress";
 import { useScanStream } from "@/lib/useScanStream";
@@ -48,6 +49,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   onClose: () => void; onChanged: () => void; onAddContext: () => void;
 }) {
   const offsite = task.channel === "offsite";
+  const router = useRouter();
   const [view, setView] = React.useState<"main" | "mcp" | "scanning" | "done">(task.kind === "mcp" ? "mcp" : "main");
   const [content, setContent] = React.useState<string>("");
   const [genBusy, setGenBusy] = React.useState(false);
@@ -222,8 +224,6 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
 
   // ---- MCP hand-off view -----------------------------------------------------
   if (view === "mcp") {
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://clerow.com";
-    const connectCmd = `claude mcp add --transport http clerow ${origin}/api/mcp \\\n  --header "Authorization: Bearer YOUR_CLEROW_KEY"`;
     const taskCmd = task.kind === "mcp"
       ? `Using the Clerow MCP, work through all my open Clerow tasks for ${domainOf(brandUrl)}, lowest-effort first.\nShip the on-site fixes as a PR. For off-site tasks (Reddit, directories, guest posts), draft the copy and tell me where to post it.\nThen re-scan and report my ranking across all 5 AI models.`
       : `Using the Clerow MCP, complete this task for ${domainOf(brandUrl)}:\n"${task.title}"\nApply the fix, then re-scan and report my ranking across all 5 AI models.`;
@@ -234,12 +234,12 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
           <div className="tm-body">
             <span className="tm-state tm-state--mcp"><span className="tm-state-ic">⚡</span>Clerow MCP</span>
             <h2 className="tm-title">Let your agent do the work.</h2>
-            <p className="tm-why">Clerow plugs into <b>Claude Code, Codex, Cursor</b> or any agent that speaks MCP. Connect once, then hand it the command below — your agent ships {task.kind === "mcp" ? "every fix" : "this fix"} and Clerow re-verifies you across all {modelCount || 5} models.</p>
+            <p className="tm-why">Clerow connects to <b>Claude (web &amp; desktop)</b> or <b>Claude Code, Codex &amp; Cursor</b>. Connect once, then hand your agent the task below — it ships {task.kind === "mcp" ? "every fix" : "this fix"} and Clerow re-verifies you across all {modelCount || 5} models.</p>
             <div className="tm-agents">{AGENTS.map((a) => (<span key={a} className="tm-agent"><span className="tm-agent-dot" />{a}</span>))}</div>
             <div className="tm-stepblock">
               <div className="tm-stepblock-h">Step 1 · Connect Clerow (one-time)</div>
-              <p className="tm-stepblock-note">Mint a key in <b>Settings → Clerow MCP</b>, then run this in your terminal.</p>
-              <CmdBlock label="Run in your terminal" text={connectCmd} />
+              <p className="tm-stepblock-note">Two ways: add the Clerow connector in <b>Claude (web &amp; desktop)</b>, or create a key for <b>Claude Code / Codex / Cursor</b>. Set it up once on the Connect page.</p>
+              <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={() => { onClose(); router.push("/dashboard/connect"); }}>Open the Connect page →</button>
             </div>
             <div className="tm-stepblock">
               <div className="tm-stepblock-h">Step 2 · {task.kind === "mcp" ? "Hand your agent everything" : "Hand your agent this task"}</div>

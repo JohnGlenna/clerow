@@ -14,7 +14,6 @@ const NAV: { href: string; icon: string; label: string }[] = [
   { href: "/dashboard/leaderboard", icon: "board", label: "Leaderboard" },
   { href: "/dashboard/connect", icon: "connect", label: "Connect" },
   { href: "/dashboard/profile", icon: "profile", label: "Profile" },
-  { href: "/dashboard/settings", icon: "settings", label: "Settings" },
 ];
 
 export function Sidebar() {

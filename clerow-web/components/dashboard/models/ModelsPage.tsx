@@ -40,7 +40,7 @@ export function ModelsPage() {
               </div>
             )}
             <div className="lm-note"><b>📚 How it sources:</b> {NOTE[m.id] ?? "Tracked across your scans."}</div>
-            {m.locked ? <button className="lm-btn lm-btn--up" onClick={() => router.push("/dashboard/settings")}>Unlock</button> : <button className="lm-btn" onClick={() => router.push("/dashboard/tasks")}>See fixes for {m.label} →</button>}
+            {m.locked ? <button className="lm-btn lm-btn--up" onClick={() => router.push("/dashboard/profile")}>Unlock</button> : <button className="lm-btn" onClick={() => router.push("/dashboard/tasks")}>See fixes for {m.label} →</button>}
           </div>
         ))}
         <div className="lm-card lm-why">
