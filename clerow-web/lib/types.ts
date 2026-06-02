@@ -107,10 +107,6 @@ export type DashboardTask = {
   forDate?: string | null;
   completedAt?: string | null;
   level?: number | null; // set when this task belongs to a Climb level
-  // Threaded through from the ladder spec so the task modal can show the
-  // "why it matters" copy and frame the fix as MCP-doable (onsite) or manual.
-  detail?: string | null;
-  channel?: "onsite" | "offsite";
 };
 
 // Duolingo-style streak surfaced everywhere the fake level bar used to be.

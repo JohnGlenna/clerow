@@ -1,8 +1,6 @@
-import "../learn.css";
-import { LearnDashboard } from "@/components/dashboard/learn/LearnDashboard";
+import { ConnectPage } from "@/components/dashboard/connect/ConnectPage";
 
-// The Clerow MCP "Connect" screen, inside the dashboard chrome (same nav, theme
-// and shell as the rest of the dashboard) — deep-linkable at /dashboard/connect.
-export default function ConnectDashboardPage() {
-  return <LearnDashboard initialPage="connect" />;
+// The Clerow MCP "Connect" screen — deep-linkable at /dashboard/connect.
+export default function Page() {
+  return <ConnectPage />;
 }

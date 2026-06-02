@@ -1,10 +1,5 @@
-import { AppShell } from "@/components/dashboard/AppShell";
-import { PageSettings } from "@/components/dashboard/PageSettings";
+import { SettingsPage } from "@/components/dashboard/settings/SettingsPage";
 
-export default function SettingsPage() {
-  return (
-    <AppShell page="settings">
-      <PageSettings />
-    </AppShell>
-  );
+export default function Page() {
+  return <SettingsPage />;
 }

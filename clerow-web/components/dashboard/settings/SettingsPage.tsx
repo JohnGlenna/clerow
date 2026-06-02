@@ -2,9 +2,8 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "../Icon";
-import { GameIcon } from "../GameIcon";
-import { PageHead } from "./AppShell";
+import { Icon } from "../../Icon";
+import { GameIcon } from "../../GameIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useSubscription, startCheckout, openBillingPortal } from "@/lib/useSubscription";
 
@@ -25,10 +24,13 @@ type BrandProfile = {
   competitors: string[];
 };
 
-export function PageSettings() {
+export function SettingsPage() {
   return (
-    <>
-      <PageHead title="Settings" sub="Your account, the site Clerow tracks, and how often we nudge you." />
+    <div className="ld-page">
+      <div className="lp-head">
+        <h1>Settings</h1>
+        <div className="sub">Your account, the site Clerow tracks, and how often we nudge you.</div>
+      </div>
 
       <div className="settings-stack">
         <AccountCard />
@@ -38,7 +40,7 @@ export function PageSettings() {
         <BillingCard />
         <DangerCard />
       </div>
-    </>
+    </div>
   );
 }
 

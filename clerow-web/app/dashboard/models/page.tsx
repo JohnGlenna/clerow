@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { ModelsPage } from "@/components/dashboard/models/ModelsPage";
 
 export default function Page() {
-  redirect("/dashboard");
+  return <ModelsPage />;
 }

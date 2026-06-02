@@ -14,7 +14,6 @@ const FILE: Record<string, string> = {
 export function AiIcon({ id, size = 16, letter }: { id: string; size?: number; letter?: string }) {
   const f = FILE[id];
   if (f) {
-    // eslint-disable-next-line @next/next/no-img-element
     return <img src={`/ai/${f}`} width={size} height={size} alt={id} style={{ display: "block", objectFit: "contain" }} />;
   }
   return <span style={{ fontSize: size * 0.7, fontWeight: 900 }}>{letter ?? id[0]?.toUpperCase()}</span>;

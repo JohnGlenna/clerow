@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { PromptsPage } from "@/components/dashboard/prompts/PromptsPage";
 
 export default function Page() {
-  redirect("/dashboard");
+  return <PromptsPage />;
 }

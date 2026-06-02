@@ -1,6 +1,6 @@
-import "./learn.css";
-import { LearnDashboard } from "@/components/dashboard/learn/LearnDashboard";
+import { redirect } from "next/navigation";
 
-export default function DashboardOverviewPage() {
-  return <LearnDashboard />;
+// The dashboard root sends users to the Tasks page (the Climb).
+export default function DashboardIndexPage() {
+  redirect("/dashboard/tasks");
 }

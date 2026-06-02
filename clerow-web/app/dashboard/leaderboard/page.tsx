@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { LeaderboardPage } from "@/components/dashboard/leaderboard/LeaderboardPage";
 
 export default function Page() {
-  redirect("/dashboard");
+  return <LeaderboardPage />;
 }

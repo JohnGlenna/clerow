@@ -1,0 +1,36 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { MascotClerow } from "../../Mascot";
+import { LDIcon } from "./LDIcon";
+
+// The dashboard sidebar. Each item is a real route; the active item is derived
+// from the URL (usePathname) rather than client state.
+const NAV: { href: string; icon: string; label: string }[] = [
+  { href: "/dashboard/tasks", icon: "learn", label: "Tasks" },
+  { href: "/dashboard/prompts", icon: "quest", label: "Prompts" },
+  { href: "/dashboard/models", icon: "scan", label: "AI Models" },
+  { href: "/dashboard/leaderboard", icon: "board", label: "Leaderboard" },
+  { href: "/dashboard/connect", icon: "connect", label: "Connect" },
+  { href: "/dashboard/profile", icon: "profile", label: "Profile" },
+  { href: "/dashboard/settings", icon: "settings", label: "Settings" },
+];
+
+export function Sidebar() {
+  const pathname = usePathname();
+  return (
+    <nav className="ld-nav">
+      <div className="ld-brand"><MascotClerow size={34} /><span>Clerow</span></div>
+      {NAV.map((it) => {
+        const on = pathname === it.href || (it.href === "/dashboard/tasks" && pathname === "/dashboard");
+        return (
+          <Link key={it.href} href={it.href} className={`ld-navitem ${on ? "on" : ""}`}>
+            <span className="ic"><LDIcon name={it.icon} /></span><span>{it.label}</span>
+          </Link>
+        );
+      })}
+      <div className="ld-nav-spacer" />
+    </nav>
+  );
+}
