@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateFixContent } from "@/lib/content/generate";
+import { streamFixContent } from "@/lib/content/generate";
+import { streamContentBody, STREAM_HEADERS } from "@/lib/content/stream";
 import { buildRobotsTxt, buildLlmsTxt } from "@/lib/content/files";
 import { parseAudit } from "@/lib/audit/ensure";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
@@ -75,17 +76,25 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     if (check?.fix) return NextResponse.json({ content: `## ${check.fix.title}\n\n${check.fix.detail}` });
   }
 
-  // --- PAID: LLM-generated drafts ---
+  // --- PAID: LLM-generated drafts, streamed token-by-token ---
   if (!isSubscribed(await getSubscription(supabase, user.id))) {
     return NextResponse.json({ error: "Subscription required to generate this content. Level 1 fixes are free." }, { status: 402 });
   }
-  try {
-    const { content } = await generateFixContent({ brand: toProfile(brand), title: task.title, detail: task.meta });
+  const profile = toProfile(brand);
+  const body = streamContentBody(async (emit) => {
+    let full = "";
+    for await (const chunk of streamFixContent({ brand: profile, title: task.title, detail: task.meta })) {
+      full += chunk;
+      emit({ type: "delta", text: chunk });
+    }
+    full = full.trim();
+    if (!full) {
+      emit({ type: "error", message: "No content was generated. Try again." });
+      return;
+    }
     // Write through to the cache so the next open is instant.
-    await supabase.from("tasks").update({ content, content_at: new Date().toISOString() }).eq("id", id);
-    return NextResponse.json({ content });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Content generation failed";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+    await supabase.from("tasks").update({ content: full, content_at: new Date().toISOString() }).eq("id", id);
+    emit({ type: "done" });
+  });
+  return new Response(body, { headers: STREAM_HEADERS });
 }

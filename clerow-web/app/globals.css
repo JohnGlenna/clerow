@@ -4189,3 +4189,99 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 .app-shell .btn--ghost:active { transform: none; box-shadow: var(--neu-in-sm); }
 .app-shell .btn--quiet { background: transparent; box-shadow: none; }
 .app-shell .btn--quiet:hover { background: var(--neu-base); box-shadow: var(--neu-in-sm); }
+
+/* =====================================================================
+   "Your next move" hero + redesigned task modal (Quests page)
+   ===================================================================== */
+.next-move { margin: 6px 0 24px; }
+.nm-eyebrow {
+  display: flex; align-items: center; gap: 9px;
+  margin-bottom: 11px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent-2);
+}
+.nm-pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); animation: nmPulse 2.2s infinite; }
+@keyframes nmPulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 9px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.nm-card {
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  cursor: pointer;
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface));
+  box-shadow: var(--neu-out-md);
+  transition: box-shadow var(--t-base), transform var(--t-base);
+}
+.nm-card:hover { transform: translateY(-2px); box-shadow: var(--neu-out-lg); }
+.nm-card:active { transform: translateY(0); }
+.nm-card-top { position: relative; padding: 22px 26px 20px; }
+.nm-card-top::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+}
+.nm-step { font-size: 11.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.nm-title {
+  font-family: var(--font-display);
+  font-weight: 900; font-size: 28px; line-height: 1.15; letter-spacing: -0.02em;
+  margin: 7px 0 10px; color: var(--ink);
+}
+.nm-why { font-size: 14px; line-height: 1.6; font-weight: 500; color: var(--ink-2); max-width: 64ch; }
+.nm-why b { color: var(--ink); font-weight: 700; }
+.nm-actions { display: flex; align-items: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+.nm-foot {
+  display: flex; align-items: center; gap: 20px;
+  padding: 12px 26px;
+  background: color-mix(in oklab, var(--accent) 4%, var(--surface));
+  border-top: 1px solid var(--border);
+  font-size: 12.5px; font-weight: 700; color: var(--ink-2); flex-wrap: wrap;
+}
+.nm-foot-it { display: flex; align-items: center; gap: 7px; }
+.nm-foot-it b { color: var(--accent-2); }
+
+/* ---- Task modal: state badge, impact/effort/models grid, footer ---- */
+.qm-title { font-size: 26px; line-height: 1.2; }
+.qm-state {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 800; padding: 5px 11px; border-radius: 999px;
+}
+.qm-state.is-ready { background: color-mix(in oklab, var(--accent) 16%, var(--surface)); color: var(--accent-2); }
+.qm-state.is-done { background: color-mix(in oklab, var(--success) 20%, var(--surface)); color: var(--success-shadow); }
+.qm-meta { display: flex; gap: 12px; margin: 4px 0 22px; }
+.qm-meta-cell {
+  flex: 1; border-radius: var(--r-md); padding: 13px; text-align: center;
+  background: var(--neu-base); box-shadow: var(--neu-in-sm);
+}
+.qm-meta-cell .l { font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.qm-meta-cell .v { font-size: 18px; font-weight: 900; margin-top: 5px; color: var(--ink); }
+.qm-meta-cell .v.accent { color: var(--accent-2); }
+.qm-actions { display: flex; gap: 10px; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); }
+.qm-actions .btn { flex: 1; justify-content: center; }
+
+/* ---- MCP view: agent chips + copyable command blocks ---- */
+.qm-agents { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 22px; }
+.qm-agent {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 700; color: var(--ink-2);
+  padding: 5px 11px; border-radius: 999px; background: var(--neu-base); box-shadow: var(--neu-in-sm);
+}
+.qm-agent-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+.qm-cmd { border-radius: var(--r-md); overflow: hidden; background: var(--neu-base); box-shadow: var(--neu-in-sm); margin-top: 4px; }
+.qm-cmd-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 10px 9px 14px; font-size: 12px; font-weight: 700; color: var(--ink-2);
+}
+.qm-cmd pre {
+  margin: 0; padding: 14px 16px; border-top: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; color: var(--ink);
+}
+.qm-copy.is-copied { color: var(--success-shadow); }
+
+@media (max-width: 560px) {
+  .nm-title { font-size: 23px; }
+  .qm-title { font-size: 22px; }
+  .qm-meta { flex-wrap: wrap; }
+  .qm-actions { flex-direction: column; }
+}

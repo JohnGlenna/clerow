@@ -2,18 +2,28 @@
 // copy-paste-ready content (an FAQ block with FAQPage JSON-LD, a comparison page
 // draft, a rewritten paragraph, a directory listing blurb, etc.).
 //
-// Pure of app I/O beyond the one HTTP call to Claude, so the Clerow MCP can call
-// this exact function later to write the content into a user's codebase. Mirrors
-// the request shape in lib/engines/anthropic.ts but drops the web_search tool —
-// here we want Claude to *write*, not browse.
+// Pure of app I/O beyond the one HTTP call to the writer model, so the Clerow MCP
+// can call this exact function later to write the content into a user's codebase.
+// Two providers are supported behind CONTENT_PROVIDER — Claude (default, tuned)
+// and Grok (xAI). Both stream token deltas so the UI can fill in live, and both
+// drop the web_search tool: here we want the model to *write*, not browse.
 
 import type { BrandProfile } from "../types";
 import type { GeoStep } from "../geoSteps";
 import type { PromptIntent } from "../supabase/database.types";
 import { geoWritingGuidelines } from "../geoFrameworks";
 
-const API_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+// Writer provider — "anthropic" (default) or "grok". Each provider's model is
+// independently env-overridable.
+const PROVIDER = (process.env.CONTENT_PROVIDER || "anthropic").toLowerCase();
+
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+
+// Grok uses xAI's Responses API (same endpoint as the scan adapter, so the model
+// id is known-good) with no tools — we want a fast write, not live search.
+const XAI_API_URL = "https://api.x.ai/v1/responses";
+const XAI_MODEL = process.env.XAI_CONTENT_MODEL || "grok-4.3";
 
 export type ContentContext = {
   brand: BrandProfile;
@@ -52,9 +62,15 @@ const SYSTEM =
   "7) Write in a confident, plain, non-fluffy voice. Honest about competitors — AI engines reward even-handed pages.\n\n" +
   geoWritingGuidelines();
 
-function apiKey(): string {
+function anthropicKey(): string {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY is not set");
+  return key;
+}
+
+function xaiKey(): string {
+  const key = process.env.XAI_API_KEY;
+  if (!key) throw new Error("XAI_API_KEY is not set");
   return key;
 }
 
@@ -79,20 +95,40 @@ function buildUserPrompt(input: FixContentInput): string {
   return lines.filter((l) => l !== "").join("\n");
 }
 
-// Generate copy-ready content for one fix (a playbook step or a quest). Throws
-// on API/key failure (the caller maps it to an HTTP error).
-export async function generateFixContent(input: FixContentInput): Promise<{ content: string }> {
-  const res = await fetch(API_URL, {
+// Yield the `data:` payloads of an SSE response, one per line. Both the Anthropic
+// Messages API and the xAI Responses API stream as `data: {json}` lines.
+async function* sseLines(res: Response): AsyncGenerator<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return;
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (line.startsWith("data:")) yield line.slice(5).trim();
+    }
+  }
+}
+
+// Claude streams the answer as `content_block_delta` frames carrying `text_delta`s.
+async function* streamAnthropic(input: FixContentInput): AsyncGenerator<string> {
+  const res = await fetch(ANTHROPIC_API_URL, {
     method: "POST",
     headers: {
-      "x-api-key": apiKey(),
+      "x-api-key": anthropicKey(),
       "anthropic-version": "2023-06-01",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: ANTHROPIC_MODEL,
       max_tokens: 2048,
       system: SYSTEM,
+      stream: true,
       messages: [{ role: "user", content: buildUserPrompt(input) }],
     }),
   });
@@ -102,25 +138,91 @@ export async function generateFixContent(input: FixContentInput): Promise<{ cont
     throw new Error(`Anthropic API error ${res.status}: ${text.slice(0, 500)}`);
   }
 
-  const data = await res.json();
-  const content: string = (data?.content ?? [])
-    .filter((b: { type?: string }) => b?.type === "text")
-    .map((b: { text?: string }) => b?.text ?? "")
-    .join("")
-    .trim();
+  for await (const data of sseLines(res)) {
+    let evt: any;
+    try {
+      evt = JSON.parse(data);
+    } catch {
+      continue;
+    }
+    if (evt?.type === "content_block_delta" && evt.delta?.type === "text_delta" && typeof evt.delta.text === "string") {
+      yield evt.delta.text;
+    } else if (evt?.type === "error") {
+      throw new Error(evt.error?.message ?? "Anthropic stream error");
+    }
+  }
+}
 
+// Grok (xAI Responses API) streams `response.output_text.delta` frames.
+async function* streamGrok(input: FixContentInput): AsyncGenerator<string> {
+  const res = await fetch(XAI_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${xaiKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: XAI_MODEL,
+      instructions: SYSTEM,
+      input: buildUserPrompt(input),
+      stream: true,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`xAI API error ${res.status}: ${text.slice(0, 500)}`);
+  }
+
+  for await (const data of sseLines(res)) {
+    if (data === "[DONE]") break;
+    let evt: any;
+    try {
+      evt = JSON.parse(data);
+    } catch {
+      continue;
+    }
+    if (evt?.type === "response.output_text.delta" && typeof evt.delta === "string") {
+      yield evt.delta;
+    } else if (evt?.type === "error" || evt?.type === "response.failed") {
+      throw new Error(evt.error?.message ?? evt.message ?? "xAI stream error");
+    }
+  }
+}
+
+// Stream copy-ready content for one fix as token deltas, via the configured
+// provider. Throws on API/key failure (the caller maps it to an HTTP error).
+export function streamFixContent(input: FixContentInput): AsyncGenerator<string> {
+  return PROVIDER === "grok" ? streamGrok(input) : streamAnthropic(input);
+}
+
+// Non-streaming convenience: accumulate the full draft. Used by the background
+// pre-warm and the MCP, which have no UI to fill in incrementally.
+export async function generateFixContent(input: FixContentInput): Promise<{ content: string }> {
+  let content = "";
+  for await (const chunk of streamFixContent(input)) content += chunk;
+  content = content.trim();
   if (!content) throw new Error("No content was generated. Try again.");
   return { content };
 }
 
-// Thin wrapper for a prompt's playbook step — keeps the richer context shape.
-export async function generateStepContent(ctx: ContentContext): Promise<{ content: string }> {
-  return generateFixContent({
+// Map a prompt's playbook-step context onto the generic fix input.
+function stepInput(ctx: ContentContext): FixContentInput {
+  return {
     brand: ctx.brand,
     title: ctx.step.title,
     detail: ctx.step.detail,
     promptText: ctx.prompt.text,
     intent: ctx.prompt.intent,
     competitorsAhead: ctx.competitorsAhead,
-  });
+  };
+}
+
+// Streaming + non-streaming wrappers for a prompt's playbook step.
+export function streamStepContent(ctx: ContentContext): AsyncGenerator<string> {
+  return streamFixContent(stepInput(ctx));
+}
+
+export async function generateStepContent(ctx: ContentContext): Promise<{ content: string }> {
+  return generateFixContent(stepInput(ctx));
 }

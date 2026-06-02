@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { loadPromptDetail } from "@/lib/scan/promptDetail";
-import { generateStepContent } from "@/lib/content/generate";
+import { streamStepContent } from "@/lib/content/generate";
+import { streamContentBody, STREAM_HEADERS } from "@/lib/content/stream";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
@@ -67,16 +68,23 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const step = detail.steps.find((s) => s.id === stepId);
   if (!step) return NextResponse.json({ error: "Step not found" }, { status: 404 });
 
-  try {
-    const { content } = await generateStepContent({
-      brand: toProfile(brand),
-      prompt: { text: detail.text, intent: detail.intent },
-      step: { id: step.id, title: step.title, detail: step.detail },
-      competitorsAhead: detail.competitorsAhead,
-    });
-    return NextResponse.json({ content });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Content generation failed";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+  const stepCtx = {
+    brand: toProfile(brand),
+    prompt: { text: detail.text, intent: detail.intent },
+    step: { id: step.id, title: step.title, detail: step.detail },
+    competitorsAhead: detail.competitorsAhead,
+  };
+  const stream = streamContentBody(async (emit) => {
+    let full = "";
+    for await (const chunk of streamStepContent(stepCtx)) {
+      full += chunk;
+      emit({ type: "delta", text: chunk });
+    }
+    if (!full.trim()) {
+      emit({ type: "error", message: "No content was generated. Try again." });
+      return;
+    }
+    emit({ type: "done" });
+  });
+  return new Response(stream, { headers: STREAM_HEADERS });
 }

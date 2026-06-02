@@ -25,7 +25,9 @@ export function PageQuests() {
   const router = useRouter();
   const { data, loading, refresh } = useDashboard();
   const [local, setLocal] = React.useState<DashboardTask[]>([]);
-  const [selected, setSelected] = React.useState<DashboardTask | null>(null);
+  // The clicked task plus whether to open straight into the Clerow MCP view.
+  const [selected, setSelected] = React.useState<{ task: DashboardTask; mcp: boolean } | null>(null);
+  const openTask = React.useCallback((task: DashboardTask, mcp = false) => setSelected({ task, mcp }), []);
 
   React.useEffect(() => setLocal(data?.tasks ?? []), [data?.tasks]);
 
@@ -78,6 +80,24 @@ export function PageQuests() {
   const streak = data?.streak;
   const xp = data?.xp;
 
+  // "Your next move" — the single highest-leverage fix to do right now: the first
+  // unfinished task in the active Climb level (ordered easiest-first by the
+  // ladder), falling back to the first open daily/active quest.
+  const nextMove = React.useMemo<NextMove | null>(() => {
+    const lvl = data?.ladder?.levels.find((l) => l.state === "active");
+    const lt = lvl?.tasks.find((t) => t.id && !t.done);
+    if (lvl && lt) {
+      return {
+        task: { id: lt.id!, title: lt.title, meta: lt.meta, xp: lt.xp, done: lt.done, detail: lt.detail, channel: lt.channel },
+        levelLabel: `Level ${lvl.level} · ${lvl.title}`,
+        stepLabel: `Step ${lvl.tasks.filter((t) => t.done).length + 1} of ${lvl.total}`,
+      };
+    }
+    const fallback = todays.find((t) => !t.done) ?? active[0];
+    if (fallback) return { task: fallback, levelLabel: "Today's quest", stepLabel: "Keeps your streak" };
+    return null;
+  }, [data?.ladder, todays, active]);
+
   return (
     <>
       <PageHead
@@ -112,11 +132,13 @@ export function PageQuests() {
         />
       </div>
 
+      {!loading && nextMove && <NextMoveHero move={nextMove} onOpen={openTask} />}
+
       {loading ? (
         <div className="app-card" style={{ padding: 24 }}>Loading quests…</div>
       ) : (
         <>
-          {data?.ladder && <ClimbFull ladder={data.ladder} onToggle={toggle} onOpen={setSelected} />}
+          {data?.ladder && <ClimbFull ladder={data.ladder} onToggle={toggle} onOpen={openTask} />}
 
           <h3 className="quest-section-h">
             <span><GameIcon name="calendar" size={18} /> Today&apos;s quests</span>
@@ -134,7 +156,7 @@ export function PageQuests() {
           ) : (
             <div className="quest-task-list">
               {todays.map((t) => (
-                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} onOpen={setSelected} />
+                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} onOpen={openTask} />
               ))}
             </div>
           )}
@@ -153,7 +175,7 @@ export function PageQuests() {
           ) : (
             <div className="quest-task-list">
               {active.map((t) => (
-                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} onOpen={setSelected} />
+                <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} onOpen={openTask} />
               ))}
             </div>
           )}
@@ -172,7 +194,7 @@ export function PageQuests() {
               </h3>
               <div className="quest-task-list">
                 {completed.slice(0, 12).map((t) => (
-                  <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} onOpen={setSelected} />
+                  <QuestRow key={t.id} task={t} onToggle={toggle} onArchive={archive} onOpen={openTask} />
                 ))}
               </div>
             </>
@@ -180,7 +202,15 @@ export function PageQuests() {
         </>
       )}
 
-      {selected && <QuestModal task={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <QuestModal
+          task={selected.task}
+          startMcp={selected.mcp}
+          brandUrl={data?.brand?.url ?? null}
+          onToggle={toggle}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </>
   );
 }
@@ -237,7 +267,11 @@ function ClimbFull({
                       <div
                         key={t.key}
                         className={`task ${t.done ? "done" : ""} ${interactive ? "task--click" : ""}`}
-                        onClick={interactive ? () => onOpen({ id: t.id!, title: t.title, meta: t.meta, xp: t.xp, done: t.done }) : undefined}
+                        onClick={
+                          interactive
+                            ? () => onOpen({ id: t.id!, title: t.title, meta: t.meta, xp: t.xp, done: t.done, detail: t.detail, channel: t.channel })
+                            : undefined
+                        }
                         title={interactive ? "Open to generate content" : undefined}
                       >
                         <span
@@ -312,16 +346,123 @@ function QuestRow({
   );
 }
 
-// Centered modal for one quest: generate the copy-ready content for that exact
-// fix and copy it. Mirrors the prompt playbook's "Make content" experience.
-function QuestModal({ task, onClose }: { task: DashboardTask; onClose: () => void }) {
-  const impact = (task.meta.match(/impact:\s*([a-z ]+)/i)?.[1] ?? "medium").trim();
+// The "Your next move" focal point: one big card calling out the single
+// highest-leverage fix. Clicking anywhere (or "Do it now") opens its modal.
+type NextMove = { task: DashboardTask; levelLabel: string; stepLabel: string };
+
+function NextMoveHero({ move, onOpen }: { move: NextMove; onOpen: (task: DashboardTask, mcp?: boolean) => void }) {
+  const { task } = move;
+  const why = task.detail ?? "One concrete fix that moves how AI sees you. We write the content — you ship it.";
+  const canMcp = task.channel !== "offsite";
+  const act = (e: React.MouseEvent, mcp = false) => {
+    e.stopPropagation();
+    onOpen(task, mcp);
+  };
+  return (
+    <div className="next-move">
+      <div className="nm-eyebrow">
+        <span className="nm-pulse" /> YOUR NEXT MOVE
+      </div>
+      <div className="nm-card" onClick={(e) => act(e)} role="button" tabIndex={0}>
+        <div className="nm-card-top">
+          <div className="nm-step">{move.levelLabel} · {move.stepLabel.toLowerCase()}</div>
+          <h2 className="nm-title">{task.title}</h2>
+          <p className="nm-why">{why}</p>
+          <div className="nm-actions">
+            <button className="btn btn--primary btn--sm" onClick={(e) => act(e)}>
+              <Icon name="arrow" size={14} /> Do it now
+            </button>
+            {canMcp && (
+              <button className="btn btn--ghost btn--sm" onClick={(e) => act(e, true)}>
+                <GameIcon name="bolt" size={13} /> Auto-fix with Clerow MCP
+              </button>
+            )}
+            <button className="btn btn--quiet btn--sm" onClick={(e) => act(e)}>See the steps</button>
+          </div>
+        </div>
+        <div className="nm-foot">
+          <span className="nm-foot-it">
+            <GameIcon name="bolt" size={13} color="#FFC800" /> Earns <b>+{task.xp} XP</b>
+          </span>
+          <span className="nm-foot-it">
+            <Icon name="clock" size={13} /> {effortOf(task.meta)}
+          </span>
+          <span className="nm-foot-it">
+            <GameIcon name="target" size={13} /> {canMcp ? "Visible to all 5 models" : "Builds off-site authority"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Pull the "≈ 10 min" effort out of a task's meta string ("≈ 10 min · impact: …").
+function effortOf(meta: string): string {
+  return (meta.split("·")[0] ?? "").replace(/≈/g, "").trim() || "~5 min";
+}
+
+// A copyable terminal/agent command block with a "Copy command" button.
+function CopyCommand({ label, text }: { label: string; text: string }) {
+  const [copied, setCopied] = React.useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1700);
+    } catch {
+      /* clipboard blocked — no-op */
+    }
+  };
+  return (
+    <div className="qm-cmd">
+      <div className="qm-cmd-head">
+        <span>{label}</span>
+        <button className={`btn btn--quiet btn--sm qm-copy ${copied ? "is-copied" : ""}`} onClick={copy}>
+          {copied ? "Copied ✓" : "Copy command"}
+        </button>
+      </div>
+      <pre>{text}</pre>
+    </div>
+  );
+}
+
+// Centered modal for one quest. Two views: the default "fix" view (why it
+// matters, impact/effort/models, and the content generator) and an MCP view
+// with copyable connect + task commands for handing the fix to an agent.
+function QuestModal({
+  task,
+  startMcp,
+  brandUrl,
+  onToggle,
+  onClose,
+}: {
+  task: DashboardTask;
+  startMcp: boolean;
+  brandUrl: string | null;
+  onToggle: (id: string) => void;
+  onClose: () => void;
+}) {
+  const canMcp = task.channel !== "offsite";
+  const [view, setView] = React.useState<"fix" | "mcp">(startMcp && canMcp ? "mcp" : "fix");
+  const [done, setDone] = React.useState(task.done);
+  const why = task.detail ?? "One concrete fix — we write the content, you ship it, then check it off to keep your streak.";
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const markDone = () => {
+    onToggle(task.id);
+    setDone((d) => !d);
+    onClose();
+  };
+
+  // The one-time connect command + a task-specific agent prompt (CLAUDE.md shape).
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://clerow.com";
+  const connectCmd = `claude mcp add --transport http clerow ${origin}/api/mcp \\\n  --header "Authorization: Bearer clerow_sk_…"`;
+  const taskCmd = `Using the Clerow MCP, complete this task for ${brandUrl ?? "my site"}:\n“${task.title}”\nApply the fix, then re-scan and report my ranking across all 5 AI models.`;
 
   return (
     <div className="drawer-backdrop" onClick={onClose}>
@@ -330,31 +471,101 @@ function QuestModal({ task, onClose }: { task: DashboardTask; onClose: () => voi
           <Icon name="x" size={16} />
         </button>
 
-        <div className="drawer-head">
-          <div className="drawer-tags">
-            <span
-              className="qd-impact"
-              style={{ background: `color-mix(in oklab, ${IMPACT_COLOR(impact)} 16%, var(--surface))`, color: IMPACT_COLOR(impact) }}
-            >
-              {impact} impact
-            </span>
-            <span className="drawer-step-xp">+{task.xp} XP</span>
-          </div>
-          <h2 className="drawer-prompt">{task.title}</h2>
-          <p className="drawer-sub">
-            One concrete fix — we write it, you ship it, then check it off to keep your streak.
-          </p>
-        </div>
+        {view === "fix" ? (
+          <>
+            <div className="drawer-head">
+              <div className="drawer-tags">
+                <span className={`qm-state ${done ? "is-done" : "is-ready"}`}>
+                  {done ? (
+                    <><Icon name="check" size={12} /> Completed</>
+                  ) : (
+                    <><GameIcon name="target" size={12} /> Ready to fix</>
+                  )}
+                </span>
+              </div>
+              <h2 className="drawer-prompt qm-title">{task.title}</h2>
+              <p className="drawer-sub">{why}</p>
+            </div>
 
-        <section className="drawer-section drawer-playbook">
-          <h3 className="drawer-h3">
-            <GameIcon name="sparkles" size={16} /> Make the content for this quest
-          </h3>
-          <p className="drawer-playbook-lead">
-            Generate copy-paste-ready content tailored to your brand, then copy it straight into your site.
-          </p>
-          <ContentMaker endpoint={`/api/tasks/${task.id}/content`} />
-        </section>
+            <div className="qm-meta">
+              <div className="qm-meta-cell">
+                <div className="l">Impact</div>
+                <div className="v accent">+{task.xp} XP</div>
+              </div>
+              <div className="qm-meta-cell">
+                <div className="l">Effort</div>
+                <div className="v">{effortOf(task.meta)}</div>
+              </div>
+              <div className="qm-meta-cell">
+                <div className="l">Models</div>
+                <div className="v">5</div>
+              </div>
+            </div>
+
+            <section className="drawer-section drawer-playbook">
+              <h3 className="drawer-h3">
+                <GameIcon name="sparkles" size={16} /> Make the content for this quest
+              </h3>
+              <p className="drawer-playbook-lead">
+                Generate copy-paste-ready content tailored to your brand, then copy it straight into your site.
+              </p>
+              <ContentMaker endpoint={`/api/tasks/${task.id}/content`} />
+            </section>
+
+            <div className="qm-actions">
+              <button className="btn btn--success btn--sm" onClick={markDone}>
+                <Icon name="check" size={14} /> {done ? "Mark as not done" : "Mark as done"}
+              </button>
+              {canMcp && (
+                <button className="btn btn--ghost btn--sm" onClick={() => setView("mcp")}>
+                  <GameIcon name="bolt" size={13} /> Let Clerow MCP do it
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="drawer-head">
+              <div className="drawer-tags">
+                <span className="qm-state is-ready">
+                  <GameIcon name="bolt" size={12} /> Clerow MCP
+                </span>
+              </div>
+              <h2 className="drawer-prompt qm-title">Let your agent do the work.</h2>
+              <p className="drawer-sub">
+                Clerow plugs into <b>Claude Code, Codex, Cursor</b> or any agent that speaks MCP. Connect once, then hand
+                it the command below — your agent ships this fix and Clerow re-verifies you across all 5 models.
+              </p>
+            </div>
+
+            <div className="qm-agents">
+              {["Claude Code", "Codex", "Cursor", "Any MCP agent"].map((a) => (
+                <span key={a} className="qm-agent"><span className="qm-agent-dot" />{a}</span>
+              ))}
+            </div>
+
+            <div className="drawer-section">
+              <h3 className="drawer-h3">Step 1 · Connect Clerow (one-time)</h3>
+              <p className="drawer-note">
+                Mint a key in <b>Settings → Clerow MCP</b>, then run this in your terminal.
+              </p>
+              <CopyCommand label="Run in your terminal" text={connectCmd} />
+            </div>
+            <div className="drawer-section">
+              <h3 className="drawer-h3">Step 2 · Hand your agent this task</h3>
+              <CopyCommand label="Paste to your agent" text={taskCmd} />
+            </div>
+
+            <div className="qm-actions">
+              <button className="btn btn--ghost btn--sm" onClick={() => setView("fix")}>
+                <Icon name="arrow-left" size={14} /> Back
+              </button>
+              <button className="btn btn--success btn--sm" onClick={markDone}>
+                <Icon name="check" size={14} /> Mark as done
+              </button>
+            </div>
+          </>
+        )}
       </aside>
     </div>
   );

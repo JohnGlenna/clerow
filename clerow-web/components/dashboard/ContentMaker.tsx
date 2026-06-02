@@ -23,17 +23,57 @@ export function ContentMaker({
   const makeContent = async () => {
     setGenerating(true);
     setError(null);
+    setContent(null);
     try {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error ?? "Couldn't generate content");
-      setContent(json.content);
+
+      // Cache hits, deterministic files, and guard errors (402/404/…) come back
+      // as plain JSON; only the live LLM draft streams. Branch on content-type,
+      // exactly like the scan stream (lib/useScanStream.ts).
+      const isStream = (res.headers.get("content-type") ?? "").includes("text/event-stream");
+      if (!isStream || !res.body) {
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error ?? "Couldn't generate content");
+        setContent(json.content ?? "");
+        return;
+      }
+
+      // Read newline-delimited {type:"delta"|"done"|"error"} frames, appending
+      // each delta so the draft fills in token-by-token.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let acc = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+          let evt: { type: string; text?: string; message?: string };
+          try {
+            evt = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (evt.type === "delta" && evt.text) {
+            acc += evt.text;
+            setContent(acc);
+          } else if (evt.type === "error") {
+            throw new Error(evt.message ?? "Couldn't generate content");
+          }
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't generate content");
+      setContent(null);
     } finally {
       setGenerating(false);
     }
