@@ -10,4 +10,13 @@ export type SheetTask = {
   title: string;
   why: string;
   xp: number;
+  minutes?: number; // effort estimate (for the Impact/Effort/Models grid)
+  steps?: string[]; // ordered "what to do" actions (backtick spans → code chips)
+  ladderKey?: string; // stable spec key — drives the file-download filename
+};
+
+// Known file-artifact tasks → the filename their generated content downloads as.
+export const TASK_FILE: Record<string, string> = {
+  "audit-robots-ai": "robots.txt",
+  "audit-llms-txt": "llms.txt",
 };

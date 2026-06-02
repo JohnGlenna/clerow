@@ -2,8 +2,7 @@ type IconName =
   | "eye" | "target" | "smile" | "bolt" | "flame" | "trophy" | "check" | "arrow"
   | "plus" | "search" | "globe" | "tag" | "download" | "grid" | "list" | "settings"
   | "calendar" | "external" | "chart" | "bar" | "help" | "spark" | "lock" | "ai"
-  | "x" | "home" | "user" | "bell" | "users" | "rocket" | "feed"
-  | "clock" | "arrow-left";
+  | "x" | "home" | "user" | "bell" | "users" | "rocket" | "feed";
 
 export function Icon({
   name,
@@ -42,10 +41,6 @@ export function Icon({
       return <svg {...props}><polyline points="20 6 9 17 4 12"/></svg>;
     case "arrow":
       return <svg {...props}><path d="M5 12h14"/><path d="M13 5l7 7-7 7"/></svg>;
-    case "arrow-left":
-      return <svg {...props}><path d="M19 12H5"/><path d="M11 5l-7 7 7 7"/></svg>;
-    case "clock":
-      return <svg {...props}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>;
     case "plus":
       return <svg {...props}><path d="M12 5v14M5 12h14"/></svg>;
     case "search":

@@ -32,6 +32,7 @@ export type LadderTask = {
   xp: number;
   impact: Impact;
   channel: Channel; // onsite (MCP-doable) vs offsite (manual — Clerow drafts the copy)
+  steps: string[]; // ordered "what to do" actions for the task modal (may be empty)
   // Runtime, attached from existing tasks:
   id: string | null;
   done: boolean;
@@ -84,14 +85,15 @@ const slug = (s: string) =>
 export type Channel = "onsite" | "offsite";
 
 // A task spec before runtime done/id are attached.
-type Spec = { key: string; title: string; detail: string; minutes: number; impact: Impact; channel: Channel };
-const spec = (key: string, title: string, detail: string, minutes: number, impact: Impact, channel: Channel = "onsite"): Spec => ({
+type Spec = { key: string; title: string; detail: string; minutes: number; impact: Impact; channel: Channel; steps: string[] };
+const spec = (key: string, title: string, detail: string, minutes: number, impact: Impact, channel: Channel = "onsite", steps: string[] = []): Spec => ({
   key,
   title,
   detail,
   minutes,
   impact,
   channel,
+  steps,
 });
 
 // Which audit checks belong to which level (by SiteCheck.id).
@@ -103,7 +105,7 @@ function auditSpecs(audit: SiteAudit | null, ids: Set<string>): Spec[] {
   if (!audit) return [];
   return audit.checks
     .filter((c) => ids.has(c.id) && c.fix)
-    .map((c) => spec(`audit-${c.id}`, c.fix!.title, c.fix!.detail, c.fix!.minutes, c.fix!.impact));
+    .map((c) => spec(`audit-${c.id}`, c.fix!.title, c.fix!.detail, c.fix!.minutes, c.fix!.impact, "onsite", c.fix!.steps));
 }
 
 // Level-2 content criteria graded by the AI page-grader (lib/scan/pageGrade.ts),
@@ -114,16 +116,36 @@ function gradedContentSpecs(audit: SiteAudit | null): Spec[] {
   if (!audit) return [];
   return audit.checks
     .filter((c) => L2_CONTENT_IDS.includes(c.id) && c.status !== "pass" && c.fix)
-    .map((c) => spec(c.id, c.fix!.title, c.fix!.detail, c.fix!.minutes, c.fix!.impact));
+    .map((c) => spec(c.id, c.fix!.title, c.fix!.detail, c.fix!.minutes, c.fix!.impact, "onsite", c.fix!.steps));
 }
 
 // If we've never crawled the site, Level 1 still needs content — fall back to the
 // universal foundations as prescriptive (self-reported) tasks.
 const L1_FALLBACK: Spec[] = [
-  spec("audit-robots-ai", "Add a robots.txt that allows AI crawlers", "Create /robots.txt allowing GPTBot, ClaudeBot, PerplexityBot, Google-Extended and OAI-SearchBot with \"Allow: /\". If a bot can't crawl you, it can't cite you.", 10, "medium"),
-  spec("audit-llms-txt", "Add an llms.txt file", "Publish /llms.txt: a short plain-text summary of what you do, who it's for, and links to your key pages — a sitemap written for language models.", 15, "medium"),
-  spec("audit-h1", "Add a single clear H1", "Give your homepage one H1 that states, in plain words, what you do — engines use it as the page's headline claim.", 10, "medium"),
-  spec("audit-meta-description", "Add a meta description", "Add a 120–160 character meta description that summarizes the page in a sentence an engine could quote.", 10, "low"),
+  spec("audit-robots-ai", "Add a robots.txt that allows AI crawlers", "Create /robots.txt allowing GPTBot, ClaudeBot, PerplexityBot, Google-Extended and OAI-SearchBot with \"Allow: /\". If a bot can't crawl you, it can't cite you.", 10, "medium", "onsite", [
+    "Create a `/robots.txt` at your site root (Clerow generates a ready-to-use one below).",
+    "Add explicit allow rules for `GPTBot`, `ClaudeBot`, `PerplexityBot` and `Google-Extended`.",
+    "Link your sitemap with a `Sitemap:` line.",
+    "Re-scan — Clerow confirms all 5 crawlers can reach your key pages.",
+  ]),
+  spec("audit-llms-txt", "Add an llms.txt file", "Publish /llms.txt: a short plain-text summary of what you do, who it's for, and links to your key pages — a sitemap written for language models.", 15, "medium", "onsite", [
+    "Create a `/llms.txt` at your site root (Clerow generates a ready-to-use one below).",
+    "Lead with a one-line summary of what you do and who it's for.",
+    "List your strongest pages — home, pricing, comparison, FAQ — each with a one-line description.",
+    "Re-scan to confirm models pick it up.",
+  ]),
+  spec("audit-h1", "Add a single clear H1", "Give your homepage one H1 that states, in plain words, what you do — engines use it as the page's headline claim.", 10, "medium", "onsite", [
+    "Add one `<h1>` near the top of your homepage.",
+    "State, in plain words, what you do — not a clever slogan.",
+    "Make sure there's only one `<h1>`; demote any others to `<h2>`.",
+    "Re-scan to confirm.",
+  ]),
+  spec("audit-meta-description", "Add a meta description", "Add a 120–160 character meta description that summarizes the page in a sentence an engine could quote.", 10, "low", "onsite", [
+    "Add a `<meta name=\"description\">` tag to your homepage `<head>`.",
+    "Write 120–160 characters summarizing the page in one quotable sentence.",
+    "Include the core thing you do and who it's for.",
+    "Re-scan to confirm.",
+  ]),
 ];
 
 function level1(ctx: LadderContext): Spec[] {
@@ -146,6 +168,13 @@ function level2(ctx: LadderContext): Spec[] {
       `Open the page${q ? ` targeting "${q}"` : ""} with a standalone, factual answer in the first 40–120 words, and make the H1/title match it. Answer-first pages are what engines lift into a recommendation.`,
       20,
       "high",
+      "onsite",
+      [
+        q ? `Find the page that should win "${q}".` : "Pick the page that should rank for your main buyer query.",
+        "Write a standalone, factual answer in the first 40–120 words — no preamble.",
+        "Make the H1 and title match that answer.",
+        "Re-scan to see if engines start lifting it.",
+      ],
     ),
     spec(
       "l2-h2-queries",
@@ -153,6 +182,13 @@ function level2(ctx: LadderContext): Spec[] {
       "Break the page into H2/H3 sections phrased the way real buyers ask (\"How does it work?\", \"Best for…\", \"Pricing\"). Descriptive headings make your content extractable.",
       20,
       "medium",
+      "onsite",
+      [
+        "Pull your top buyer questions from the Prompts tab.",
+        "Add an `<h2>`/`<h3>` for each, phrased exactly how buyers ask it.",
+        "Answer each question in the first sentence under its heading.",
+        "Re-scan to confirm the sections are extractable.",
+      ],
     ),
     spec(
       "l2-comparison-table",
@@ -160,6 +196,13 @@ function level2(ctx: LadderContext): Spec[] {
       "Add a clean feature table comparing you to the obvious alternatives (price, platforms, who each is best for). Engines heavily favor tabular data for \"vs\" and \"best\" queries.",
       30,
       "high",
+      "onsite",
+      [
+        "List yourself against your 2–3 obvious alternatives.",
+        "Use honest, specific rows: pricing, key features, who each is best for.",
+        "Build it as real HTML `<table>` markup — not an image.",
+        "Re-scan to check \"vs\" and \"best\" queries.",
+      ],
     ),
     spec(
       "l2-eeat",
@@ -167,6 +210,13 @@ function level2(ctx: LadderContext): Spec[] {
       "Add an author byline with credentials, a first-hand note (\"we tested…\"/\"we built…\"), one or two quotable stats with named sources, and disclose any affiliations — the E-E-A-T signals AI rewards.",
       30,
       "high",
+      "onsite",
+      [
+        "Add an author byline with real credentials to your key page.",
+        "Add a first-hand note (\"we tested…\", \"we built…\") with a concrete number.",
+        "Cite 1–2 quotable stats with named, linked sources; disclose any affiliations.",
+        "Re-scan to confirm the trust signals land.",
+      ],
     ),
     spec(
       "l2-freshness",
@@ -174,6 +224,13 @@ function level2(ctx: LadderContext): Spec[] {
       "Add a visible \"Last updated\" date to your key pages and refresh them regularly. Perplexity especially favors recent content — stale pages quietly lose their citations.",
       10,
       "low",
+      "onsite",
+      [
+        "Add a visible \"Last updated\" date to your key pages.",
+        "Mark it up with `dateModified` in your schema.",
+        "Keep it honest — update it when you actually edit the page.",
+        "Re-scan to confirm freshness is detected.",
+      ],
     ),
   ];
   // Prefer the AI page-grader's page-specific findings; else the generic specs.
@@ -260,6 +317,7 @@ function toTask(s: Spec, existing: Map<string, { id: string; done: boolean; reso
     xp: impactXp(s.impact),
     impact: s.impact,
     channel: s.channel,
+    steps: s.steps,
     id: e?.id ?? null,
     done: e?.done ?? false,
     resolved: e?.resolved ?? e?.done ?? false,

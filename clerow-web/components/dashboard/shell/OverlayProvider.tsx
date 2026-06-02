@@ -76,6 +76,7 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
         <TaskModal
           task={task}
           modelCount={data?.models?.length ?? 0}
+          brandUrl={data?.brand?.url ?? null}
           onClose={() => setTask(null)}
           onChanged={refresh}
           onAddContext={() => setContext(true)}

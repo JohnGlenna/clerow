@@ -5,39 +5,72 @@ import { PixelProgress } from "../../ui/PixelProgress";
 import { ScanProgress } from "../../scan/ScanProgress";
 import { useScanStream } from "@/lib/useScanStream";
 import { playCheck } from "@/lib/sound";
-import type { SheetTask } from "./types";
+import { TASK_FILE, type SheetTask } from "./types";
 
-// The task modal: a single quest opened from the path, the rail, or the Prompts
-// page. The fix flow (choose how to fix → copy-ready content) is a centered
-// modal; the full-scan checkpoint runs its live scan / results full-screen.
-export function TaskModal({ task, modelCount, onClose, onChanged, onAddContext }: { task: SheetTask; modelCount: number; onClose: () => void; onChanged: () => void; onAddContext: () => void }) {
-  const [sel, setSel] = React.useState<"diy" | "mcp" | "rescan" | null>(
-    task.kind === "mcp" ? "mcp" : task.kind === "checkpoint" ? "rescan" : task.channel === "offsite" ? "diy" : null,
+const AGENTS = ["Claude Code", "Codex", "Cursor", "Any MCP agent"];
+
+function domainOf(url: string | null): string {
+  if (!url) return "your site";
+  return url.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] || "your site";
+}
+
+// Render a step/description string, turning `backtick` spans into code chips.
+function withChips(text: string): React.ReactNode {
+  const parts = text.split(/(`[^`]+`)/g);
+  return parts.map((p, i) =>
+    p.startsWith("`") && p.endsWith("`") ? <code key={i} className="tm-chip">{p.slice(1, -1)}</code> : <React.Fragment key={i}>{p}</React.Fragment>,
   );
-  const [view, setView] = React.useState<"choose" | "steps" | "share" | "scanning" | "done">("choose");
+}
+
+// A copyable command block (the MCP view's Step 1 / Step 2).
+function CmdBlock({ label, text }: { label: string; text: string }) {
+  const [copied, setCopied] = React.useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(text);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+  return (
+    <div className="tm-cmd">
+      <div className="tm-cmd-h">
+        <span>{label}</span>
+        <button className={`tm-cmd-copy ${copied ? "on" : ""}`} onClick={copy}>{copied ? "Copied ✓" : "⧉ Copy command"}</button>
+      </div>
+      <pre>{text}</pre>
+    </div>
+  );
+}
+
+// The task modal. The fix flow (steps + ready content) and the MCP hand-off are a
+// centered modal; the full-scan checkpoint runs its live scan / results full-screen.
+export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAddContext }: {
+  task: SheetTask; modelCount: number; brandUrl: string | null;
+  onClose: () => void; onChanged: () => void; onAddContext: () => void;
+}) {
+  const offsite = task.channel === "offsite";
+  const [view, setView] = React.useState<"main" | "mcp" | "scanning" | "done">(task.kind === "mcp" ? "mcp" : "main");
   const [content, setContent] = React.useState<string>("");
-  const [busy, setBusy] = React.useState(false);
+  const [genBusy, setGenBusy] = React.useState(false);
+  const [genErr, setGenErr] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const scan = useScanStream();
 
-  const cmd = `Clerow: read my open Clerow tasks and ship "${task.title}" as a PR, then re-check all my AI models when done.`;
+  const fileName = task.ladderKey ? TASK_FILE[task.ladderKey] : undefined;
 
-  // Esc closes the centered fix modal (but not while a scan is streaming).
   React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && view !== "scanning") onClose();
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && view !== "scanning") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, view]);
 
-  const loadContent = async () => {
-    setBusy(true);
-    setView("steps");
+  // Generate the copy-ready fix. Handles both the instant JSON (deterministic
+  // files / cached / free audit fixes) and the token-streamed paid LLM draft.
+  const generate = async () => {
+    if (genBusy) return;
+    setGenBusy(true); setGenErr(null); setContent("");
     try {
-      let res: Response | null = null;
+      let res: Response;
       if (task.promptId) {
-        // Prompt lesson: rebuild the prompt's playbook, then generate its top step.
         const detail = await fetch(`/api/prompts/${task.promptId}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
         const stepId = detail?.steps?.[0]?.id;
         if (!stepId) { setContent("Scan this prompt across your models first, then we can generate the fix."); return; }
@@ -48,13 +81,46 @@ export function TaskModal({ task, modelCount, onClose, onChanged, onAddContext }
         setContent("We'll have a guide here shortly.");
         return;
       }
-      const json = await res.json().catch(() => ({}));
-      setContent(typeof json.content === "string" ? json.content : json.error || "Couldn't generate content.");
-    } catch {
-      setContent("Couldn't generate content. Try again.");
+      const isStream = (res.headers.get("content-type") ?? "").includes("text/event-stream");
+      if (!isStream || !res.body) {
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error ?? "Couldn't generate content");
+        setContent(json.content ?? "");
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "", acc = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+          let evt: { type: string; text?: string; message?: string };
+          try { evt = JSON.parse(line); } catch { continue; }
+          if (evt.type === "delta" && evt.text) { acc += evt.text; setContent(acc); }
+          else if (evt.type === "error") throw new Error(evt.message ?? "Couldn't generate content");
+        }
+      }
+    } catch (e) {
+      setGenErr(e instanceof Error ? e.message : "Couldn't generate content");
     } finally {
-      setBusy(false);
+      setGenBusy(false);
     }
+  };
+
+  const copyContent = () => { if (!content) return; navigator.clipboard?.writeText(content); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
+  const download = () => {
+    if (!content || !fileName) return;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = fileName; document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
   const markDone = async () => {
@@ -62,38 +128,27 @@ export function TaskModal({ task, modelCount, onClose, onChanged, onAddContext }
       playCheck();
       await fetch("/api/tasks", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: task.id, done: true }) }).catch(() => {});
     }
+    if (task.kind === "checkpoint") { setView("done"); return; }
     setView("done");
   };
-
   const skip = async () => {
-    if (task.id) {
-      await fetch("/api/tasks", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: task.id, archived: true }) }).catch(() => {});
-    }
-    onChanged();
-    onClose();
+    if (task.id) await fetch("/api/tasks", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: task.id, archived: true }) }).catch(() => {});
+    onChanged(); onClose();
   };
-
   const rescan = async () => {
-    // Switch to the live view and stream per-model progress as each AI model runs
-    // through the brand's prompts (the comprehensive scan also re-crawls the site).
     setView("scanning");
-    const outcome = await scan.run("/api/scan/full", {
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
+    const outcome = await scan.run("/api/scan/full", { headers: { "content-type": "application/json" }, body: JSON.stringify({}) });
     if (!outcome.ok) {
       if (outcome.status === 402) alert(outcome.error || "You're out of scans this month.");
       else if (outcome.status === 429) alert(outcome.error || "A scan is already running — give it a moment.");
       else alert(outcome.error || "Re-scan failed. Try again.");
-      setView("choose");
-      return;
+      setView("main"); return;
     }
     setView("done");
   };
-
   const close = () => { onChanged(); onClose(); };
 
-  // ---- Full-screen scan takeover (live progress) -----------------------------
+  // ---- Full-screen scan takeover --------------------------------------------
   if (view === "scanning") {
     const cells = scan.prompts.flatMap((p) => p.engines);
     const total = cells.length || 1;
@@ -105,10 +160,7 @@ export function TaskModal({ task, modelCount, onClose, onChanged, onAddContext }
       { key: "scanning", label: "Testing buyer queries on 5 models" },
     ];
     const curPhase = PHASES.findIndex((p) => p.key === scan.phase);
-    const steps = PHASES.map((p, i) => ({
-      label: p.label,
-      state: (curPhase < 0 || i < curPhase ? "done" : i === curPhase ? "active" : "pending") as "done" | "active" | "pending",
-    }));
+    const steps = PHASES.map((p, i) => ({ label: p.label, state: (curPhase < 0 || i < curPhase ? "done" : i === curPhase ? "active" : "pending") as "done" | "active" | "pending" }));
     return (
       <div className="sheet-back">
         <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={pct} /></div><span className="lesson-heart">📡 Live</span></div>
@@ -122,7 +174,7 @@ export function TaskModal({ task, modelCount, onClose, onChanged, onAddContext }
     );
   }
 
-  // ---- Full-scan results take the full screen too ----------------------------
+  // ---- Full-scan results (checkpoint) full-screen ----------------------------
   if (view === "done" && task.kind === "checkpoint") {
     const overall = scan.result && "score" in scan.result ? scan.result.score.overall : null;
     const groups = scan.prompts.filter((p) => p.text).sort((a, b) => a.index - b.index);
@@ -134,58 +186,33 @@ export function TaskModal({ task, modelCount, onClose, onChanged, onAddContext }
         <div className="lesson-body lesson-body--steps"><div className="lesson-inner lesson-inner--steps">
           <div className="results-head">
             <div className="results-score">{overall ?? "—"}</div>
-            <div>
-              <div className="results-h">Scan complete</div>
-              <div className="results-sub">Your AI visibility score{overall != null ? ` is ${overall}` : ""} · finish this level&apos;s tasks to unlock the next.</div>
-            </div>
+            <div><div className="results-h">Scan complete</div><div className="results-sub">Your AI visibility score{overall != null ? ` is ${overall}` : ""} · finish this level&apos;s tasks to unlock the next.</div></div>
           </div>
           {scan.site.length > 0 && (
             <div className="results-card">
               <div className="results-card-h">🔎 Your website scan {siteGaps.length > 0 && <span>{siteGaps.length} to fix</span>}</div>
-              <div className="results-checks">
-                {scan.site.map((c) => (
-                  <div key={c.id} className={`results-check ${c.status}`}>
-                    <span className="rc-mark">{mark(c.status)}</span>
-                    <span>{c.label}</span>
-                  </div>
-                ))}
-              </div>
+              <div className="results-checks">{scan.site.map((c) => (<div key={c.id} className={`results-check ${c.status}`}><span className="rc-mark">{mark(c.status)}</span><span>{c.label}</span></div>))}</div>
             </div>
           )}
           {groups.length > 0 && (
-            <div className="results-card">
-              <div className="results-card-h">💬 What each model said</div>
-              <ScanProgress done engines={scan.engines} prompts={scan.prompts} elapsedMs={0} showOrbit={false} />
-            </div>
+            <div className="results-card"><div className="results-card-h">💬 What each model said</div><ScanProgress done engines={scan.engines} prompts={scan.prompts} elapsedMs={0} showOrbit={false} /></div>
           )}
-          <div className="results-card results-next">
-            <div className="results-card-h">✅ We turned this into your tasks</div>
-            <p className="results-next-p">
-              Everything to make your site rank higher is now in your tasks. Work through them top to bottom —
-              <b> copy Clerow&apos;s ready-made fix</b> for each, or let the <b>Clerow MCP</b> ship them for you automatically.
-            </p>
-          </div>
+          <div className="results-card results-next"><div className="results-card-h">✅ We turned this into your tasks</div><p className="results-next-p">Everything to make your site rank higher is now in your tasks. Work through them top to bottom — <b>copy Clerow&apos;s ready-made fix</b> for each, or let the <b>Clerow MCP</b> ship them for you automatically.</p></div>
         </div></div>
-        <div className="lesson-foot"><div className="lesson-foot-in">
-          <button className="btn-check" onClick={close}>See my tasks</button>
-        </div></div>
+        <div className="lesson-foot"><div className="lesson-foot-in"><button className="btn-check" onClick={close}>See my tasks</button></div></div>
       </div>
     );
   }
 
-  // ---- Everything below is the centered fix modal ----------------------------
-  const stop = (e: React.MouseEvent) => e.stopPropagation();
-  const canMcp = task.channel !== "offsite";
-
-  // A cleared task / MCP quest → a compact success state inside the modal.
+  // ---- Compact success (task / mcp cleared) ----------------------------------
   if (view === "done") {
     return (
       <div className="tm-scrim" onClick={close}>
-        <div className="tm-modal tm-modal--sm" onClick={stop} role="dialog" aria-modal="true">
+        <div className="tm-modal tm-modal--sm" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
           <div className="tm-done">
             <div className="tm-done-check">✓</div>
-            <h2 className="tm-title">Nice! Quest cleared</h2>
-            <p className="tm-why">+{task.xp || 20} XP · streak kept 🔥</p>
+            <h2 className="tm-title tm-title--sm">Nice! Quest cleared</h2>
+            <p className="tm-why" style={{ textAlign: "center" }}>+{task.xp || 20} XP · streak kept 🔥</p>
             <button className="tm-btn tm-btn--go" onClick={close}>Continue</button>
           </div>
         </div>
@@ -193,126 +220,130 @@ export function TaskModal({ task, modelCount, onClose, onChanged, onAddContext }
     );
   }
 
-  // The copy-ready DIY content.
-  if (view === "steps") {
-    const canCopy = !busy && !!content;
-    const copyContent = () => { if (!canCopy) return; navigator.clipboard?.writeText(content); setCopied(true); setTimeout(() => setCopied(false), 1600); };
+  // ---- MCP hand-off view -----------------------------------------------------
+  if (view === "mcp") {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://clerow.com";
+    const connectCmd = `claude mcp add --transport http clerow ${origin}/api/mcp \\\n  --header "Authorization: Bearer YOUR_CLEROW_KEY"`;
+    const taskCmd = task.kind === "mcp"
+      ? `Using the Clerow MCP, work through all my open Clerow tasks for ${domainOf(brandUrl)}, lowest-effort first.\nShip the on-site fixes as a PR. For off-site tasks (Reddit, directories, guest posts), draft the copy and tell me where to post it.\nThen re-scan and report my ranking across all 5 AI models.`
+      : `Using the Clerow MCP, complete this task for ${domainOf(brandUrl)}:\n"${task.title}"\nApply the fix, then re-scan and report my ranking across all 5 AI models.`;
     return (
       <div className="tm-scrim" onClick={close}>
-        <div className="tm-modal" onClick={stop} role="dialog" aria-modal="true">
-          <div className="tm-head">
-            <span className="tm-state tm-state--ready">✦ Copy-ready fix</span>
-            <button className="tm-x" onClick={close} aria-label="Close">✕</button>
-          </div>
+        <div className="tm-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="tm-head"><span className="tm-crumb">Clerow MCP</span><button className="tm-x" onClick={close} aria-label="Close">✕</button></div>
           <div className="tm-body">
-            <h2 className="tm-title">{task.title}</h2>
-            <div className="tm-code">
-              <button className="tm-copy" onClick={copyContent} disabled={!canCopy}>{copied ? "Copied ✓" : "⧉ Copy"}</button>
-              <pre>{busy ? "Generating your content…" : content}</pre>
+            <span className="tm-state tm-state--mcp"><span className="tm-state-ic">⚡</span>Clerow MCP</span>
+            <h2 className="tm-title">Let your agent do the work.</h2>
+            <p className="tm-why">Clerow plugs into <b>Claude Code, Codex, Cursor</b> or any agent that speaks MCP. Connect once, then hand it the command below — your agent ships {task.kind === "mcp" ? "every fix" : "this fix"} and Clerow re-verifies you across all {modelCount || 5} models.</p>
+            <div className="tm-agents">{AGENTS.map((a) => (<span key={a} className="tm-agent"><span className="tm-agent-dot" />{a}</span>))}</div>
+            <div className="tm-stepblock">
+              <div className="tm-stepblock-h">Step 1 · Connect Clerow (one-time)</div>
+              <p className="tm-stepblock-note">Mint a key in <b>Settings → Clerow MCP</b>, then run this in your terminal.</p>
+              <CmdBlock label="Run in your terminal" text={connectCmd} />
+            </div>
+            <div className="tm-stepblock">
+              <div className="tm-stepblock-h">Step 2 · {task.kind === "mcp" ? "Hand your agent everything" : "Hand your agent this task"}</div>
+              <CmdBlock label="Paste to your agent" text={taskCmd} />
             </div>
           </div>
           <div className="tm-foot">
-            <button className="tm-btn tm-btn--ghost" onClick={() => setView("choose")}>← Back</button>
-            <button className="tm-btn tm-btn--go" onClick={markDone}>Mark done ✓</button>
+            <button className="tm-btn tm-btn--ghost" onClick={task.kind === "mcp" ? close : () => setView("main")}>{task.kind === "mcp" ? "Close" : "← Back"}</button>
+            {task.id && <button className="tm-btn tm-btn--go" onClick={markDone}>✓ Mark as done</button>}
           </div>
         </div>
       </div>
     );
   }
 
-  // The MCP share command popup (nested over the choose modal).
-  const sharePop = view === "share" ? (
-    <div className="tm-scrim tm-scrim--over" onClick={() => setView("choose")}>
-      <div className="tm-modal tm-modal--sm" onClick={stop} role="dialog" aria-modal="true">
-        <div className="tm-head">
-          <span className="tm-state tm-state--mcp">🤖 Clerow MCP</span>
-          <button className="tm-x" onClick={() => setView("choose")} aria-label="Close">✕</button>
-        </div>
-        <div className="tm-body">
-          <h2 className="tm-title">Share with your AI agent</h2>
-          <p className="tm-why">Paste this into Claude Code, Cursor, or any agent connected to Clerow MCP.</p>
-          <div className="tm-code">
-            <pre>{cmd}</pre>
+  // ---- Checkpoint (full-scan starter) ---------------------------------------
+  if (task.kind === "checkpoint") {
+    return (
+      <div className="tm-scrim" onClick={close}>
+        <div className="tm-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="tm-head"><span className="tm-crumb">Checkpoint</span><button className="tm-x" onClick={close} aria-label="Close">✕</button></div>
+          <div className="tm-body">
+            <span className="tm-state tm-state--ready"><span className="tm-state-ic">🚩</span>Checkpoint</span>
+            <h2 className="tm-title">{task.title}</h2>
+            <p className="tm-why">{task.why}</p>
+            <button className="tm-cta-add" onClick={onAddContext}>✨ Add business context to sharpen results</button>
           </div>
-        </div>
-        <div className="tm-foot">
-          <button className="tm-btn tm-btn--ghost" onClick={() => { navigator.clipboard?.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>{copied ? "Copied ✓" : "Copy command"}</button>
-          <button className="tm-btn tm-btn--go" onClick={markDone}>I&apos;ll mark it done</button>
+          <div className="tm-foot"><button className="tm-btn tm-btn--go tm-btn--wide" onClick={rescan}>🚩 Re-scan now</button></div>
         </div>
       </div>
-    </div>
-  ) : null;
+    );
+  }
 
-  const footLabel = sel === "diy" ? (task.channel === "offsite" ? "Write my post" : "See the fix") : sel === "mcp" ? "Share with AI" : sel === "rescan" ? "Re-scan now" : "Continue";
-  const onFoot = () => {
-    if (sel === "diy") loadContent();
-    else if (sel === "mcp") setView("share");
-    else if (sel === "rescan") rescan();
-  };
-  const stateLabel = task.kind === "mcp" ? ["tm-state--mcp", "🤖 Autopilot"] : task.kind === "checkpoint" ? ["tm-state--ready", "🚩 Checkpoint"] : ["tm-state--ready", "✓ Ready to fix"];
-
+  // ---- Main task view (the redesign) ----------------------------------------
+  const steps = task.steps ?? [];
+  const showMeta = task.kind === "task";
   return (
     <div className="tm-scrim" onClick={close}>
-      <div className="tm-modal" onClick={stop} role="dialog" aria-modal="true">
+      <div className="tm-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="tm-head">
-          <span className={`tm-state ${stateLabel[0]}`}>{stateLabel[1]}</span>
-          <button className="tm-x" onClick={close} aria-label="Close">✕</button>
+          <span className="tm-crumb">{offsite ? "Off-site authority" : "Foundations"}</span>
+          <div className="tm-head-r">
+            {task.id && <button className="tm-skip" onClick={skip}>Skip</button>}
+            <button className="tm-x" onClick={close} aria-label="Close">✕</button>
+          </div>
         </div>
         <div className="tm-body">
+          <span className="tm-state tm-state--ready"><span className="tm-state-ic">◎</span>Ready to fix</span>
           <h2 className="tm-title">{task.title}</h2>
-          <p className="tm-why">{task.why}</p>
+          <p className="tm-why">{withChips(task.why)}</p>
 
-          {task.kind === "task" && (
+          {showMeta && (
             <div className="tm-meta">
               <div className="tm-meta-cell"><span className="l">Impact</span><span className="v accent">+{task.xp} XP</span></div>
+              <div className="tm-meta-cell"><span className="l">Effort</span><span className="v">{task.minutes ? `~${task.minutes} min` : "—"}</span></div>
               <div className="tm-meta-cell"><span className="l">Models</span><span className="v">{modelCount || 5}</span></div>
-              <div className="tm-meta-cell"><span className="l">Where</span><span className="v">{canMcp ? "On your site" : "Off-site"}</span></div>
             </div>
           )}
 
-          {task.kind === "checkpoint" ? (
+          {offsite && (
+            <div className="tm-part-tag">Part A · Clerow writes it &nbsp;→&nbsp; Part B · you post it</div>
+          )}
+
+          {steps.length > 0 ? (
             <>
-              <button className={`opt ${sel === "rescan" ? "on" : ""}`} onClick={() => setSel("rescan")}>
-                <span className="oic">🚩</span>
-                <div><div className="ot">Re-scan now</div><div className="od">Clerow re-queries all your AI models and recomputes your score. ~60s.</div></div>
-              </button>
-              <button className="scan-cta-add" style={{ marginTop: 12 }} onClick={onAddContext}>✨ Add business context to sharpen results</button>
+              <div className="tm-steps-h">{offsite ? "How it works" : "What to do"}</div>
+              <ol className="tm-steps">
+                {steps.map((s, i) => (
+                  <li key={i} className="tm-step"><span className="tm-step-n">{i + 1}</span><span className="tm-step-t">{withChips(s)}</span></li>
+                ))}
+              </ol>
             </>
-          ) : task.kind === "mcp" ? (
-            <button className="opt violet on" onClick={() => setSel("mcp")}>
-              <span className="oic">🤖</span>
-              <div><div className="ot">Connect Clerow MCP</div><div className="od">Your agent reads every open quest and ships the fixes. Clerow verifies across all models.</div></div>
-              <span className="obadge">Autopilot</span>
-            </button>
-          ) : task.channel === "offsite" ? (
-            <>
-              <div className="lesson-choose">This one lives off your site — here&apos;s the easy way:</div>
-              <button className={`opt ${sel === "diy" ? "on" : ""}`} onClick={() => setSel("diy")}>
-                <span className="onum">1</span><span className="oic">✍️</span>
-                <div><div className="ot">Get the draft + where to post it</div><div className="od">Clerow writes the exact post/listing copy for your brand. Paste it where AI already looks, then mark it done — an AI agent can&apos;t post this for you.</div></div>
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="lesson-choose">How do you want to fix this?</div>
-              <button className={`opt ${sel === "diy" ? "on" : ""}`} onClick={() => setSel("diy")}>
-                <span className="onum">1</span><span className="oic">🛠️</span>
-                <div><div className="ot">I&apos;ll do it myself</div><div className="od">Get the copy-paste-ready fix tailored to your brand.</div></div>
-              </button>
-              <button className={`opt violet ${sel === "mcp" ? "on" : ""}`} onClick={() => setSel("mcp")}>
-                <span className="onum">2</span><span className="oic">🤖</span>
-                <div><div className="ot">Let Clerow MCP do it</div><div className="od">Share a command with your AI agent — it ships the fix, Clerow re-checks every model.</div></div>
-                <span className="obadge">Autopilot</span>
-              </button>
-            </>
+          ) : null}
+
+          {/* Generate the ready-to-ship content (copy + download). */}
+          <div className="tm-content">
+            <div className="tm-content-h">
+              <span>{offsite ? "Part A — Clerow writes your post" : fileName ? `Your ${fileName}` : "Copy-ready content"}</span>
+              <button className="tm-gen" onClick={generate} disabled={genBusy}>{genBusy ? "Writing…" : content ? "Regenerate" : fileName ? `Generate ${fileName}` : "Generate the content"}</button>
+            </div>
+            {genErr && <div className="tm-gen-err">{genErr}</div>}
+            {content && (
+              <>
+                <pre className="tm-content-box">{content}</pre>
+                <div className="tm-content-actions">
+                  <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={copyContent}>{copied ? "Copied ✓" : "⧉ Copy"}</button>
+                  {fileName && <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={download}>⤓ Download {fileName}</button>}
+                </div>
+              </>
+            )}
+          </div>
+
+          {offsite && (
+            <div className="tm-partb">
+              <div className="tm-partb-h">Part B · You post it</div>
+              <p>An AI agent can&apos;t post to Reddit, a forum or your blog for you. Paste the copy above where AI already looks, then mark this done to keep your streak.</p>
+            </div>
           )}
         </div>
         <div className="tm-foot">
-          <button className="tm-btn tm-btn--ghost" onClick={skip}>Skip</button>
-          <button className="tm-btn tm-btn--go" disabled={!sel || busy} onClick={onFoot}>{busy ? "…" : footLabel}</button>
+          <button className="tm-btn tm-btn--go" onClick={markDone}>→ Mark as done</button>
+          {!offsite && <button className="tm-btn tm-btn--ghost" onClick={() => setView("mcp")}>⚡ Let Clerow MCP do it</button>}
         </div>
       </div>
-      {sharePop}
     </div>
   );
 }

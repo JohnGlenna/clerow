@@ -16,9 +16,9 @@ export function NextMoveHero() {
 
   const step = lvl.tasks.filter((t) => t.resolved).length + 1;
   const canMcp = lt.channel !== "offsite";
-  const effort = (lt.meta.split("·")[0] ?? "").replace(/≈/g, "").trim() || "~5 min";
+  const effort = lt.minutes ? `~${lt.minutes} min` : (lt.meta.split("·")[0] ?? "").replace(/≈/g, "").trim() || "~5 min";
 
-  const task: SheetTask = { kind: "task", id: lt.id, channel: lt.channel, title: lt.title, why: lt.detail, xp: lt.xp };
+  const task: SheetTask = { kind: "task", id: lt.id, channel: lt.channel, title: lt.title, why: lt.detail, xp: lt.xp, minutes: lt.minutes, steps: lt.steps, ladderKey: lt.key };
   const open = () => openTask(task);
 
   return (

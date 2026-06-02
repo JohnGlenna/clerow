@@ -21,6 +21,9 @@ export type SiteCheckFix = {
   minutes: number;
   impact: GeoStep["impact"];
   xp: number;
+  // Concrete, ordered actions shown as the "What to do" checklist in the task
+  // modal. Optional — tasks without authored steps fall back to `detail`.
+  steps: string[];
 };
 
 export type SiteCheck = {
@@ -80,7 +83,8 @@ const fix = (
   detail: string,
   minutes: number,
   impact: GeoStep["impact"],
-): SiteCheckFix => ({ title, detail, minutes, impact, xp: impactXp(impact) });
+  steps: string[] = [],
+): SiteCheckFix => ({ title, detail, minutes, impact, xp: impactXp(impact), steps });
 
 // --- individual signal derivations (all pure, given fetched text) ------------
 
@@ -96,6 +100,12 @@ function checkCrawlable(home: Fetched | null): SiteCheck {
         "Our crawler couldn't load your homepage. AI answer-engine bots likely hit the same wall — and a page they can't fetch can never be cited. Check that your server responds quickly and doesn't block non-browser user-agents.",
         45,
         "very high",
+        [
+          "Open your homepage in a private window — confirm it loads fast and returns HTML (not an error or endless spinner).",
+          "Check your host/CDN/WAF (Cloudflare, Vercel, etc.) for rules that block non-browser user-agents or rate-limit bots.",
+          "Allow the AI crawler user-agents (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`) through any firewall or bot-protection.",
+          "Re-scan — Clerow confirms your homepage now responds to crawlers.",
+        ],
       ),
     };
   }
@@ -110,6 +120,12 @@ function checkCrawlable(home: Fetched | null): SiteCheck {
         `Your homepage returned HTTP ${home.status} to a plain (non-JS) request. AI crawlers and search bots often don't run JavaScript, so they may get the same error and can't read or cite you. Server-render the key content (or return valid HTML to bot user-agents).`,
         60,
         "very high",
+        [
+          `Reproduce it: \`curl -A "GPTBot" https://yoursite.com\` — you'll see the same HTTP ${home.status} the bots get.`,
+          "Fix the underlying error (bad redirect, auth wall, geo-block, or a JS-only shell that returns no HTML).",
+          "Make sure the response is a 200 with real HTML content for bot user-agents.",
+          "Re-scan to confirm crawlers get a clean page.",
+        ],
       ),
     };
   }
@@ -129,6 +145,12 @@ function checkHttps(https: boolean): SiteCheck {
           "Add a TLS certificate (most hosts do this free) and redirect all http:// traffic to https://. AI engines and Google treat non-HTTPS sites as low-trust.",
           30,
           "high",
+          [
+            "Enable a free TLS certificate (Let's Encrypt — most hosts like Cloudflare, Vercel and Netlify do this in one click).",
+            "Add a permanent 301 redirect from all `http://` URLs to `https://`.",
+            "Update internal links, canonical tags and your sitemap to the `https://` URLs.",
+            "Re-scan to confirm HTTPS is live.",
+          ],
         ),
       };
 }
@@ -145,6 +167,12 @@ function checkRobots(robots: Fetched | null): SiteCheck {
         `Create /robots.txt allowing the AI answer-engine bots (${AI_CRAWLERS.join(", ")}) with "Allow: /", and link your sitemap. If a bot can't crawl you, it can't cite you.`,
         10,
         "medium",
+        [
+          "Create a `/robots.txt` at your site root.",
+          "Add explicit allow rules for `GPTBot`, `ClaudeBot`, `PerplexityBot` and `Google-Extended`.",
+          "Link your sitemap with a `Sitemap:` line.",
+          "Re-scan — Clerow confirms all 5 crawlers can reach your key pages.",
+        ],
       ),
     };
   }
@@ -167,6 +195,12 @@ function checkRobots(robots: Fetched | null): SiteCheck {
         `Remove the "Disallow: /" rules that stop ${AI_CRAWLERS.join(", ")} and allow them to crawl your key pages. Blocked bots can never recommend you.`,
         10,
         "high",
+        [
+          "Open your existing `/robots.txt`.",
+          "Remove any `Disallow: /` lines under `User-agent: *` or the AI bots (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`).",
+          "Add explicit `Allow: /` rules for those AI crawlers.",
+          "Re-scan to confirm the bots are no longer blocked.",
+        ],
       ),
     };
   }
@@ -187,6 +221,12 @@ function checkLlms(llms: Fetched | null): SiteCheck {
           "Publish /llms.txt: a short, plain-text summary of what your product is, who it's for, and links to your key pages (home, pricing, comparisons, FAQ). It's a sitemap written for language models.",
           15,
           "medium",
+          [
+            "Create a `/llms.txt` at your site root (Clerow generates a ready-to-use one below).",
+            "Lead with a one-line summary of what you do and who it's for.",
+            "List your strongest pages — home, pricing, comparison and FAQ — each with a one-line description.",
+            "Re-scan to confirm models pick it up.",
+          ],
         ),
       };
 }
@@ -207,6 +247,12 @@ function checkSitemap(sitemap: Fetched | null, robots: Fetched | null): SiteChec
           "Generate /sitemap.xml, reference it from robots.txt, and submit it to Bing Webmaster Tools — ChatGPT's search leans on the Bing index.",
           15,
           "low",
+          [
+            "Generate a `/sitemap.xml` listing your important pages (most CMSs and frameworks do this automatically).",
+            "Reference it from `/robots.txt` with a `Sitemap:` line.",
+            "Submit it in Bing Webmaster Tools — ChatGPT search leans on the Bing index.",
+            "Re-scan to confirm the sitemap is detected.",
+          ],
         ),
       };
 }
@@ -224,7 +270,12 @@ function checkTitle(html: string): SiteCheck {
       label: "Page title",
       status: "fail",
       detail: "Your homepage has no <title> tag.",
-      fix: fix("Add a clear, specific <title>", "Write a 30–60 character title that names what you do and for whom — it's the first thing both search and AI read.", 10, "medium"),
+      fix: fix("Add a clear, specific <title>", "Write a 30–60 character title that names what you do and for whom — it's the first thing both search and AI read.", 10, "medium", [
+        "Add a `<title>` tag inside your homepage `<head>`.",
+        "Write 30–60 characters that name what you do and for whom (e.g. \"Acme — invoicing software for freelancers\").",
+        "Lead with the concrete value, not a tagline.",
+        "Re-scan to confirm the title is read correctly.",
+      ]),
     };
   }
   if (title.length < 15 || title.length > 65) {
@@ -233,7 +284,12 @@ function checkTitle(html: string): SiteCheck {
       label: "Page title",
       status: "warn",
       detail: `Your title is ${title.length} characters (aim for ~30–60).`,
-      fix: fix("Tighten your <title>", "Rewrite the title to ~30–60 characters, leading with what you do and for whom.", 10, "low"),
+      fix: fix("Tighten your <title>", "Rewrite the title to ~30–60 characters, leading with what you do and for whom.", 10, "low", [
+        "Trim or expand your `<title>` to ~30–60 characters.",
+        "Lead with what you do and for whom; drop filler words.",
+        "Keep your brand name at the end, not the start.",
+        "Re-scan to confirm.",
+      ]),
     };
   }
   return { id: "title", label: "Page title", status: "pass", detail: `Title looks good: "${title.slice(0, 60)}".`, fix: null };
@@ -247,7 +303,12 @@ function checkH1(html: string): SiteCheck {
       label: "H1 heading",
       status: "fail",
       detail: "No H1 heading found on your homepage.",
-      fix: fix("Add a single clear H1", "Give the page one H1 that states, in plain words, what you do — answer-engines use it as the page's headline claim.", 10, "medium"),
+      fix: fix("Add a single clear H1", "Give the page one H1 that states, in plain words, what you do — answer-engines use it as the page's headline claim.", 10, "medium", [
+        "Add one `<h1>` near the top of your homepage.",
+        "State, in plain words, what you do — not a clever slogan.",
+        "Make sure there's only one `<h1>`; demote any others to `<h2>`.",
+        "Re-scan to confirm.",
+      ]),
     };
   }
   if (count > 1) {
@@ -256,7 +317,12 @@ function checkH1(html: string): SiteCheck {
       label: "H1 heading",
       status: "warn",
       detail: `Found ${count} H1s — a page should have exactly one.`,
-      fix: fix("Use exactly one H1", "Keep a single H1 as the page's headline and demote the rest to H2/H3 so the structure is unambiguous.", 10, "low"),
+      fix: fix("Use exactly one H1", "Keep a single H1 as the page's headline and demote the rest to H2/H3 so the structure is unambiguous.", 10, "low", [
+        "Pick the one heading that best states what the page is about — keep it as `<h1>`.",
+        "Change every other `<h1>` to `<h2>` or `<h3>`.",
+        "Keep headings in a logical order (h1 → h2 → h3).",
+        "Re-scan to confirm a single H1.",
+      ]),
     };
   }
   return { id: "h1", label: "H1 heading", status: "pass", detail: "Your homepage has exactly one H1.", fix: null };
@@ -272,7 +338,12 @@ function checkMetaDescription(html: string): SiteCheck {
       label: "Meta description",
       status: "fail",
       detail: "No meta description on your homepage.",
-      fix: fix("Add a meta description", "Add a 120–160 character meta description that summarizes the page in a sentence an engine could quote.", 10, "low"),
+      fix: fix("Add a meta description", "Add a 120–160 character meta description that summarizes the page in a sentence an engine could quote.", 10, "low", [
+        "Add a `<meta name=\"description\">` tag to your homepage `<head>`.",
+        "Write 120–160 characters summarizing the page in one quotable sentence.",
+        "Include the core thing you do and who it's for.",
+        "Re-scan to confirm.",
+      ]),
     };
   }
   return { id: "meta-description", label: "Meta description", status: "pass", detail: "A meta description is present.", fix: null };
@@ -320,6 +391,12 @@ function checkSsr(home: Fetched | null): SiteCheck {
         "Several AI crawlers (notably GPTBot) don't run JavaScript — they see only your raw HTML. Server-side render or pre-render your key content (or return static HTML to bot user-agents) so the facts you want cited are in the initial response. Test with View Source: if the facts aren't there, the bot never sees them.",
         60,
         "high",
+        [
+          "Open your homepage and choose \"View Source\" — check whether your key facts/copy are actually in the raw HTML.",
+          "If they're missing, enable server-side rendering or pre-rendering for those pages (SSR/SSG/prerender).",
+          "Confirm the important text is present in the initial HTML response, not injected later by JS.",
+          "Re-scan to confirm bots can read your content.",
+        ],
       ),
     };
   }
@@ -339,6 +416,12 @@ function checkSchema(html: string): SiteCheck {
         "Add Organization and SoftwareApplication (or Product) JSON-LD, plus FAQPage on a page with a Q&A block. Schema feeds your brand entity straight into the AI knowledge graph.",
         25,
         "medium",
+        [
+          "Add an `Organization` JSON-LD block (name, url, logo, sameAs links to your profiles) to your homepage.",
+          "Add `SoftwareApplication` or `Product` JSON-LD describing what you offer.",
+          "Add `FAQPage` JSON-LD wherever you have a Q&A block.",
+          "Validate with Google's Rich Results Test, then re-scan.",
+        ],
       ),
     };
   }

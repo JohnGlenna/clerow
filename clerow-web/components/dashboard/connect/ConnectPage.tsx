@@ -162,6 +162,20 @@ export function ConnectPage() {
         ))}
       </div>
 
+      <h2 className="lp-sec">What Clerow can ship for you</h2>
+      <div className="cnx-modes">
+        <div className="cnx-mode">
+          <div className="cnx-mode-h"><span className="cnx-mode-ic on">🛠️</span><div><b>On your site → it ships it</b><span>Fully automated</span></div></div>
+          <p>robots.txt, llms.txt, schema, FAQ blocks, comparison &amp; landing pages — your agent generates the file <b>and writes it into your repo / opens a PR</b>. You just review and merge.</p>
+          <div className="cnx-mode-tags">{["robots.txt", "llms.txt", "JSON-LD schema", "FAQ + pages"].map((t) => <span key={t}>{t}</span>)}</div>
+        </div>
+        <div className="cnx-mode">
+          <div className="cnx-mode-h"><span className="cnx-mode-ic off">✍️</span><div><b>Off your site → it drafts it, you post</b><span>Part A by Clerow · Part B by you</span></div></div>
+          <p>Reddit answers, G2 / Capterra listings, guest posts, forum replies — an agent <b>can&apos;t post these for you</b>, so Clerow writes the exact copy and tells you where it goes. You paste it where AI already looks.</p>
+          <div className="cnx-mode-tags">{["Reddit / forums", "G2 · Capterra", "Guest posts", "Directories"].map((t) => <span key={t}>{t}</span>)}</div>
+        </div>
+      </div>
+
       <h2 className="lp-sec">Five tools, one connector</h2>
       <div className="cnx-tools">
         <CnxTool name="get_visibility">

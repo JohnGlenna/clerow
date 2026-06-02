@@ -34,8 +34,8 @@ const SYSTEM =
   "- l2-comparison-table: is there an honest comparison/feature table vs alternatives?\n" +
   "- l2-eeat: author credentials, first-hand proof (\"we tested…\"), named stats/sources, disclosures?\n" +
   "- l2-freshness: a visible \"last updated\" date or clearly recent content?\n" +
-  "For each: status 'pass' (already good) or 'fail' (missing/weak). For every non-pass write a SPECIFIC fix that references what's actually on THIS page (quote/paraphrase the real H1, headings, copy). " +
-  'Return ONLY JSON, no prose: {"checks":[{"id":"l2-answer-first","status":"pass"|"fail","detail":"what you found on the page","fix":{"title":"…","detail":"…","minutes":20,"impact":"low|medium|high|very high"}}]}. ' +
+  "For each: status 'pass' (already good) or 'fail' (missing/weak). For every non-pass write a SPECIFIC fix that references what's actually on THIS page (quote/paraphrase the real H1, headings, copy), plus a `steps` array of 3–4 short, concrete, ordered actions the user can follow (reference the real page; wrap any file paths or code tokens in backticks; end with a 're-scan' step). " +
+  'Return ONLY JSON, no prose: {"checks":[{"id":"l2-answer-first","status":"pass"|"fail","detail":"what you found on the page","fix":{"title":"…","detail":"…","minutes":20,"impact":"low|medium|high|very high","steps":["…","…","…"]}}]}. ' +
   "Omit fix when status is pass.";
 
 function apiKey(): string {
@@ -44,13 +44,14 @@ function apiKey(): string {
   return key;
 }
 
-type RawCheck = { id?: string; status?: string; detail?: string; fix?: { title?: string; detail?: string; minutes?: number; impact?: string } };
+type RawCheck = { id?: string; status?: string; detail?: string; fix?: { title?: string; detail?: string; minutes?: number; impact?: string; steps?: unknown } };
 
 function toFix(raw: RawCheck["fix"]): SiteCheckFix | null {
   if (!raw?.title || !raw?.detail) return null;
   const impact = (IMPACTS.has(raw.impact as GeoStep["impact"]) ? raw.impact : "medium") as GeoStep["impact"];
   const minutes = typeof raw.minutes === "number" && raw.minutes > 0 ? raw.minutes : 20;
-  return { title: String(raw.title), detail: String(raw.detail), minutes, impact, xp: impactXp(impact) };
+  const steps = Array.isArray(raw.steps) ? raw.steps.filter((s) => typeof s === "string").map(String).slice(0, 6) : [];
+  return { title: String(raw.title), detail: String(raw.detail), minutes, impact, xp: impactXp(impact), steps };
 }
 
 // Grade the page. Throws on API/key/parse failure (caller treats it best-effort).
