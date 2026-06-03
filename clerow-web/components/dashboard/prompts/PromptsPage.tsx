@@ -22,6 +22,7 @@ export function PromptsPage() {
       kind: "task",
       id: null,
       promptId: p.id,
+      crumb: "Win the queries",
       title: `Win the query: "${p.text}"`,
       why: "Ship a focused page that answers this query and names you as a top option, then get it cited — Clerow generates the draft for you.",
       xp: 60,

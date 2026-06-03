@@ -18,7 +18,7 @@ export function NextMoveHero() {
   const canMcp = lt.channel !== "offsite";
   const effort = lt.minutes ? `~${lt.minutes} min` : (lt.meta.split("·")[0] ?? "").replace(/≈/g, "").trim() || "~5 min";
 
-  const task: SheetTask = { kind: "task", id: lt.id, channel: lt.channel, title: lt.title, why: lt.detail, xp: lt.xp, minutes: lt.minutes, steps: lt.steps, ladderKey: lt.key };
+  const task: SheetTask = { kind: "task", id: lt.id, channel: lt.channel, title: lt.title, why: lt.detail, xp: lt.xp, minutes: lt.minutes, steps: lt.steps, ladderKey: lt.key, crumb: lvl.title };
   const open = () => openTask(task);
 
   return (

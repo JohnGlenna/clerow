@@ -320,7 +320,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
     <div className="tm-scrim" onClick={close}>
       <div className="tm-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="tm-head">
-          <span className="tm-crumb">{offsite ? "Off-site authority" : "Foundations"}</span>
+          <span className="tm-crumb">{task.crumb ?? (offsite ? "Off-site authority" : "Foundations")}</span>
           <div className="tm-head-r">
             {task.id && <button className="tm-skip" onClick={skip}>Skip</button>}
             <button className="tm-x" onClick={close} aria-label="Close">✕</button>

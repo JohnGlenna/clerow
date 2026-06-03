@@ -137,7 +137,7 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
               xp={t.xp}
               start={kind === "current" && ti === firstCurrent}
               mascot={kind === "current" && ti === firstCurrent}
-              onClick={clickable ? () => onOpen({ kind: "task", id: t.id, channel: t.channel, title: t.title, why: t.detail, xp: t.xp, minutes: t.minutes, steps: t.steps, ladderKey: t.key }) : undefined}
+              onClick={clickable ? () => onOpen({ kind: "task", id: t.id, channel: t.channel, title: t.title, why: t.detail, xp: t.xp, minutes: t.minutes, steps: t.steps, ladderKey: t.key, crumb: lvl.title }) : undefined}
             />
           );
         });
