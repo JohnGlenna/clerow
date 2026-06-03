@@ -95,6 +95,26 @@ function buildUserPrompt(input: FixContentInput): string {
   return lines.filter((l) => l !== "").join("\n");
 }
 
+// Build a copy-paste-ready *brief* for a calling agent (e.g. the Clerow MCP's
+// own client — Claude Code, Cursor) to write the content itself, instead of
+// Clerow spending a model call. Reuses the exact same tuned SYSTEM rules + the
+// brand/competitor/prompt context buildUserPrompt assembles, so a local agent
+// writes to the same GEO spec the server-side generator would have followed.
+export function buildContentBrief(input: FixContentInput): string {
+  return [
+    `You are writing AEO/GEO content for ${input.brand.company}. Follow the rules below, then write the finished file and save it into the repo.`,
+    "",
+    "## Writing rules",
+    SYSTEM,
+    "",
+    "## Context",
+    buildUserPrompt(input),
+    "",
+    "## Your task",
+    "Write the finished, copy-paste-ready content now (Markdown), matching the rules above and the surrounding site's structure and voice, then save it into the repo.",
+  ].join("\n");
+}
+
 // Yield the `data:` payloads of an SSE response, one per line. Both the Anthropic
 // Messages API and the xAI Responses API stream as `data: {json}` lines.
 async function* sseLines(res: Response): AsyncGenerator<string> {

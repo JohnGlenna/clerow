@@ -12,9 +12,8 @@ import { loadBrandSnapshot } from "../scan/snapshot";
 import { ensureSiteAudit } from "../audit/ensure";
 import { buildLadder, ensureLadderTasks, type LadderTask } from "../ladder";
 import { assembleLadderContext } from "../scan/ladderContext";
-import { generateFixContent } from "../content/generate";
+import { buildContentBrief } from "../content/generate";
 import { buildRobotsTxt, buildLlmsTxt } from "../content/files";
-import { getSubscription, isSubscribed } from "../billing/subscription";
 import type { BrandProfile } from "../types";
 
 type Db = SupabaseClient<Database>;
@@ -59,8 +58,16 @@ function brandProfile(b: BrandRow): BrandProfile {
   };
 }
 
-async function isPaid(admin: Db, userId: string): Promise<boolean> {
-  return isSubscribed(await getSubscription(admin, userId));
+// The MCP is free but deliberately scoped to Level 1 ("Foundations") — the rest
+// of the climb lives in the paid Clerow dashboard. A task above Level 1 gets this
+// friendly pointer rather than an error the calling agent would choke on.
+const LEVEL1_ONLY_NOTE =
+  "The Clerow MCP is free but covers Level 1 (Foundations) only. Levels 2–5 — on-page & structure, authority & citations, winning buyer queries, and measuring — require a Clerow Premium subscription and are worked in the dashboard.";
+
+function higherLevel(level: number | null) {
+  return text(
+    `This task is part of Level ${level ?? "2+"}, which requires a Clerow Premium subscription. The free MCP covers Level 1 (Foundations) only — upgrade in the Clerow dashboard to unlock Levels 2–5.`,
+  );
 }
 
 // Build the same ladder the dashboard shows (idempotently seeds active/open levels).
@@ -105,16 +112,17 @@ export function registerTools(server: McpServer) {
   // --- READ: the prioritized task ladder (current level) ---
   server.tool(
     "list_tasks",
-    "List the brand's prioritized GEO tasks ('The Climb'). Returns the current active level's tasks (id, title, detail, impact, xp) plus a summary of every level. Use get_task_content to generate what to ship, then complete_task.",
+    "List the brand's free Level 1 ('Foundations') GEO tasks — the technical quick wins to get read & cited by AI (id, title, detail, impact, xp) — plus a summary of every level (Levels 2–5 live in the Clerow dashboard). Use get_task_content to get what to ship, then complete_task.",
     async (extra) => {
       const r = await resolveCtx(extra.authInfo);
       if (!r.ok) return r.result;
       const { ladder } = await loadLadder(r.ctx.admin, r.ctx.brand);
-      const active = ladder.levels.find((l) => l.state === "active");
+      const level1 = ladder.levels.find((l) => l.level === 1);
       return json({
         currentLevel: ladder.currentLevel,
         levels: ladder.levels.map((l) => ({ level: l.level, title: l.title, state: l.state, done: l.doneCount, total: l.total })),
-        activeTasks: (active?.tasks ?? []).map((t) => ({ id: t.id, key: t.key, title: t.title, detail: t.detail, impact: t.impact, xp: t.xp, done: t.done })),
+        activeTasks: (level1?.tasks ?? []).map((t) => ({ id: t.id, key: t.key, title: t.title, detail: t.detail, impact: t.impact, xp: t.xp, done: t.done })),
+        note: LEVEL1_ONLY_NOTE,
       });
     },
   );
@@ -139,34 +147,40 @@ export function registerTools(server: McpServer) {
   // --- ACT: generate the ready-to-ship artifact for a task (paid) ---
   server.tool(
     "get_task_content",
-    "Generate the finished, ready-to-ship content/file for a task id (from list_tasks). Returns an actual robots.txt or llms.txt file when relevant, otherwise copy-paste-ready Markdown (FAQ + JSON-LD, comparison page, landing/how-to draft). Requires an active Clerow subscription.",
+    "Get what to ship for a Level 1 task id (from list_tasks). Returns an actual robots.txt or llms.txt file when relevant, otherwise a brief — the GEO writing rules plus the brand/competitor context — for YOU (the calling agent) to write the finished, repo-aware content from. Free; covers Level 1 only.",
     { taskId: z.string().describe("A task id from list_tasks") },
     async ({ taskId }, extra) => {
       const r = await resolveCtx(extra.authInfo);
       if (!r.ok) return r.result;
-      const { admin, brand, userId } = r.ctx;
-      if (!(await isPaid(admin, userId)))
-        return fail("Content generation requires an active Clerow subscription. Reading tasks and the audit is free.");
+      const { admin, brand } = r.ctx;
 
       const { ladder, primaryPrompt, competitorsAhead } = await loadLadder(admin, brand);
-      const match: LadderTask | undefined = ladder.levels.flatMap((l) => l.tasks).find((t) => t.id === taskId);
+      const containing = ladder.levels.find((l) => l.tasks.some((t) => t.id === taskId));
+      const match: LadderTask | undefined = containing?.tasks.find((t) => t.id === taskId);
 
-      // Deterministic files for the technical fixes.
+      // Resolve the task's level (for the Level-1 gate) and its title/detail —
+      // falling back to the stored task row if it isn't in the built ladder.
+      let level = containing?.level ?? null;
+      let title = match?.title;
+      let detail = match?.detail ?? "";
+      if (!match) {
+        const { data: row } = await admin.from("tasks").select("title, meta, level").eq("id", taskId).eq("brand_id", brand.id).maybeSingle();
+        if (!row) return fail("Task not found for this brand.");
+        title = row.title;
+        detail = row.meta;
+        level = row.level;
+      }
+      if (level !== 1) return higherLevel(level);
+      if (!title) return fail("Task not found for this brand.");
+
+      // Deterministic files for the technical fixes — no model call needed.
       const key = match?.key ?? "";
       if (key.includes("llms")) return text(buildLlmsTxt(brand));
       if (key.includes("robots")) return text(buildRobotsTxt(brand));
 
-      // Fall back to the brand's stored task row if it isn't in the active ladder.
-      let title = match?.title;
-      let detail = match?.detail ?? "";
-      if (!title) {
-        const { data: row } = await admin.from("tasks").select("title, meta").eq("id", taskId).eq("brand_id", brand.id).maybeSingle();
-        if (!row) return fail("Task not found for this brand.");
-        title = row.title;
-        detail = row.meta;
-      }
-
-      const { content } = await generateFixContent({
+      // Otherwise hand the calling agent a brief and let IT write the content
+      // (repo-aware, and the free MCP spends no model call of its own).
+      const brief = buildContentBrief({
         brand: brandProfile(brand),
         title,
         detail,
@@ -179,24 +193,26 @@ export function registerTools(server: McpServer) {
       // of claiming it published it.
       if (match?.channel === "offsite") {
         return text(
-          `> NOTE: This is an off-site task — you (the agent) cannot publish it. Give the draft below to the user to post manually at the relevant third-party site, then call complete_task once they confirm.\n\n${content}`,
+          `> NOTE: This is an off-site task — you (the agent) cannot publish it. Write the draft per the brief below, then give it to the user to post manually at the relevant third-party site, and call complete_task once they confirm.\n\n${brief}`,
         );
       }
-      return text(content);
+      return text(brief);
     },
   );
 
   // --- ACT: mark a task done (keeps the streak / earns XP) (paid) ---
   server.tool(
     "complete_task",
-    "Mark a task done after the agent has shipped it. Stamps completion so it keeps the user's Clerow streak and awards XP. Requires an active Clerow subscription.",
+    "Mark a Level 1 task done after the agent has shipped it. Stamps completion so it keeps the user's Clerow streak and awards XP. Free; covers Level 1 only.",
     { taskId: z.string().describe("A task id from list_tasks") },
     async ({ taskId }, extra) => {
       const r = await resolveCtx(extra.authInfo);
       if (!r.ok) return r.result;
-      const { admin, brand, userId } = r.ctx;
-      if (!(await isPaid(admin, userId)))
-        return fail("Completing tasks via MCP requires an active Clerow subscription.");
+      const { admin, brand } = r.ctx;
+      // Gate to Level 1 before mutating — don't mark a higher-level task done.
+      const { data: row } = await admin.from("tasks").select("level").eq("id", taskId).eq("brand_id", brand.id).maybeSingle();
+      if (!row) return fail("Task not found for this brand.");
+      if (row.level !== 1) return higherLevel(row.level);
       const { data, error } = await admin
         .from("tasks")
         .update({ done: true, completed_at: new Date().toISOString() })
