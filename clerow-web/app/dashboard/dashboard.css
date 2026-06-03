@@ -198,20 +198,21 @@
 .btn-upg:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--blue-deep); }
 .btn-upg:disabled { opacity: .7; cursor: default; }
 
-/* upgrade popup (modal) */
-.upg-sheet { position: relative; width: 100%; max-width: 460px; background: var(--surface); border: 2px solid var(--line); border-radius: 24px; padding: 30px 26px 22px; text-align: center; box-shadow: 0 30px 70px -18px rgba(0,0,0,.6); }
-.upg-x { position: absolute; top: 14px; right: 16px; background: none; border: 0; color: var(--ink-3); font-size: 22px; line-height: 1; }
+/* upgrade popup (modal) — pin the dark pop-up palette (mounts outside .ld-root, so
+   var(--surface) would resolve to the light :root theme and turn it white). */
+.upg-sheet { position: relative; width: 100%; max-width: 460px; background: linear-gradient(180deg,#15252B,#0F1A1F); border: 1px solid #273A42; border-radius: 24px; padding: 30px 26px 22px; text-align: center; color: #F3F7F8; box-shadow: 0 44px 100px -28px rgba(0,0,0,.85); }
+.upg-x { position: absolute; top: 14px; right: 16px; background: none; border: 0; color: #A7BCC4; font-size: 22px; line-height: 1; }
 .upg-sheet-ic { width: 62px; height: 62px; border-radius: 18px; margin: 0 auto 14px; background: linear-gradient(180deg,#FFE066,var(--xp)); display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: 0 5px 0 var(--xp-deep); }
-.upg-sheet h2 { margin: 0 0 8px; font-size: 23px; font-weight: 900; letter-spacing: -.02em; }
-.upg-sheet-sub { margin: 0 0 16px; font-size: 14px; color: var(--ink-2); font-weight: 600; line-height: 1.5; }
+.upg-sheet h2 { margin: 0 0 8px; font-size: 23px; font-weight: 900; letter-spacing: -.02em; color: #F3F7F8; }
+.upg-sheet-sub { margin: 0 0 16px; font-size: 14px; color: #A7BCC4; font-weight: 600; line-height: 1.5; }
 .upg-price-big { margin-bottom: 16px; }
-.upg-price-big b { font-size: 44px; font-weight: 900; letter-spacing: -.03em; }
-.upg-price-big span { font-size: 15px; color: var(--ink-3); font-weight: 800; }
+.upg-price-big b { font-size: 44px; font-weight: 900; letter-spacing: -.03em; color: #F3F7F8; }
+.upg-price-big span { font-size: 15px; color: #6E848C; font-weight: 800; }
 .upg-sheet-list { list-style: none; padding: 0; margin: 0 0 20px; display: flex; flex-direction: column; gap: 11px; text-align: left; }
-.upg-sheet-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; font-weight: 700; color: var(--ink); }
-.upg-sheet-list .ck { color: var(--green); font-weight: 900; flex: 0 0 auto; }
+.upg-sheet-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; font-weight: 700; color: #F3F7F8; }
+.upg-sheet-list .ck { color: #38A9E0; font-weight: 900; flex: 0 0 auto; }
 .btn-upg--lg { height: 54px; font-size: 15px; }
-.upg-later { background: none; border: 0; color: var(--ink-3); font-weight: 800; font-size: 13.5px; margin-top: 12px; cursor: pointer; }
+.upg-later { background: none; border: 0; color: #6E848C; font-weight: 800; font-size: 13.5px; margin-top: 12px; cursor: pointer; }
 .rail-mini-q { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
 .rail-mini-q:last-child { border-bottom: 0; }
 .rail-mini-q .qc { width: 32px; height: 32px; border-radius: 9px; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; font-size: 15px; flex: 0 0 32px; }
@@ -424,6 +425,23 @@
 
 .ld-root .cnx-code { display: flex; align-items: center; gap: 10px; margin-top: 12px; background: #0D0820; border: 1px solid #34265a; border-radius: 11px; padding: 10px 12px; }
 .ld-root .cnx-code code { flex: 1; font-family: var(--mono); font-size: 12.5px; color: #C9B0FF; word-break: break-all; }
+
+/* connect block — same multi-client setup as the in-task MCP hand-off pop-up */
+.ld-root .cnx-connect { background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+.ld-root .cnx-connect-h { font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--blue); }
+.ld-root .cnx-connect-note { margin: 8px 0 14px; font-size: 13.5px; color: var(--ink-2); font-weight: 600; line-height: 1.5; }
+.ld-root .cnx-connect-note b { color: var(--ink); }
+.ld-root .cnx-clienttabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.ld-root .cnx-clienttab { font-size: 12.5px; font-weight: 800; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; cursor: pointer; }
+.ld-root .cnx-clienttab:hover { border-color: var(--blue-mid); color: var(--ink); }
+.ld-root .cnx-clienttab.on { color: var(--blue); background: var(--blue-soft); border-color: var(--blue-mid); }
+.ld-root .cnx-cmd { border: 1px solid #34265a; border-radius: 12px; overflow: hidden; background: #0D0820; }
+.ld-root .cnx-cmd-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px 9px 14px; font-size: 12px; font-weight: 700; color: #C9B8EC; border-bottom: 1px solid #34265a; }
+.ld-root .cnx-cmd-copy { flex: 0 0 auto; background: linear-gradient(180deg,#B97CF5,var(--violet)); border: 0; color: #fff; font-family: inherit; font-weight: 900; font-size: 12px; padding: 7px 12px; border-radius: 9px; box-shadow: 0 3px 0 var(--violet-deep); cursor: pointer; }
+.ld-root .cnx-cmd-copy:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--violet-deep); }
+.ld-root .cnx-cmd-copy.on { background: var(--blue); box-shadow: 0 3px 0 var(--blue-deep); }
+.ld-root .cnx-cmd pre { margin: 0; padding: 15px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: #D9C2FF; white-space: pre-wrap; word-break: break-word; }
+.ld-root .cnx-connect-hint { font-size: 12.5px; color: var(--ink-3); margin: 10px 2px 0; line-height: 1.5; }
 
 .ld-root .cnx-keybtn { margin-top: 12px; border: 0; border-radius: 11px; padding: 11px 18px; font-weight: 900; font-size: 13.5px; background: linear-gradient(180deg,#B97CF5,var(--violet)); color: #fff; box-shadow: 0 4px 0 var(--violet-deep); }
 .ld-root .cnx-keybtn:disabled { opacity: .6; }
