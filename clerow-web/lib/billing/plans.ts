@@ -18,15 +18,15 @@ export type Plan = {
   /** Max prompt-scans per brand per rolling 24h (legacy hint; budget is the real cap). */
   dailyScans: number;
   /** Monthly API-cost ceiling in USD — the real per-plan COGS guard, enforced in
-   *  limits.ts against summed scan est_cost. Founder $29 plan caps at $10 of spend
-   *  (raised from $5 when Founder gained all 5 models + per-level multi-prompt scans). */
+   *  limits.ts against summed scan est_cost. The Premium $29 plan caps at $10 of spend
+   *  (raised from $5 when it gained all 5 models + per-level multi-prompt scans). */
   monthlyBudgetUsd: number;
 };
 
 // `maxEngines` + `monthlyBudgetUsd` are the cost ceiling per plan, enforced
 // server-side (see lib/billing/limits.ts + cost.ts). Tune as COGS/pricing demand.
 export const PLANS: Record<PlanKey, Plan> = {
-  founder:    { key: "founder",    name: "Founder",        price: 29,  priceEnv: "STRIPE_PRICE_FOUNDER",    checkout: true,  maxEngines: 5, dailyScans: 25,   monthlyBudgetUsd: 10 },
+  founder:    { key: "founder",    name: "Premium",        price: 29,  priceEnv: "STRIPE_PRICE_FOUNDER",    checkout: true,  maxEngines: 5, dailyScans: 25,   monthlyBudgetUsd: 10 },
   team:       { key: "team",       name: "Marketing Team", price: 89,  priceEnv: "STRIPE_PRICE_TEAM",       checkout: true,  maxEngines: 5, dailyScans: 100,  monthlyBudgetUsd: 13 },
   enterprise: { key: "enterprise", name: "Enterprise",     price: 249, priceEnv: "STRIPE_PRICE_ENTERPRISE", checkout: false, maxEngines: 5, dailyScans: 1000, monthlyBudgetUsd: 35 },
 };

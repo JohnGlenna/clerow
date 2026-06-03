@@ -24,9 +24,13 @@ function readEnv(key) {
 
 const stripe = new Stripe(readEnv("STRIPE_SECRET_KEY"));
 
-// key → env var name, product name, monthly price in whole dollars
+// key → env var name, product name, monthly price in whole dollars.
+// NOTE: the "founder" plan is branded "Premium" in the UI; the plan key + env var
+// stay `founder`/STRIPE_PRICE_FOUNDER so existing prices/subscriptions keep working.
+// To rename the EXISTING product, do it in the Stripe Dashboard (findOrCreateProduct
+// matches on name, so re-running this after a rename would mint a NEW product + price).
 const PLANS = [
-  { key: "founder",    env: "STRIPE_PRICE_FOUNDER",    name: "Clerow Founder",        dollars: 29 },
+  { key: "founder",    env: "STRIPE_PRICE_FOUNDER",    name: "Clerow Premium",        dollars: 29 },
   { key: "team",       env: "STRIPE_PRICE_TEAM",       name: "Clerow Marketing Team", dollars: 89 },
   { key: "enterprise", env: "STRIPE_PRICE_ENTERPRISE", name: "Clerow Enterprise",     dollars: 249 },
 ];

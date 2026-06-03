@@ -224,13 +224,13 @@ function Pricing({ onStart }: { onStart: () => void }) {
           <div className="price feat">
             <span className="tag">⭐ For founders &amp; small teams</span>
             <span className="pic">🦉</span>
-            <span className="nm">Founder</span>
+            <span className="nm">Premium</span>
             <div className="amt"><span className="c">$</span>29</div>
             <div className="per">per month · cancel anytime</div>
             <ul>{lines.map((f, j) => <li key={j}><span className="ck">✓</span>{f}</li>)}</ul>
             <button className="btn btn-primary" onClick={onStart}>Subscribe — $29/mo</button>
             <p style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 700, margin: "12px 0 0", textAlign: "center" }}>
-              Free: your first scan (Perplexity) + Level 1 fixes.
+              Free: your first scan (ChatGPT) + Level 1 fixes.
             </p>
           </div>
         </div>

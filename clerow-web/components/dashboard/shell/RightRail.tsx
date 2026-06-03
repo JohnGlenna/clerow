@@ -145,7 +145,7 @@ export function RightRail({ data }: { data: DashboardData }) {
       {!data.subscribed && (
         <div className="upg-card">
           <div className="upg-head">
-            <span className="upg-tag">⭐ Founder plan</span>
+            <span className="upg-tag">⭐ Premium plan</span>
             <span className="upg-price"><b>$29</b>/mo</span>
           </div>
           <h4>Unlock every level &amp; all 5 models</h4>

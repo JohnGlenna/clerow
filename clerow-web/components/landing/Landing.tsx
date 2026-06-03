@@ -524,7 +524,7 @@ function LandingPricing() {
   const tiers = [
     {
       key: "founder",
-      name: "Founder",
+      name: "Premium",
       icon: "owl" as GameIconName,
       desc: "For solo founders shipping by themselves.",
       monthly: 29,
@@ -535,7 +535,7 @@ function LandingPricing() {
         "Punch list with XP & streaks",
         "Email digest",
       ],
-      cta: "Get founder plan",
+      cta: "Get premium plan",
       tag: undefined as string | undefined,
     },
     {

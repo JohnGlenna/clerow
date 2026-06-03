@@ -79,14 +79,14 @@ async function main() {
     .eq("brand_id", brand.id);
   console.log("prompts discovered:", promptCount);
 
-  // ---- 4. subscribe john → Founder (so the paid full scan is allowed) ----
-  h("4. SUBSCRIBE john → Founder (active)");
+  // ---- 4. subscribe john → Premium (so the paid full scan is allowed) ----
+  h("4. SUBSCRIBE john → Premium (active)");
   const { error: se } = await admin.from("subscriptions").upsert(
     { user_id: userId, status: "active", plan: "founder", stripe_customer_id: "test_" + userId.slice(0, 8) },
     { onConflict: "user_id" },
   );
   if (se) throw new Error("subscription upsert failed: " + se.message);
-  console.log("subscription: founder / active");
+  console.log("subscription: premium (plan key: founder) / active");
 
   // ---- 5. FULL SCAN — mirrors POST /api/scan/full ----
   h("5. FULL SCAN  (site crawl + top 5 prompts × all 5 models)");

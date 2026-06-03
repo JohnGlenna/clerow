@@ -12,7 +12,7 @@ import { useSubscription, startCheckout, openBillingPortal } from "@/lib/useSubs
 // (which lives on the Connect page) were dropped in the move.
 
 const PLAN_LABELS: Record<string, { name: string; price: number; desc: string }> = {
-  founder: { name: "Founder", price: 29, desc: "1 domain · all 5 AI models" },
+  founder: { name: "Premium", price: 29, desc: "1 domain · all 5 AI models" },
   team: { name: "Marketing Team", price: 89, desc: "1 domain · 5 seats · all models" },
   enterprise: { name: "Enterprise", price: 249, desc: "1 domain · unlimited seats" },
 };
@@ -164,17 +164,14 @@ function BillingCard() {
                 {subscribed && plan ? plan.name : "Free"}
                 {subscribed && (<span className={`settings-plan-badge ${cancelling ? "is-warn" : ""}`}>{cancelling ? "Cancels at period end" : "Active"}</span>)}
               </div>
-              <div className="settings-plan-desc">{subscribed && plan ? `$${plan.price}/mo · ${plan.desc}` : "One free Perplexity scan. Upgrade to track every engine, daily."}</div>
+              <div className="settings-plan-desc">{subscribed && plan ? `$${plan.price}/mo · ${plan.desc}` : "One free ChatGPT scan. Upgrade to track every engine, daily."}</div>
             </div>
           </div>
           <div className="settings-actions">
             {subscribed ? (
               <button className="btn btn--ghost btn--sm" onClick={() => openBillingPortal()}><Icon name="external" size={14} /> Manage billing</button>
             ) : (
-              <>
-                <button className="btn btn--primary btn--sm" onClick={() => startCheckout("team")}><Icon name="bolt" size={14} /> Upgrade to Marketing Team</button>
-                <button className="btn btn--ghost btn--sm" onClick={() => startCheckout("founder")}>Founder — $29/mo</button>
-              </>
+              <button className="btn btn--primary btn--sm" onClick={() => startCheckout("founder")}><Icon name="bolt" size={14} /> Upgrade to Premium — $29/mo</button>
             )}
           </div>
         </>
