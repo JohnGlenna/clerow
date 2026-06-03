@@ -14,6 +14,8 @@ export async function GET(req: Request) {
   const clientId = p.get("client_id");
   const redirectUri = p.get("redirect_uri");
   const responseType = p.get("response_type");
+  const codeChallenge = p.get("code_challenge");
+  const codeChallengeMethod = p.get("code_challenge_method");
 
   if (!clientId || !redirectUri) {
     return NextResponse.json(
@@ -23,6 +25,11 @@ export async function GET(req: Request) {
   }
   if (responseType && responseType !== "code") {
     return redirectError(redirectUri, p.get("state"), "unsupported_response_type");
+  }
+  // OAuth 2.1: PKCE is mandatory and S256-only. Reject before sending the user to
+  // the consent screen so a non-conforming client fails fast.
+  if (!codeChallenge || codeChallengeMethod !== "S256") {
+    return redirectError(redirectUri, p.get("state"), "invalid_request");
   }
 
   const admin = createAdminClient();

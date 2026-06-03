@@ -22,6 +22,7 @@ export type Database = {
         Row: {
           brand_id: string | null
           created_at: string
+          expires_at: string | null
           id: string
           key_hash: string
           last_used_at: string | null
@@ -33,6 +34,7 @@ export type Database = {
         Insert: {
           brand_id?: string | null
           created_at?: string
+          expires_at?: string | null
           id?: string
           key_hash: string
           last_used_at?: string | null
@@ -44,6 +46,7 @@ export type Database = {
         Update: {
           brand_id?: string | null
           created_at?: string
+          expires_at?: string | null
           id?: string
           key_hash?: string
           last_used_at?: string | null
@@ -59,6 +62,51 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "brands"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      oauth_refresh_tokens: {
+        Row: {
+          access_key_id: string | null
+          client_id: string
+          created_at: string
+          resource: string | null
+          scope: string | null
+          token_hash: string
+          user_id: string
+        }
+        Insert: {
+          access_key_id?: string | null
+          client_id: string
+          created_at?: string
+          resource?: string | null
+          scope?: string | null
+          token_hash: string
+          user_id: string
+        }
+        Update: {
+          access_key_id?: string | null
+          client_id?: string
+          created_at?: string
+          resource?: string | null
+          scope?: string | null
+          token_hash?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_refresh_tokens_access_key_id_fkey"
+            columns: ["access_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oauth_refresh_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "oauth_clients"
+            referencedColumns: ["client_id"]
           },
         ]
       }

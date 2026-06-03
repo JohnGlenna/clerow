@@ -46,26 +46,11 @@ function CnxTool({ name, pro, children }: { name: string; pro?: boolean; childre
 }
 
 // The Clerow MCP connect guide — plug Clerow into Claude / Cursor / any agent.
+// One way in: paste the URL, sign in, approve. OAuth does the rest — no keys to
+// copy, paste, or rotate.
 export function ConnectPage() {
   const [method, setMethod] = React.useState<"claude" | "cli">("claude");
-  const [fresh, setFresh] = React.useState<string | null>(null);
-  const [creating, setCreating] = React.useState(false);
-  const cmd = `claude mcp add --transport http clerow ${MCP_URL} --header "Authorization: Bearer ${fresh ?? "YOUR_KEY"}"`;
-
-  const createKey = async () => {
-    setCreating(true);
-    try {
-      const res = await fetch("/api/keys", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "MCP key" }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (json.plaintext) setFresh(json.plaintext);
-    } finally {
-      setCreating(false);
-    }
-  };
+  const cmd = `claude mcp add --transport http clerow ${MCP_URL}`;
 
   return (
     <div className="ld-page">
@@ -81,6 +66,10 @@ export function ConnectPage() {
           <code>{MCP_URL}</code>
           <CnxCopy value={MCP_URL} label="Copy URL" />
         </div>
+        <p className="cnx-hero-note">
+          🔒 Sign-in handled by OAuth — no API keys to copy or paste. Approve once in your browser and revoke
+          anytime in Settings.
+        </p>
       </div>
 
       <div className="cnx-tabs">
@@ -120,24 +109,17 @@ export function ConnectPage() {
         </ol>
       ) : (
         <ol className="cnx-steps">
-          <CnxStep n={1} t="Create a Clerow MCP key">
-            We only store a hash — copy it now, it won’t be shown again.
-            <button className="cnx-keybtn" onClick={createKey} disabled={creating}>
-              {creating ? "Creating…" : fresh ? "Create another key" : "Create MCP key"}
-            </button>
-            {fresh && (
-              <div className="cnx-fresh">
-                <b>Your new key — copy it now</b>
-                <code>{fresh}</code>
-              </div>
-            )}
-          </CnxStep>
-          <CnxStep n={2} t="Add Clerow to your agent">
-            Run this in your terminal (Cursor and other MCP clients use the same URL + Bearer key).
+          <CnxStep n={1} t="Add Clerow to your agent">
+            Run this in your terminal. Cursor and other MCP clients add the same URL — no key, no header.
             <div className="cnx-code">
               <code>{cmd}</code>
               <CnxCopy value={cmd} />
             </div>
+          </CnxStep>
+          <CnxStep n={2} t="Sign in &amp; approve">
+            The first time your agent calls Clerow it opens this site in your browser. Sign in, click{" "}
+            <b>Approve</b>, and the agent is connected — it stores the token and refreshes it for you. In Claude
+            Code you can trigger this anytime with <code>/mcp</code>.
           </CnxStep>
           <CnxStep n={3} t="Start shipping">
             Ask your agent for your top task, let it generate the file and commit it, then have it mark the task

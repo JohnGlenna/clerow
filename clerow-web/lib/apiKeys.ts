@@ -25,10 +25,28 @@ export function generateKey(): { plaintext: string; hash: string; prefix: string
   return { plaintext, hash: hashKey(plaintext), prefix: plaintext.slice(0, KEY_PREFIX.length + 6) };
 }
 
+// Mint an OAuth access token (a Clerow API key) for a user, with an expiry.
+// Returns the plaintext (handed to the client once) and the row id so the caller
+// can pair it with a refresh token. Used by the OAuth token endpoint.
+export async function mintAccessKey(
+  admin: Db,
+  opts: { userId: string; name: string; ttlSeconds: number },
+): Promise<{ plaintext: string; keyId: string; expiresAt: string } | null> {
+  const { plaintext, hash, prefix } = generateKey();
+  const expiresAt = new Date(Date.now() + opts.ttlSeconds * 1000).toISOString();
+  const { data, error } = await admin
+    .from("api_keys")
+    .insert({ user_id: opts.userId, name: opts.name, key_hash: hash, prefix, expires_at: expiresAt })
+    .select("id")
+    .single();
+  if (error || !data) return null;
+  return { plaintext, keyId: data.id, expiresAt };
+}
+
 export type ResolvedKey = { userId: string; brandId: string | null; keyId: string };
 
 // Resolve a presented Bearer credential to its owner + their current brand.
-// Returns null for missing / malformed / unknown / revoked keys. Stamps
+// Returns null for missing / malformed / unknown / revoked / expired keys. Stamps
 // last_used_at. MUST be called with the admin client (bypasses RLS).
 export async function resolveKey(admin: Db, bearer: string | null | undefined): Promise<ResolvedKey | null> {
   if (!bearer) return null;
@@ -37,10 +55,12 @@ export async function resolveKey(admin: Db, bearer: string | null | undefined): 
 
   const { data: key } = await admin
     .from("api_keys")
-    .select("id, user_id, brand_id, revoked_at")
+    .select("id, user_id, brand_id, revoked_at, expires_at")
     .eq("key_hash", hashKey(token))
     .maybeSingle();
   if (!key || key.revoked_at) return null;
+  // expires_at is null for legacy manually-minted keys (never expire).
+  if (key.expires_at && new Date(key.expires_at).getTime() < Date.now()) return null;
 
   // Use the key's pinned brand, else the user's most recent brand.
   let brandId = key.brand_id;

@@ -238,7 +238,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
             <div className="tm-agents">{AGENTS.map((a) => (<span key={a} className="tm-agent"><span className="tm-agent-dot" />{a}</span>))}</div>
             <div className="tm-stepblock">
               <div className="tm-stepblock-h">Step 1 · Connect Clerow (one-time)</div>
-              <p className="tm-stepblock-note">Two ways: add the Clerow connector in <b>Claude (web &amp; desktop)</b>, or create a key for <b>Claude Code / Codex / Cursor</b>. Set it up once on the Connect page.</p>
+              <p className="tm-stepblock-note">Paste the Clerow server URL into <b>Claude (web &amp; desktop)</b> or <b>Claude Code / Codex / Cursor</b>, then sign in and approve in your browser — no keys to copy. Set it up once on the Connect page.</p>
               <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={() => { onClose(); router.push("/dashboard/connect"); }}>Open the Connect page →</button>
             </div>
             <div className="tm-stepblock">

@@ -16,6 +16,13 @@ export async function POST(req: Request) {
   if (!clientId || !redirectUri) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
+  // PKCE is mandatory (OAuth 2.1). Never mint a code without an S256 challenge.
+  if (!body.code_challenge || body.code_challenge_method !== "S256") {
+    return NextResponse.json(
+      { error: "invalid_request", error_description: "PKCE (S256) is required" },
+      { status: 400 },
+    );
+  }
 
   const supabase = await createClient();
   const {
