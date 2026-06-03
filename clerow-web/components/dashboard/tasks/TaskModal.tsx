@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
 import { PixelProgress } from "../../ui/PixelProgress";
 import { ScanProgress } from "../../scan/ScanProgress";
 import { useScanStream } from "@/lib/useScanStream";
@@ -9,6 +8,34 @@ import { playCheck } from "@/lib/sound";
 import { TASK_FILE, type SheetTask } from "./types";
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Any MCP agent"];
+
+const MCP_URL = "https://clerow.com/api/mcp";
+
+// Per-client connect info shown inline in the MCP hand-off (no keys — the client
+// runs the OAuth browser flow on first call).
+const MCP_CLIENTS = [
+  {
+    key: "claudecode" as const,
+    tab: "Claude Code",
+    label: "Run in your terminal",
+    cmd: `claude mcp add --transport http clerow ${MCP_URL}`,
+    hint: "Then run /mcp in Claude Code and approve in your browser.",
+  },
+  {
+    key: "codex" as const,
+    tab: "Codex",
+    label: "Run in your terminal",
+    cmd: `codex mcp add clerow --url "${MCP_URL}"`,
+    hint: "Codex opens your browser to sign in the first time it calls Clerow.",
+  },
+  {
+    key: "web" as const,
+    tab: "Claude / ChatGPT / Cursor",
+    label: "Add a custom connector with this URL",
+    cmd: MCP_URL,
+    hint: "Settings → Connectors → Add custom connector, paste the URL, then sign in.",
+  },
+];
 
 function domainOf(url: string | null): string {
   if (!url) return "your site";
@@ -49,12 +76,12 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   onClose: () => void; onChanged: () => void; onAddContext: () => void;
 }) {
   const offsite = task.channel === "offsite";
-  const router = useRouter();
   const [view, setView] = React.useState<"main" | "mcp" | "scanning" | "done">(task.kind === "mcp" ? "mcp" : "main");
   const [content, setContent] = React.useState<string>("");
   const [genBusy, setGenBusy] = React.useState(false);
   const [genErr, setGenErr] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
+  const [mcpClient, setMcpClient] = React.useState<"claudecode" | "codex" | "web">("claudecode");
   const scan = useScanStream();
 
   const fileName = task.ladderKey ? TASK_FILE[task.ladderKey] : undefined;
@@ -238,8 +265,13 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
             <div className="tm-agents">{AGENTS.map((a) => (<span key={a} className="tm-agent"><span className="tm-agent-dot" />{a}</span>))}</div>
             <div className="tm-stepblock">
               <div className="tm-stepblock-h">Step 1 · Connect Clerow (one-time)</div>
-              <p className="tm-stepblock-note">Paste the Clerow server URL into <b>Claude (web &amp; desktop)</b> or <b>Claude Code / Codex / Cursor</b>, then sign in and approve in your browser — no keys to copy. Set it up once on the Connect page.</p>
-              <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={() => { onClose(); router.push("/dashboard/connect"); }}>Open the Connect page →</button>
+              <p className="tm-stepblock-note">Add the Clerow MCP server to your agent, then <b>sign in &amp; approve in your browser</b>. No keys, no config — it just works.</p>
+              <div className="tm-clienttabs" role="tablist">
+                {MCP_CLIENTS.map((c) => (
+                  <button key={c.key} role="tab" aria-selected={mcpClient === c.key} className={`tm-clienttab ${mcpClient === c.key ? "on" : ""}`} onClick={() => setMcpClient(c.key)}>{c.tab}</button>
+                ))}
+              </div>
+              {(() => { const c = MCP_CLIENTS.find((x) => x.key === mcpClient)!; return (<><CmdBlock label={c.label} text={c.cmd} /><p className="tm-stepblock-hint">{c.hint}</p></>); })()}
             </div>
             <div className="tm-stepblock">
               <div className="tm-stepblock-h">Step 2 · {task.kind === "mcp" ? "Hand your agent everything" : "Hand your agent this task"}</div>
