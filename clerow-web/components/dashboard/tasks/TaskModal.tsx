@@ -252,8 +252,8 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   // ---- MCP hand-off view -----------------------------------------------------
   if (view === "mcp") {
     const taskCmd = task.kind === "mcp"
-      ? `Using the Clerow MCP, work through all my open Clerow tasks for ${domainOf(brandUrl)}, lowest-effort first.\nShip the on-site fixes as a PR. For off-site tasks (Reddit, directories, guest posts), draft the copy and tell me where to post it.\nThen re-scan and report my ranking across all 5 AI models.`
-      : `Using the Clerow MCP, complete this task for ${domainOf(brandUrl)}:\n"${task.title}"\nApply the fix, then re-scan and report my ranking across all 5 AI models.`;
+      ? `Using the Clerow MCP, work through all my open Clerow tasks for ${domainOf(brandUrl)}, lowest-effort first.\nShip the on-site fixes as a PR. For off-site tasks (Reddit, directories, guest posts), draft the copy and tell me where to post it.`
+      : `Using the Clerow MCP, complete this task for ${domainOf(brandUrl)}:\n"${task.title}"\nApply the fix.`;
     return (
       <div className="tm-scrim" onClick={close}>
         <div className="tm-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
