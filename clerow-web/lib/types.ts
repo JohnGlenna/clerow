@@ -30,6 +30,7 @@ export type DiscoveredPrompt = {
 export type RankedBrand = {
   rank: number;
   name: string;
+  domain: string | null; // brand's website host (e.g. "salesforce.com"), null if unknown
   isYou: boolean;
   visibility: number; // 0–100
   sentiment: BrandSentiment;
@@ -80,6 +81,7 @@ export type DashboardModel = {
 export type DashboardCompetitor = {
   rank: number;
   name: string;
+  domain: string | null; // resolved website host, null if the scan couldn't determine one
   isYou: boolean;
   visibility: number;
   sentiment: BrandSentiment;

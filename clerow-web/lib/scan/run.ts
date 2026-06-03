@@ -99,6 +99,7 @@ async function persistEngineResult(
       scan_result_id: result.id,
       rank: b.rank,
       name: b.name,
+      domain: b.domain,
       is_you: b.isYou,
       visibility: b.visibility,
       sentiment: b.sentiment,
@@ -205,13 +206,14 @@ export async function loadLatestFreeResult(db: DB, brandId: string): Promise<Run
 
   const { data: brandRows } = await db
     .from("result_brands")
-    .select("rank, name, is_you, visibility, sentiment, position")
+    .select("rank, name, domain, is_you, visibility, sentiment, position")
     .eq("scan_result_id", pr.id)
     .order("rank", { ascending: true });
 
   const brands: RankedBrand[] = (brandRows ?? []).map((b) => ({
     rank: b.rank,
     name: b.name,
+    domain: b.domain,
     isYou: b.is_you,
     visibility: b.visibility,
     sentiment: b.sentiment,

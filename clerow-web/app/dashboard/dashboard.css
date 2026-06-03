@@ -167,6 +167,9 @@
 .rr-row .mc { width: 24px; height: 24px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: 11px; flex: 0 0 24px; overflow: hidden; }
 .rr-row .mc img { width: 100%; height: 100%; object-fit: contain; }
 .rr-name { flex: 1; font-weight: 800; }
+/* Logo-less fallback: render the brand's domain so the row reads as a real
+   website rather than an ambiguous initial. Monospace + muted = "this is a URL". */
+.rr-domain { font-family: var(--mono); font-weight: 700; font-size: 12.5px; color: var(--ink-2); }
 .rr-you { font-size: 9px; font-weight: 900; background: var(--blue); color: #fff; padding: 1px 6px; border-radius: 5px; margin-left: 7px; letter-spacing: .04em; }
 .rr-v { font-family: var(--mono); font-weight: 800; font-size: 12.5px; color: var(--ink-2); }
 .rr-v.no { color: var(--red); }

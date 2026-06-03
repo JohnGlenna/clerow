@@ -6,6 +6,7 @@ import { ScanProgress } from "../../scan/ScanProgress";
 import { useScanStream } from "@/lib/useScanStream";
 import { playCheck } from "@/lib/sound";
 import { TASK_FILE, type SheetTask } from "./types";
+import { MascotClerow } from "../../Mascot";
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Any MCP agent"];
 
@@ -29,8 +30,15 @@ const MCP_CLIENTS = [
     hint: "Codex opens your browser to sign in the first time it calls Clerow.",
   },
   {
+    key: "ide" as const,
+    tab: "Cursor / VS Code / Kiro",
+    label: "Add to your IDE's MCP config (.cursor/mcp.json, .vscode/mcp.json, …)",
+    cmd: `{\n  "mcpServers": {\n    "clerow": {\n      "url": "${MCP_URL}"\n    }\n  }\n}`,
+    hint: "Works in Cursor, VS Code, Antigravity, Kiro, Windsurf — any IDE that uses the standard MCP JSON config. Then sign in & approve in your browser.",
+  },
+  {
     key: "web" as const,
-    tab: "Claude / ChatGPT / Cursor",
+    tab: "Claude / ChatGPT",
     label: "Add a custom connector with this URL",
     cmd: MCP_URL,
     hint: "Settings → Connectors → Add custom connector, paste the URL, then sign in.",
@@ -81,7 +89,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   const [genBusy, setGenBusy] = React.useState(false);
   const [genErr, setGenErr] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
-  const [mcpClient, setMcpClient] = React.useState<"claudecode" | "codex" | "web">("claudecode");
+  const [mcpClient, setMcpClient] = React.useState<"claudecode" | "codex" | "ide" | "web">("claudecode");
   const scan = useScanStream();
 
   const fileName = task.ladderKey ? TASK_FILE[task.ladderKey] : undefined;
@@ -253,7 +261,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   if (view === "mcp") {
     const taskCmd = task.kind === "mcp"
       ? `Using the Clerow MCP, work through all my open Clerow tasks for ${domainOf(brandUrl)}, lowest-effort first.\nShip the on-site fixes as a PR. For off-site tasks (Reddit, directories, guest posts), draft the copy and tell me where to post it.`
-      : `Using the Clerow MCP, complete this task for ${domainOf(brandUrl)}:\n"${task.title}"\nApply the fix.`;
+      : `Using the Clerow MCP, complete this task for ${domainOf(brandUrl)}:\n"${task.title}"`;
     return (
       <div className="tm-scrim" onClick={close}>
         <div className="tm-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
@@ -265,7 +273,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
             <div className="tm-agents">{AGENTS.map((a) => (<span key={a} className="tm-agent"><span className="tm-agent-dot" />{a}</span>))}</div>
             <div className="tm-stepblock">
               <div className="tm-stepblock-h">Step 1 · Connect Clerow (one-time)</div>
-              <p className="tm-stepblock-note">Add the Clerow MCP server to your agent, then <b>sign in &amp; approve in your browser</b>. No keys, no config — it just works.</p>
+              <p className="tm-stepblock-note">Add the Clerow MCP server to your agent, then <b>sign in &amp; approve in your browser</b>.</p>
               <div className="tm-clienttabs" role="tablist">
                 {MCP_CLIENTS.map((c) => (
                   <button key={c.key} role="tab" aria-selected={mcpClient === c.key} className={`tm-clienttab ${mcpClient === c.key ? "on" : ""}`} onClick={() => setMcpClient(c.key)}>{c.tab}</button>
@@ -373,7 +381,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
         </div>
         <div className="tm-foot">
           <button className="tm-btn tm-btn--go" onClick={markDone}>→ Mark as done</button>
-          {!offsite && <button className="tm-btn tm-btn--ghost" onClick={() => setView("mcp")}>⚡ Let Clerow MCP do it</button>}
+          {!offsite && <button className="tm-btn tm-btn--ghost" onClick={() => setView("mcp")}><span style={{ display: "inline-flex", verticalAlign: "middle", marginRight: 6 }}><MascotClerow size={18} /></span>Let Clerow MCP do it</button>}
         </div>
       </div>
     </div>

@@ -8,40 +8,45 @@ import { domainOf } from "./util";
 import { useOverlay } from "./OverlayProvider";
 import type { DashboardData, DashboardModel } from "@/lib/types";
 
-// Deterministic chip color for a competitor in the placement card — stable across
-// renders (the scan doesn't carry per-brand colors, so we hash the name).
-const RANK_SWATCHES = ["#FF7A45", "#3D7BFF", "#7C3AED", "#10A37F", "#E0457B", "#D97706", "#0EA5E9", "#475569"];
-function swatchFor(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return RANK_SWATCHES[h % RANK_SWATCHES.length];
-}
-
-// Best-effort domain for a brand's logo. We have the exact URL for the user's own
-// brand; for competitors the scan only stores a name, so we guess `<name>.com`.
-function logoDomain(name: string, isYou: boolean, ownUrl?: string): string | null {
+// Best-effort domain for a brand's logo/label. The scan now resolves a real
+// domain per brand (detect.ts); prefer it. Fall back to the user's own connected
+// URL, then to a `<name>.com` guess for older scans that have no stored domain.
+function logoDomain(name: string, isYou: boolean, scanned: string | null, ownUrl?: string): string | null {
+  if (scanned) return scanned;
   if (isYou) return ownUrl ? domainOf(ownUrl) : null;
   const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
   return slug ? `${slug}.com` : null;
 }
 
-// A brand's logo via Clearbit, falling back to a colored initial chip when the
-// logo 404s (unknown/guessed domain) — so the row always renders cleanly.
-function BrandLogo({ name, domain, color }: { name: string; domain: string | null; color: string }) {
+// A brand's identity cell: the fetched logo (via Clearbit) + brand name when a
+// logo loads. When it 404s (unknown/guessed domain) we drop the chip and show
+// the domain itself (e.g. "salesforce.com") instead of an ambiguous initial —
+// so the user can tell the row points at a real website.
+function BrandCell({ name, domain, isYou }: { name: string; domain: string | null; isYou: boolean }) {
   const [ok, setOk] = React.useState(false);
+  const you = isYou ? <span className="rr-you">YOU</span> : null;
   return (
-    <span className="mc" style={{ background: ok ? "#fff" : color }}>
-      {domain && (
-        <img
-          src={`https://logo.clearbit.com/${domain}`}
-          alt=""
-          onLoad={() => setOk(true)}
-          onError={() => setOk(false)}
-          style={{ display: ok ? "block" : "none" }}
-        />
+    <>
+      {ok && domain ? (
+        <span className="mc" style={{ background: "#fff" }}>
+          <img src={`https://logo.clearbit.com/${domain}`} alt="" />
+        </span>
+      ) : (
+        domain && (
+          <img
+            src={`https://logo.clearbit.com/${domain}`}
+            alt=""
+            onLoad={() => setOk(true)}
+            onError={() => setOk(false)}
+            style={{ display: "none" }}
+          />
+        )
       )}
-      {!ok && name.charAt(0).toUpperCase()}
-    </span>
+      <span className={`rr-name ${ok ? "" : "rr-domain"}`}>
+        {ok ? name : domain ?? name}
+        {you}
+      </span>
+    </>
   );
 }
 
@@ -130,12 +135,11 @@ export function RightRail({ data }: { data: DashboardData }) {
             {placementRows.map((row) => (
               <div key={`${row.rank}-${row.name}`} className={`rr-row ${row.isYou ? "me" : ""}`}>
                 <span className="rr-rank">#{row.rank}</span>
-                <BrandLogo
+                <BrandCell
                   name={row.name}
-                  domain={logoDomain(row.name, row.isYou, data.brand?.url)}
-                  color={row.isYou ? "var(--blue)" : swatchFor(row.name)}
+                  domain={logoDomain(row.name, row.isYou, row.domain, data.brand?.url)}
+                  isYou={row.isYou}
                 />
-                <span className="rr-name">{row.name}{row.isYou && <span className="rr-you">YOU</span>}</span>
                 <span className={`rr-v ${row.isYou && !row.visibility ? "no" : ""}`}>{row.visibility}%</span>
               </div>
             ))}

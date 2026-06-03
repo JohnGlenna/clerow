@@ -2,9 +2,36 @@
 
 import React from "react";
 import { MascotClerow } from "../../Mascot";
+import { GameIcon, type GameIconName } from "../../GameIcon";
 import { LDIcon } from "../shell/LDIcon";
-import type { DashboardData, LadderLevel, LadderTask } from "@/lib/types";
+import type { Channel, DashboardData, LadderLevel, LadderTask } from "@/lib/types";
 import type { SheetTask } from "./types";
+
+// A task-appropriate game-art icon for a path node, keyed by the stable ladder_key
+// so the icon reflects what the task actually is (a comparison table, an llms.txt
+// file, a Reddit answer) instead of every node showing the same "①". Falls back to
+// a channel-sensible default for keys we don't recognize (e.g. scan-generated ones).
+function taskIcon(key: string | undefined, channel: Channel | undefined): GameIconName {
+  const k = key ?? "";
+  // Exact matches for the fixed foundation/on-page specs.
+  const EXACT: Record<string, GameIconName> = {
+    "audit-robots-ai": "brain", "audit-llms-txt": "scroll", "audit-h1": "book",
+    "audit-title": "quill", "audit-meta-description": "quill", "audit-crawlable": "search",
+    "audit-https": "bricks", "audit-ssr": "bolt", "audit-schema": "gears", "audit-sitemap": "compass",
+    "l2-answer-first": "chat", "l2-h2-queries": "idea", "l2-comparison-table": "chart",
+    "l2-eeat": "laurels", "l2-freshness": "calendar",
+    "l3-reddit": "chat", "l3-directory": "star", "l3-entity": "world",
+    "l5-rescan": "cycle",
+  };
+  if (EXACT[k]) return EXACT[k];
+  // Prefix matches for the dynamically-keyed specs (one per source/competitor/prompt).
+  if (k.startsWith("l3-source-")) return "megaphone";
+  if (k.startsWith("l4-compare-")) return "swords";
+  if (k.startsWith("l4-prompt-")) return "target";
+  if (k.startsWith("l4-howto")) return "book";
+  // Unknown key — pick by where the fix lives.
+  return channel === "offsite" ? "world" : "gears";
+}
 
 function PathNode({ kind, icon, cap, xp, start, mascot, onClick }: {
   kind: string; icon: React.ReactNode; cap: string; xp?: number | null; start?: boolean; mascot?: boolean; onClick?: () => void;
@@ -105,7 +132,7 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
             <PathNode
               key={t.key}
               kind={kind}
-              icon={kind === "done" ? "✓" : kind === "locked" ? <LDIcon name="lock" /> : "①"}
+              icon={kind === "done" ? <GameIcon name="check" size={34} /> : kind === "locked" ? <LDIcon name="lock" /> : <GameIcon name={taskIcon(t.key, t.channel)} size={34} />}
               cap={t.title}
               xp={t.xp}
               start={kind === "current" && ti === firstCurrent}
@@ -117,7 +144,7 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
         // The full-scan action lives in the prominent top CTA, so the active level
         // only carries the MCP auto-fix entry as a tail node.
         const tailNodes = active ? [
-          <PathNode key="__mcp" kind="mcp" icon="🤖" cap="Auto-fix the rest with Clerow MCP"
+          <PathNode key="__mcp" kind="mcp" icon={<MascotClerow size={46} />} cap="Auto-fix the rest with Clerow MCP"
             onClick={() => onOpen({ kind: "mcp", id: null, title: "Let Clerow MCP fix everything", why: "Connect Clerow to Claude Code, Cursor, or any agent. It reads your open quests, ships the fixes as a PR, and Clerow re-checks every model.", xp: 0 })} />,
         ] : [];
         const nodes = [...taskNodes, ...tailNodes];

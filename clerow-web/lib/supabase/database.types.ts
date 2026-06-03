@@ -387,6 +387,7 @@ export type Database = {
       }
       result_brands: {
         Row: {
+          domain: string | null
           id: string
           is_you: boolean
           name: string
@@ -397,6 +398,7 @@ export type Database = {
           visibility: number
         }
         Insert: {
+          domain?: string | null
           id?: string
           is_you?: boolean
           name: string
@@ -407,6 +409,7 @@ export type Database = {
           visibility?: number
         }
         Update: {
+          domain?: string | null
           id?: string
           is_you?: boolean
           name?: string

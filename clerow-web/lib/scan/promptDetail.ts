@@ -65,6 +65,7 @@ export async function loadPromptDetail(
       list.push({
         rank: row.rank,
         name: row.name,
+        domain: row.domain,
         isYou: row.is_you,
         visibility: Math.round(Number(row.visibility)),
         sentiment: row.sentiment,

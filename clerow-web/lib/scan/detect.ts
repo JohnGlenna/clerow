@@ -18,6 +18,7 @@ const SCHEMA = {
         type: "object",
         properties: {
           name: { type: "string" },
+          domain: { type: ["string", "null"] },
           isYou: { type: "boolean" },
           visibility: { type: "number" },
           sentiment: { type: "string", enum: SENTIMENTS },
@@ -32,11 +33,20 @@ const SCHEMA = {
 
 type RawBrand = {
   name: string;
+  domain?: string | null;
   isYou?: boolean;
   visibility?: number;
   sentiment?: string;
   position?: number | null;
 };
+
+// "https://www.Salesforce.com/crm" or "Salesforce.com" → "salesforce.com".
+// Null unless it looks like a bare host, so a hallucinated sentence can't leak in.
+function cleanDomain(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const host = v.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0];
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) ? host : null;
+}
 
 function coerceSentiment(v: unknown): BrandSentiment {
   return typeof v === "string" && (SENTIMENTS as string[]).includes(v)
@@ -68,7 +78,9 @@ export async function detectRanking(
           "share of the recommendation (the scores across all brands should roughly sum to 100), a " +
           "'sentiment' (pos/neut/neg), and an approximate 'position' (1 = recommended first/most strongly; " +
           "null if only mentioned in passing). Set isYou=true ONLY for the user's brand. " +
-          "If the user's brand is NOT recommended in the answer, do not invent it — just omit it.",
+          "If the user's brand is NOT recommended in the answer, do not invent it — just omit it. " +
+          "Also give 'domain' = the brand's primary website host, lowercase, no protocol or path " +
+          "(e.g. 'salesforce.com'); use null if you are not confident which domain is theirs.",
       },
       {
         role: "user",
@@ -94,6 +106,7 @@ export async function detectRanking(
     .map((b) => ({
       rank: 0,
       name: b.name.trim(),
+      domain: cleanDomain(b.domain),
       // Trust the model's flag, but also catch the brand by name match.
       isYou: Boolean(b.isYou) || norm(b.name) === youKey,
       visibility: Math.max(0, Math.min(100, Number(b.visibility) || 0)),
@@ -112,6 +125,7 @@ export async function detectRanking(
     youRow = {
       rank: brands.length + 1,
       name: brand.company || "Your brand",
+      domain: cleanDomain(brand.url),
       isYou: true,
       visibility: 0,
       sentiment: "warn",

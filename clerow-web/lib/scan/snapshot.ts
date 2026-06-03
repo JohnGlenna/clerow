@@ -155,17 +155,20 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
 
   // Aggregate competitors across engines: average visibility, best (min)
   // position, sentiment by strongest seen. Rank by averaged visibility.
-  type Agg = { name: string; isYou: boolean; vis: number[]; positions: number[]; sentiment: BrandSentiment };
+  type Agg = { name: string; domain: string | null; isYou: boolean; vis: number[]; positions: number[]; sentiment: BrandSentiment };
   const byName = new Map<string, Agg>();
   for (const row of rb ?? []) {
     const key = row.name.trim().toLowerCase();
     const agg = byName.get(key) ?? {
       name: row.name,
+      domain: null,
       isYou: false,
       vis: [],
       positions: [],
       sentiment: "neut" as BrandSentiment,
     };
+    // First engine that resolved a real domain wins; others can't see it.
+    agg.domain = agg.domain ?? row.domain;
     agg.isYou = agg.isYou || row.is_you;
     agg.vis.push(Number(row.visibility));
     if (row.position != null) agg.positions.push(Number(row.position));
@@ -178,6 +181,7 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
   snap.competitors = [...byName.values()]
     .map((a) => ({
       name: a.name,
+      domain: a.domain,
       isYou: a.isYou,
       visibility: Math.round(avg(a.vis)),
       position: a.positions.length ? Math.round(Math.min(...a.positions)) : null,
