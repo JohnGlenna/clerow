@@ -104,9 +104,6 @@ export function Onboarding() {
             <MascotClerow size={32} />
             Clerow
           </a>
-          <a className="onboard-skip" href="/dashboard">
-            Skip for now →
-          </a>
         </div>
       </header>
 
@@ -250,7 +247,7 @@ function ScanStep({
       {/* Step 2 result */}
       {phase === "done" && result && (
         <div style={{ marginTop: 16 }}>
-          <ResultTable engine={result.engine} prompt={result.prompt} brands={result.brands} />
+          <ResultTable engine={result.engine} prompt={result.prompt} brands={result.brands} siteUrl={url} />
         </div>
       )}
 

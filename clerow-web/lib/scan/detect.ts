@@ -144,3 +144,49 @@ export async function detectRanking(
     },
   };
 }
+
+// A single buyer answer often names just 1–2 brands, so the reveal table looks
+// thin. To surface the real competitive set the way users expect (à la Peec),
+// ask the SAME engine to expand the primary prompt into a longer ranked list of
+// who it would recommend, then reuse detectRanking to pull the brands out. These
+// are the engine's own recommendations — not the user's tracked list — so they're
+// real competitive signal. We zero their visibility: they weren't recommended for
+// the buyer prompt itself, only named when explicitly asked for a longer list.
+// Best-effort: any failure returns [] so the scan still succeeds.
+export async function discoverCompetitors(
+  primaryPrompt: string,
+  brand: BrandProfile,
+  query: (prompt: string, signal?: AbortSignal) => Promise<{ text: string }>,
+  signal?: AbortSignal,
+): Promise<RankedBrand[]> {
+  const ask =
+    `For the question "${primaryPrompt}", list the top 8 products or companies you would ` +
+    `recommend, ranked best first. Give each on its own line with the brand name and a brief reason.`;
+  try {
+    const answer = await query(ask, signal);
+    const det = await detectRanking(answer.text, brand, signal);
+    return det.brands
+      .filter((b) => !b.isYou)
+      .map((b) => ({ ...b, visibility: 0, position: null, sentiment: "neut" as BrandSentiment, rank: 0 }));
+  } catch {
+    return [];
+  }
+}
+
+// Merge extra (0%) discovered competitors into a detected ranking: skip any whose
+// name already appears (incl. the user's own row), append the rest, then re-sort
+// by visibility (recommended brands stay on top, 0% competitors below) and
+// re-number ranks. The user's row keeps its real visibility/rank.
+export function mergeDiscoveredBrands(base: RankedBrand[], extra: RankedBrand[]): RankedBrand[] {
+  const seen = new Set(base.map((b) => norm(b.name)));
+  const merged = [...base];
+  for (const e of extra) {
+    const key = norm(e.name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push({ ...e, isYou: false });
+  }
+  merged.sort((a, b) => b.visibility - a.visibility || (a.position ?? 99) - (b.position ?? 99));
+  merged.forEach((b, i) => (b.rank = i + 1));
+  return merged;
+}

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEngine, enabledEngines, ENGINES, FREE_ENGINES, PAID_ENGINES, type EngineId } from "../engines";
 import { discoverPrompts } from "./discover";
-import { detectRanking } from "./detect";
+import { detectRanking, discoverCompetitors, mergeDiscoveredBrands } from "./detect";
 import type { ScanEvent } from "./events";
 import { costForEngines, roundUsd } from "../billing/cost";
 import { assertBudget, planFromSub } from "../billing/limits";
@@ -66,6 +66,9 @@ async function persistEngineResult(
   engineId: EngineId,
   signal?: AbortSignal,
   onEvent?: (e: ScanEvent) => void,
+  // Optional hook to transform the detected brands before persisting (the free
+  // scan uses it to merge in engine-discovered competitors). No-op when omitted.
+  enrichBrands?: (brands: RankedBrand[]) => Promise<RankedBrand[]>,
 ) {
   const engine = getEngine(engineId);
   // Emit per-engine progress as we go. Under the concurrent Promise.allSettled in
@@ -77,7 +80,10 @@ async function persistEngineResult(
     emit("querying");
     const answer = await engine.query(prompt.text, signal);
     emit("detecting");
-    const detection = await detectRanking(answer.text, profile, signal);
+    let detection = await detectRanking(answer.text, profile, signal);
+    if (enrichBrands) {
+      detection = { ...detection, brands: await enrichBrands(detection.brands) };
+    }
 
     const { data: result, error: re } = await db
       .from("scan_results")
@@ -143,6 +149,11 @@ export async function runFreeScan(
 
   try {
     const profile = toProfile(brand);
+    // Enrich the (often sparse) buyer-prompt ranking with the engine's own list
+    // of recommended alternatives, so the reveal shows a real competitive set
+    // instead of just the one brand the answer happened to name. Best-effort:
+    // discoverCompetitors swallows its own errors and returns [] on failure.
+    // Adds one extra engine + detection call to the once-per-brand free scan.
     const { detection, label, citations } = await persistEngineResult(
       db,
       scan.id,
@@ -151,6 +162,11 @@ export async function runFreeScan(
       engineId,
       undefined,
       onEvent,
+      async (brands) => {
+        const engine = getEngine(engineId);
+        const discovered = await discoverCompetitors(primary.text, profile, (p, s) => engine.query(p, s));
+        return mergeDiscoveredBrands(brands, discovered);
+      },
     );
 
     await seedTeaserTasks(db, brandId, profile, primary.text, detection.you.mentioned, detection.brands, citations);

@@ -17,7 +17,6 @@ function StatPill({
     <span className={`stat-pill ${cls}`} tabIndex={0}>
       <span className="ic"><GameIcon name={icon} size={16} color={color} /></span>
       <span className="val">{value}</span>
-      <span className="lab">{label}</span>
       <span className="stat-tip" role="tooltip">
         <span className="stat-tip-t">{label}</span>
         {tip}
