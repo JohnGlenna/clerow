@@ -86,6 +86,7 @@ export type DashboardCompetitor = {
   visibility: number;
   sentiment: BrandSentiment;
   position: number | null;
+  enginesCount: number; // distinct AI models that recommended the brand for the primary prompt
 };
 
 export type DashboardPrompt = {

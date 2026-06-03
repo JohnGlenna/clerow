@@ -27,7 +27,9 @@ export function PixelAreaChart({
   surface?: string;
   valueLabel?: string;
 }) {
-  const [active, setActive] = React.useState(Math.max(0, data.length - 1));
+  // null = nothing hovered (no pinned tooltip cluttering the chart); the header
+  // then shows the latest point. Hovering a node reveals its tooltip + marker.
+  const [hovered, setHovered] = React.useState<number | null>(null);
 
   if (data.length < 2) {
     return (
@@ -49,6 +51,7 @@ export function PixelAreaChart({
   const baseY = H - PAD.bottom;
   const areaPathD = `${stepPath} L ${pts[pts.length - 1].x} ${baseY} H ${pts[0].x} Z`;
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(top * f));
+  const active = hovered ?? data.length - 1;
   const a = data[active] ?? data[data.length - 1];
   const ap = point(active, a.value);
 
@@ -58,7 +61,7 @@ export function PixelAreaChart({
         <span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-3,#6E848C)" }}>{valueLabel} over time</span>
         <span style={{ fontFamily: "var(--mono)", fontWeight: 800, fontSize: 13, color }}>{a.value}{valueLabel === "Visibility" ? "" : ""} · {a.label}</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", overflow: "visible" }} role="img" aria-label={`${valueLabel} trend`}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", overflow: "visible" }} role="img" aria-label={`${valueLabel} trend`} onMouseLeave={() => setHovered(null)}>
         <defs>
           <pattern id="pixgrid" width="16" height="16" patternUnits="userSpaceOnUse">
             <path d="M 16 0 L 0 0 0 16" fill="none" stroke={ink} strokeOpacity="0.08" strokeWidth="2" />
@@ -78,9 +81,9 @@ export function PixelAreaChart({
         <path d={stepPath} fill="none" stroke={color} strokeWidth="6" strokeLinejoin="miter" strokeLinecap="square" />
         {data.map((d, i) => {
           const p = point(i, d.value);
-          const isActive = i === active;
+          const isActive = hovered === i;
           return (
-            <g key={i} onMouseEnter={() => setActive(i)} onFocus={() => setActive(i)} tabIndex={0} style={{ cursor: "pointer", outline: "none" }}>
+            <g key={i} onMouseEnter={() => setHovered(i)} onFocus={() => setHovered(i)} onBlur={() => setHovered(null)} tabIndex={0} style={{ cursor: "pointer", outline: "none" }}>
               <line x1={p.x} x2={p.x} y1={PAD.top} y2={baseY} stroke="transparent" strokeWidth={Math.max(20, innerW / data.length)} />
               <rect x={p.x - 7} y={p.y - 7} width="14" height="14" fill={isActive ? ink : color} stroke={surface} strokeWidth="3" />
             </g>
@@ -89,11 +92,13 @@ export function PixelAreaChart({
         {data.map((d, i) => (
           <text key={i} x={point(i, 0).x} y={H - 16} textAnchor="middle" fontSize="10" fill={ink} fillOpacity="0.5">{d.label}</text>
         ))}
-        <g transform={`translate(${Math.min(ap.x + 12, W - 150)} ${Math.max(ap.y - 54, 14)})`}>
-          <rect width="138" height="40" fill={surface} stroke={ink} strokeWidth="3" />
-          <text x="10" y="17" fontSize="10" fill={ink}>{a.label}</text>
-          <text x="10" y="32" fontSize="10" fill={color}>{valueLabel}: {a.value}</text>
-        </g>
+        {hovered !== null && (
+          <g transform={`translate(${Math.min(ap.x + 12, W - 150)} ${Math.max(ap.y - 54, 14)})`} style={{ pointerEvents: "none" }}>
+            <rect width="138" height="40" fill={surface} stroke={ink} strokeWidth="3" />
+            <text x="10" y="17" fontSize="10" fill={ink}>{a.label}</text>
+            <text x="10" y="32" fontSize="10" fill={color}>{valueLabel}: {a.value}</text>
+          </g>
+        )}
       </svg>
     </div>
   );

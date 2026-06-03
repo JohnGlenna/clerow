@@ -4,19 +4,9 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { AiIcon } from "../../ui/AiIcon";
 import { LDIcon } from "./LDIcon";
-import { domainOf } from "./util";
+import { logoDomain } from "./util";
 import { useOverlay } from "./OverlayProvider";
 import type { DashboardData, DashboardModel } from "@/lib/types";
-
-// Best-effort domain for a brand's logo/label. The scan now resolves a real
-// domain per brand (detect.ts); prefer it. Fall back to the user's own connected
-// URL, then to a `<name>.com` guess for older scans that have no stored domain.
-function logoDomain(name: string, isYou: boolean, scanned: string | null, ownUrl?: string): string | null {
-  if (scanned) return scanned;
-  if (isYou) return ownUrl ? domainOf(ownUrl) : null;
-  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return slug ? `${slug}.com` : null;
-}
 
 // A brand's identity cell: the fetched logo (via Clearbit) + brand name when a
 // logo loads. When it 404s (unknown/guessed domain) we drop the chip and show

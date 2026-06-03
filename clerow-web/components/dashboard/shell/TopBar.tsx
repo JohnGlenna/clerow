@@ -2,12 +2,32 @@
 
 import { MascotClerow } from "../../Mascot";
 import { AiIcon } from "../../ui/AiIcon";
-import { GameIcon } from "../../GameIcon";
+import { GameIcon, type GameIconName } from "../../GameIcon";
 import { domainOf } from "./util";
 import type { DashboardData } from "@/lib/types";
 
+// One stat pill: icon + label + value, with a styled tooltip explaining what
+// the number means on hover (replaces the old native `title=` tooltips).
+function StatPill({
+  cls, icon, color, value, label, tip,
+}: {
+  cls: string; icon: GameIconName; color: string; value: number; label: string; tip: string;
+}) {
+  return (
+    <span className={`stat-pill ${cls}`} tabIndex={0}>
+      <span className="ic"><GameIcon name={icon} size={16} color={color} /></span>
+      <span className="val">{value}</span>
+      <span className="lab">{label}</span>
+      <span className="stat-tip" role="tooltip">
+        <span className="stat-tip-t">{label}</span>
+        {tip}
+      </span>
+    </span>
+  );
+}
+
 // The sticky top bar shown on every dashboard page: the connected domain, the
-// models it was scanned across, and the score / streak / xp / scans-left pills.
+// models it was scanned across, and the visibility / streak / xp / scans pills.
 export function TopBar({ data }: { data: DashboardData }) {
   const models = data.models ?? [];
   return (
@@ -24,19 +44,15 @@ export function TopBar({ data }: { data: DashboardData }) {
         </span>
       </div>
       {data.score && (
-        <span className="stat-pill score" title="AI visibility score — from your latest scan">
-          <span className="ic"><GameIcon name="chart" size={16} color="#38A9E0" /></span>{data.score.overall}
-        </span>
+        <StatPill cls="score" icon="chart" color="#38A9E0" value={data.score.overall} label="Visibility"
+          tip="Your AI visibility score from the latest scan — how often AI engines recommend you (0–100)." />
       )}
-      <span className="stat-pill streak" title="Day streak — keep it alive by clearing a task each day">
-        <span className="ic"><GameIcon name="flame" size={16} color="#FF9600" /></span>{data.streak?.current ?? 0}
-      </span>
-      <span className="stat-pill xp" title="Total XP earned all-time">
-        <span className="ic"><GameIcon name="gem" size={16} color="#FFC800" /></span>{data.xp?.total ?? 0}
-      </span>
-      <span className="stat-pill heart" title="Scans left this month">
-        <span className="ic"><GameIcon name="bolt" size={16} color="#A560F0" /></span>{data.scansLeft ?? 0}
-      </span>
+      <StatPill cls="streak" icon="flame" color="#FF9600" value={data.streak?.current ?? 0} label="Streak"
+        tip="Day streak — keep it alive by clearing at least one task every day." />
+      <StatPill cls="xp" icon="gem" color="#FFC800" value={data.xp?.total ?? 0} label="XP"
+        tip="Total points you've earned all-time for completing tasks and scans." />
+      <StatPill cls="heart" icon="bolt" color="#A560F0" value={data.scansLeft ?? 0} label="Scans"
+        tip="Scans left this month on your current plan. Resets each billing cycle." />
     </div>
   );
 }

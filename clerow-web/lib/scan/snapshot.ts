@@ -154,8 +154,11 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
   snap.score = { overall: overallScore(visibility, sentiment, position), visibility, position, sentiment };
 
   // Aggregate competitors across engines: average visibility, best (min)
-  // position, sentiment by strongest seen. Rank by averaged visibility.
-  type Agg = { name: string; domain: string | null; isYou: boolean; vis: number[]; positions: number[]; sentiment: BrandSentiment };
+  // position, sentiment by strongest seen, and how many distinct engines
+  // recommended the brand. Rank by averaged visibility.
+  const engineByResult = new Map<string, string>();
+  for (const [id, r] of latestByEngine) engineByResult.set(r.id, id);
+  type Agg = { name: string; domain: string | null; isYou: boolean; vis: number[]; positions: number[]; sentiment: BrandSentiment; engines: Set<string> };
   const byName = new Map<string, Agg>();
   for (const row of rb ?? []) {
     const key = row.name.trim().toLowerCase();
@@ -166,6 +169,7 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
       vis: [],
       positions: [],
       sentiment: "neut" as BrandSentiment,
+      engines: new Set<string>(),
     };
     // First engine that resolved a real domain wins; others can't see it.
     agg.domain = agg.domain ?? row.domain;
@@ -175,6 +179,8 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
     if (SENTIMENT_RANK.indexOf(row.sentiment) > SENTIMENT_RANK.indexOf(agg.sentiment)) {
       agg.sentiment = row.sentiment;
     }
+    const eng = engineByResult.get(row.scan_result_id);
+    if (eng) agg.engines.add(eng);
     byName.set(key, agg);
   }
 
@@ -186,6 +192,7 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
       visibility: Math.round(avg(a.vis)),
       position: a.positions.length ? Math.round(Math.min(...a.positions)) : null,
       sentiment: a.sentiment,
+      enginesCount: a.engines.size,
       rank: 0,
     }))
     .sort((x, y) => y.visibility - x.visibility || (x.position ?? 99) - (y.position ?? 99))

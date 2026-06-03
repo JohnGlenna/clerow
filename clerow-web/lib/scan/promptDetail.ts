@@ -70,6 +70,7 @@ export async function loadPromptDetail(
         visibility: Math.round(Number(row.visibility)),
         sentiment: row.sentiment,
         position: row.position != null ? Number(row.position) : null,
+        enginesCount: 1, // this list is a single engine's result
       });
       brandsByResult.set(row.scan_result_id, list);
     }

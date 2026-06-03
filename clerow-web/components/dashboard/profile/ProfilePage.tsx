@@ -2,6 +2,7 @@
 
 import { useDashboard } from "@/lib/useDashboard";
 import { MascotClerow } from "../../Mascot";
+import { GameIcon, type GameIconName } from "../../GameIcon";
 import { PixelXpBar } from "../../ui/PixelXpBar";
 import { PixelAreaChart } from "../../ui/PixelAreaChart";
 import { LpHead } from "../shared/PageBits";
@@ -18,10 +19,10 @@ export function ProfilePage() {
   if (!data) return <div className="ld-page" style={{ color: "var(--ink-2)" }}>Loading…</div>;
   const xp = data.xp;
   const streak = data.streak;
-  const medals: { t: string; i: string; n: string }[] = [
-    { t: "gold", i: "🏆", n: "First scan" }, { t: "silver", i: "📜", n: "Schema" },
-    { t: "bronze", i: "⚡", n: "Quick fix" }, { t: "gold", i: "📈", n: "Trending" },
-    { t: "locked", i: "🔒", n: "30-day" }, { t: "locked", i: "👑", n: "#1 spot" },
+  const medals: { t: string; i: GameIconName; n: string }[] = [
+    { t: "gold", i: "search", n: "First scan" }, { t: "silver", i: "scroll", n: "Schema" },
+    { t: "bronze", i: "bolt", n: "Quick fix" }, { t: "gold", i: "progression", n: "Trending" },
+    { t: "locked", i: "calendar", n: "30-day" }, { t: "locked", i: "crown", n: "#1 spot" },
   ];
 
   return (
@@ -48,7 +49,7 @@ export function ProfilePage() {
       <h2 className="lp-sec">Achievements</h2>
       <div className="lp-card" style={{ padding: 18 }}>
         <div className="lmedal-row">
-          {medals.map((m, i) => (<div key={i} className={`lmedal ${m.t}`}><span className="m">{m.i}</span><span className="n">{m.n}</span></div>))}
+          {medals.map((m, i) => (<div key={i} className={`lmedal ${m.t}`}><span className="m"><GameIcon name={m.i} size={24} /></span><span className="n">{m.n}</span></div>))}
         </div>
       </div>
 

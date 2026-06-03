@@ -22,9 +22,9 @@ type BrandProfile = { company: string; url: string; industry: string; descriptio
 export function AccountSettings() {
   return (
     <div className="settings-stack">
-      <AccountCard />
       <BrandCard />
       <BillingCard />
+      <AccountCard />
       <DangerCard />
     </div>
   );
@@ -34,9 +34,6 @@ function AccountCard() {
   const supabase = React.useMemo(() => createClient(), []);
   const [email, setEmail] = React.useState("");
   const [name, setName] = React.useState("");
-  const [initial, setInitial] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
-  const [saved, setSaved] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -51,45 +48,19 @@ function AccountCard() {
     return () => { cancelled = true; };
   }, [supabase]);
 
-  React.useEffect(() => {
-    const base = (name || email).trim();
-    setInitial(base ? base[0]!.toUpperCase() : "?");
-  }, [name, email]);
-
-  const save = async () => {
-    setSaving(true);
-    setSaved(false);
-    const { error } = await supabase.auth.updateUser({ data: { display_name: name.trim() } });
-    setSaving(false);
-    if (error) { alert(error.message); return; }
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2500);
-  };
+  const initial = ((name || email).trim()[0] ?? "?").toUpperCase();
 
   return (
     <section className="app-card">
-      <div className="app-card-head"><h4>Account</h4><span className="sub">Your login and display name</span></div>
+      <div className="app-card-head"><h4>Account</h4><span className="sub">Your login</span></div>
       <div className="settings-identity">
         <span className="settings-avatar">{initial}</span>
         <div>
-          <div className="settings-identity-name">{name || "Add your name"}</div>
+          <div className="settings-identity-name">{name || email || "…"}</div>
           <div className="settings-identity-email">{email || "…"}</div>
         </div>
       </div>
-      <div className="form-stack">
-        <div className="form-row">
-          <label htmlFor="set-name">Display name</label>
-          <input id="set-name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Founder" />
-        </div>
-        <div className="form-row">
-          <label htmlFor="set-email">Email</label>
-          <input id="set-email" className="input" value={email} disabled readOnly />
-          <span className="settings-hint">Email is tied to your login and can&apos;t be changed here.</span>
-        </div>
-      </div>
-      <div className="settings-actions">
-        <button className="btn btn--primary btn--sm" onClick={save} disabled={saving}>{saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}</button>
-      </div>
+      <span className="settings-hint">Your name and email come from your login and can&apos;t be changed here.</span>
     </section>
   );
 }
