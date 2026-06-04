@@ -223,7 +223,7 @@ function DiscoveryStrip() {
         </div>
         <div className="dsc-stats">
           <span className="dsc-stat"><b>42</b><span>prompts</span></span>
-          <span className="dsc-stat"><b>4</b><span>AI models</span></span>
+          <span className="dsc-stat"><b>5</b><span>AI models</span></span>
           <span className="dsc-stat"><b>168</b><span>queries / day</span></span>
         </div>
       </div>
@@ -249,7 +249,7 @@ function DiscoveryStrip() {
       <div className="discovery-foot">
         <span className="dsc-arrow">↓</span>
         <span>
-          <b>Step 2:</b> we run each prompt through all 4 AI models, then score how you rank.
+          <b>Step 2:</b> we run each prompt through all 5 AI models, then score how you rank.
         </span>
       </div>
     </div>

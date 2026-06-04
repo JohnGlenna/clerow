@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { streamFixContent } from "@/lib/content/generate";
 import { streamContentBody, STREAM_HEADERS } from "@/lib/content/stream";
-import { buildRobotsTxt, buildLlmsTxt } from "@/lib/content/files";
+import { deterministicTaskContent } from "@/lib/content/files";
 import { parseAudit } from "@/lib/audit/ensure";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -66,15 +66,11 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   // --- Cache hit: pre-warmed (or previously generated) content, served instantly ---
   if (task.content) return NextResponse.json({ content: task.content });
 
-  // --- FREE Level-1 fixes (no LLM) ---
-  const key = task.ladder_key ?? "";
-  if (key === "audit-llms-txt") return NextResponse.json({ content: buildLlmsTxt(brand) });
-  if (key === "audit-robots-ai") return NextResponse.json({ content: buildRobotsTxt(brand) });
-  if (key.startsWith("audit-")) {
-    const audit = parseAudit(brand.site_audit);
-    const check = audit?.checks.find((c) => `audit-${c.id}` === key);
-    if (check?.fix) return NextResponse.json({ content: `## ${check.fix.title}\n\n${check.fix.detail}` });
-  }
+  // --- FREE Level-1 fixes (no LLM): robots.txt/llms.txt files or the audit's
+  //     diagnostic steps for a technical fix. Shared with the MCP's
+  //     get_task_content so the two surfaces can't drift apart.
+  const ready = deterministicTaskContent(task.ladder_key ?? "", brand, parseAudit(brand.site_audit));
+  if (ready) return NextResponse.json({ content: ready });
 
   // --- PAID: LLM-generated drafts, streamed token-by-token ---
   if (!isSubscribed(await getSubscription(supabase, user.id))) {

@@ -116,18 +116,26 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
         const open = lvl.state === "open"; // unlocked ahead — tasks visible/actionable
         const locked = lvl.state === "locked";
         const showTasks = active || open;
-        // First unresolved task in the active level is "current" (the one nudge).
-        const firstCurrent = active ? lvl.tasks.findIndex((t) => !t.resolved) : -1;
+        // First unresolved, NON-paywalled task in the active level is "current" (the
+        // one nudge) — paywalled tasks never get the Start bubble.
+        const firstCurrent = active ? lvl.tasks.findIndex((t) => !t.resolved && !t.locked) : -1;
+        // Once the free taster(s) in this active level are done, the locked tasks
+        // become the wall: still shown, but clicking them opens the upgrade sheet.
+        const tasterCleared = active && !lvl.tasks.some((t) => !t.locked && !t.resolved);
         // Active + open levels get dotted connectors + clickable tasks; done/locked stay a plain grid.
         const taskNodes = lvl.tasks.map((t: LadderTask, ti: number) => {
+          // Paywalled tasks render as a lock node that upsells on click.
+          const paywalled = t.locked;
           const kind = t.resolved
             ? "done"
-            : active && ti === firstCurrent
-              ? "current"
-              : open
-                ? "current" // every unresolved task in an unlocked-ahead level is actionable
-                : "locked"; // active level's later tasks stay greyed (one-thing-at-a-time)
-          const clickable = (kind === "done" || kind === "current") && !!t.id;
+            : paywalled
+              ? "locked"
+              : active && ti === firstCurrent
+                ? "current"
+                : open
+                  ? "current" // every unresolved task in an unlocked-ahead level is actionable
+                  : "locked"; // active level's later tasks stay greyed (one-thing-at-a-time)
+          const clickable = paywalled || ((kind === "done" || kind === "current") && !!t.id);
           return (
             <PathNode
               key={t.key}
@@ -137,17 +145,20 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
               xp={t.xp}
               start={kind === "current" && ti === firstCurrent}
               mascot={kind === "current" && ti === firstCurrent}
-              onClick={clickable ? () => onOpen({ kind: "task", id: t.id, channel: t.channel, title: t.title, why: t.detail, xp: t.xp, minutes: t.minutes, steps: t.steps, ladderKey: t.key, crumb: lvl.title }) : undefined}
+              onClick={!clickable ? undefined : paywalled ? onUpgrade : () => onOpen({ kind: "task", id: t.id, channel: t.channel, title: t.title, why: t.detail, xp: t.xp, minutes: t.minutes, steps: t.steps, ladderKey: t.key, crumb: lvl.title })}
             />
           );
         });
         // The full-scan action lives in the prominent top CTA, so the active level
-        // only carries the MCP auto-fix entry as a tail node.
-        const tailNodes = active ? [
+        // only carries the MCP auto-fix entry as a tail node — but not once a free
+        // user has cleared the taster (the "rest" is paywalled; show the wall instead).
+        const tailNodes = active && !(tasterCleared && !subscribed) ? [
           <PathNode key="__mcp" kind="mcp" icon={<MascotClerow size={46} />} cap="Auto-fix the rest with Clerow MCP"
             onClick={() => onOpen({ kind: "mcp", id: null, title: "Let Clerow MCP fix everything", why: "Connect Clerow to Claude Code, Cursor, or any agent. It reads your open quests, ships the fixes as a PR, and Clerow re-checks every model.", xp: 0 })} />,
         ] : [];
         const nodes = [...taskNodes, ...tailNodes];
+        // Estimated visibility upside still behind the paywall for this level.
+        const gain = !subscribed ? data.lockedGain?.byLevel?.[lvl.level] : undefined;
 
         return (
           <React.Fragment key={lvl.level}>
@@ -156,7 +167,7 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
               <div>
                 <div className="k">Level {lvl.level}{active ? " · in progress" : open ? " · unlocked" : locked ? " · locked" : " · done"}</div>
                 <h3>{lvl.title}</h3>
-                <div className="unit-find">{lvl.findings}</div>
+                <div className="unit-find">{lvl.findings}{locked && gain ? ` · est. +${gain}% visibility` : ""}</div>
               </div>
               {locked
                 ? subscribed
@@ -169,6 +180,16 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
             {showTasks
               ? <PathGrid nodeCount={nodes.length}>{nodes}</PathGrid>
               : <div className="path-wrap">{nodes}</div>}
+            {tasterCleared && !subscribed && (
+              <button className="climb-wall" onClick={onUpgrade}>
+                <span className="climb-wall-ic">⭐</span>
+                <span className="climb-wall-txt">
+                  <b>You shipped your first structure win.</b>
+                  <span>Go Premium to finish the climb{data.lockedGain?.overall ? ` — est. +${data.lockedGain.overall}% AI visibility` : ""}.</span>
+                </span>
+                <span className="climb-wall-cta">Upgrade</span>
+              </button>
+            )}
           </React.Fragment>
         );
       })}

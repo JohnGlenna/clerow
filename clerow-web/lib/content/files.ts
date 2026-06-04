@@ -2,6 +2,7 @@
 // these as ready-to-commit files so an agent can drop them straight into the
 // user's repo — no LLM call needed (and no hallucinated paths).
 
+import type { SiteAudit } from "../audit/site";
 import type { Database } from "../supabase/database.types";
 
 type BrandRow = Database["public"]["Tables"]["brands"]["Row"];
@@ -52,4 +53,33 @@ export function buildLlmsTxt(brand: Pick<BrandRow, "company" | "url" | "descript
   ]
     .filter((l) => l !== "")
     .join("\n") + "\n";
+}
+
+// The deterministic, no-LLM content for a task, keyed by its ladder_key. This is
+// the single source of truth shared by the MCP (get_task_content) and the
+// dashboard "Make content" route, so the two can't drift apart:
+//  • robots.txt / llms.txt  -> the generated file
+//  • any other audit-* fix  -> the audit's own fix detail + diagnostic steps.
+//    These are CODE/INFRA fixes (server errors, missing tags, no SSR) — NOT
+//    prose — so they must never get the AEO content-writing brief.
+//  • everything else (real content tasks) -> null, so the caller falls back to
+//    a content brief / LLM draft.
+export function deterministicTaskContent(
+  key: string,
+  brand: Pick<BrandRow, "company" | "url" | "description" | "industry">,
+  audit: SiteAudit | null,
+): string | null {
+  // Checked before the generic audit- branch: their keys start with "audit-" too.
+  if (key.includes("robots")) return buildRobotsTxt(brand);
+  if (key.includes("llms")) return buildLlmsTxt(brand);
+  if (key.startsWith("audit-")) {
+    const check = audit?.checks.find((c) => `audit-${c.id}` === key);
+    if (check?.fix) {
+      const steps = check.fix.steps.length
+        ? "\n\n## Steps\n" + check.fix.steps.map((s) => `- ${s}`).join("\n")
+        : "";
+      return `## ${check.fix.title}\n\n${check.fix.detail}${steps}`;
+    }
+  }
+  return null;
 }

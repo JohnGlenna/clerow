@@ -1,9 +1,9 @@
 // Shared app-level types passed between the scan pipeline, API routes, and UI.
 import type { PromptIntent, PromptVolume, BrandSentiment, Citation } from "./supabase/database.types";
 import type { GeoStep } from "./geoSteps";
-import type { Ladder } from "./ladder";
+import type { Ladder, LockedGain } from "./ladder";
 
-export type { Ladder, LadderLevel, LadderTask, LevelState, Channel } from "./ladder";
+export type { Ladder, LadderLevel, LadderTask, LevelState, Channel, LockedGain } from "./ladder";
 
 // The brand profile the scan reasons about (subset of the `brands` row).
 export type BrandProfile = {
@@ -197,6 +197,9 @@ export type DashboardData = {
   prompts?: DashboardPrompt[];
   tasks?: DashboardTask[];
   ladder?: Ladder;
+  // Estimated AI-visibility upside still behind the paywall (the "+N%" carrot at
+  // the wall). Null/absent for subscribers. Computed from the locked tasks.
+  lockedGain?: LockedGain | null;
   streak?: DashboardStreak;
   xp?: DashboardXp;
   trend?: DashboardTrend;

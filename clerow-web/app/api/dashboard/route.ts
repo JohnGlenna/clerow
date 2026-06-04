@@ -7,7 +7,7 @@ import { loadBrandSnapshot, captureDailySnapshot, loadSnapshotHistory } from "@/
 import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/streak";
 import { levelFromXp } from "@/lib/xp";
 import { ensureSiteAudit } from "@/lib/audit/ensure";
-import { buildLadder, ensureLadderTasks, refreshLadderTaskContent } from "@/lib/ladder";
+import { buildLadder, ensureLadderTasks, refreshLadderTaskContent, projectLockedGain } from "@/lib/ladder";
 import { buildLadderContext } from "@/lib/scan/ladderContext";
 import { budgetStatus, planFromSub } from "@/lib/billing/limits";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
@@ -137,22 +137,35 @@ export async function GET(req: Request) {
   const audit = await ensureSiteAudit(supabase, brand);
   const ladderCtx = buildLadderContext(brand, snapshot, prompts ?? [], audit);
 
+  // Subscription gates the climb: a free user gets the frontier (Level 1 + one
+  // Level 2 taster), everything beyond is paywalled. Fetched here (before the
+  // ladder build) so it can be passed into buildLadder.
+  const sub = await getSubscription(supabase, user.id);
+  const subscribed = isSubscribed(sub);
+
   // How far the user has unlocked the climb: the highest level any seeded ladder
   // task belongs to. Unlocking a level seeds its tasks, so the tasks are the
   // record — incomplete levels at/below this render "open" instead of "locked".
-  const unlockedThrough = (tasks ?? []).reduce(
-    (max, t) => (t.source === "ladder" && (t.level ?? 0) > max ? t.level ?? 0 : max),
-    0,
-  );
+  // Only subscribers can unlock ahead, so a free (or churned) user is pinned to 0,
+  // which re-locks any higher-level tasks left seeded from a lapsed subscription.
+  const unlockedThrough = !subscribed
+    ? 0
+    : (tasks ?? []).reduce(
+        (max, t) => (t.source === "ladder" && (t.level ?? 0) > max ? t.level ?? 0 : max),
+        0,
+      );
 
   const ladderExisting = new Map<string, { id: string; done: boolean; resolved: boolean }>();
   for (const t of tasks ?? [])
     if (t.ladder_key) ladderExisting.set(t.ladder_key, { id: t.id, done: t.done, resolved: t.done || t.archived });
-  const preLadder = buildLadder(ladderCtx, ladderExisting, unlockedThrough);
+  const preLadder = buildLadder(ladderCtx, ladderExisting, unlockedThrough, subscribed);
   const inserted = await ensureLadderTasks(supabase, brand.id, preLadder, new Set(ladderExisting.keys()));
   for (const r of inserted)
     if (r.ladder_key) ladderExisting.set(r.ladder_key, { id: r.id, done: r.done, resolved: r.done || r.archived });
-  const ladder = buildLadder(ladderCtx, ladderExisting, unlockedThrough);
+  const ladder = buildLadder(ladderCtx, ladderExisting, unlockedThrough, subscribed);
+  // The "finish the climb for ~+N%" carrot — estimated visibility upside still
+  // behind the paywall. Null for subscribers (nothing locked).
+  const lockedGain = subscribed ? null : projectLockedGain(ladder);
   // Rewrite seeded tasks whose spec changed since last scan (e.g. generic L2 →
   // the AI page-grader's page-specific version), so a full scan visibly updates them.
   await refreshLadderTaskContent(supabase, ladder, (tasks ?? []).filter((t) => t.source === "ladder"));
@@ -192,7 +205,7 @@ export async function GET(req: Request) {
   const xp = levelFromXp(totalXp);
 
   // Monthly scan-budget status (the COGS guard) → surfaced as "scans left".
-  const sub = await getSubscription(supabase, user.id);
+  // `sub`/`subscribed` were resolved above for the ladder gate; reuse them here.
   const plan = planFromSub(sub);
   const budget = await budgetStatus(supabase, user.id, plan, now);
 
@@ -200,7 +213,7 @@ export async function GET(req: Request) {
   // boxes open instantly. Subscribers only (LLM drafts are plan-gated), and
   // best-effort: a service-role client keeps writing after the response flushes,
   // and the helper skips anything already cached. Never blocks this request.
-  if (isSubscribed(sub)) {
+  if (subscribed) {
     after(async () => {
       try {
         await prewarmActiveLevel(createAdminClient(), brand, ladder);
@@ -280,8 +293,9 @@ export async function GET(req: Request) {
       level: t.level,
     })),
     ladder,
+    lockedGain,
     scansLeft: budget.scansLeft,
     budget: { spent: Math.round(budget.spent * 100) / 100, ceiling: budget.ceiling },
-    subscribed: isSubscribed(sub),
+    subscribed,
   });
 }

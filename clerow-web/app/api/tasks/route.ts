@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,6 +107,19 @@ export async function PATCH(req: Request) {
   const update: Database["public"]["Tables"]["tasks"]["Update"] = {};
   if ("done" in body) {
     const done = Boolean(body.done);
+    // Free-frontier guard (defense-in-depth): a non-subscriber may not complete a
+    // paywalled ladder task. Locked tasks are never seeded for a normal free user
+    // (no id to PATCH), but a churned ex-subscriber can still hold stale level 3–5
+    // ladder rows — reject those so the boundary holds off the happy path too.
+    if (done) {
+      const { data: t } = await supabase.from("tasks").select("source, level").eq("id", id).maybeSingle();
+      if (t?.source === "ladder" && (t.level ?? 0) >= 3 && !isSubscribed(await getSubscription(supabase, user.id))) {
+        return NextResponse.json(
+          { error: "This task requires a Clerow Premium subscription." },
+          { status: 402 },
+        );
+      }
+    }
     update.done = done;
     update.completed_at = done ? now : null;
   }

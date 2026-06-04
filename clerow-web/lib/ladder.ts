@@ -23,6 +23,17 @@ import type { SiteAudit } from "./audit/site";
 type DB = SupabaseClient<Database>;
 type Impact = GeoStep["impact"];
 
+// --- The free frontier -------------------------------------------------------
+// A non-subscriber may complete all of Level 1 plus the first Level 2 task (the
+// "taster") — enough to feel one real structure win — then hits the paywall.
+// This is the single source of truth both surfaces (dashboard + MCP) respect.
+export const FREE_L2_TASTER = 1; // number of free Level-2 tasks
+export function isTaskFree(level: number, indexInLevel: number): boolean {
+  if (level <= 1) return true;
+  if (level === 2) return indexInLevel < FREE_L2_TASTER;
+  return false;
+}
+
 export type LadderTask = {
   key: string; // stable ladder_key (idempotency)
   title: string;
@@ -33,6 +44,10 @@ export type LadderTask = {
   impact: Impact;
   channel: Channel; // onsite (MCP-doable) vs offsite (manual — Clerow drafts the copy)
   steps: string[]; // ordered "what to do" actions for the task modal (may be empty)
+  // Paywalled: beyond the free frontier (Level 1 + one Level 2 taster) for a
+  // non-subscriber. Locked tasks are never seeded, never actionable, and render
+  // as an upgrade preview. Always false for subscribers. Computed in buildLadder.
+  locked: boolean;
   // Runtime, attached from existing tasks:
   id: string | null;
   done: boolean;
@@ -318,6 +333,7 @@ function toTask(s: Spec, existing: Map<string, { id: string; done: boolean; reso
     impact: s.impact,
     channel: s.channel,
     steps: s.steps,
+    locked: false, // overridden per-level in buildLadder when the caller is free
     id: e?.id ?? null,
     done: e?.done ?? false,
     resolved: e?.resolved ?? e?.done ?? false,
@@ -359,18 +375,28 @@ function levelFinding(level: number, ctx: LadderContext, remaining: number): str
 // none). Incomplete levels at or below it render as "open" (tasks visible) rather
 // than "locked", letting subscribers jump ahead without finishing earlier levels.
 // Default 0 preserves the strict sequential behavior (e.g. the MCP caller).
+// `subscribed` (default true) gates the per-task `locked` flag to the free
+// frontier (Level 1 + one Level 2 taster) — false marks everything beyond it
+// paywalled, which is what keeps the active L2 level from advancing for a free
+// user (the taster never completes the level, so L3+ stay locked).
 export function buildLadder(
   ctx: LadderContext,
   existing: Map<string, { id: string; done: boolean; resolved: boolean }>,
   unlockedThrough = 0,
+  subscribed = true,
 ): Ladder {
   const built = LEVEL_META.map((meta, i) => {
-    const tasks = meta.build(ctx).map((s) => toTask(s, existing));
+    const level = i + 1;
+    const tasks = meta.build(ctx).map((s, ti) => {
+      const t = toTask(s, existing);
+      t.locked = !subscribed && !isTaskFree(level, ti);
+      return t;
+    });
     const total = tasks.length;
     // Completion counts resolved (done or skipped); progress shown to the user.
     const doneCount = tasks.filter((t) => t.resolved).length;
-    const findings = levelFinding(i + 1, ctx, total - doneCount);
-    return { level: i + 1, title: meta.title, blurb: meta.blurb, findings, tasks, total, doneCount };
+    const findings = levelFinding(level, ctx, total - doneCount);
+    return { level, title: meta.title, blurb: meta.blurb, findings, tasks, total, doneCount };
   });
 
   const isComplete = (l: { total: number; doneCount: number }) => l.total === 0 || l.doneCount === l.total;
@@ -387,9 +413,33 @@ export function buildLadder(
   return { levels, currentLevel: activeIdx === -1 ? built.length : activeIdx + 1 };
 }
 
+// A conservative, clearly-estimated AI-visibility upside from the still-locked
+// (paywalled) tasks — the "finish the climb for ~+N%" carrot at the wall. Weights
+// each unresolved locked task by impact and scales the total into a modest percent,
+// capped so it always reads as a credible estimate rather than a promise. Returns
+// the overall estimate plus a per-level breakdown (level → estimated % points).
+const IMPACT_WEIGHT: Record<Impact, number> = { low: 1, medium: 2, high: 4, "very high": 6 };
+export type LockedGain = { overall: number; byLevel: Record<number, number> };
+export function projectLockedGain(ladder: Ladder): LockedGain {
+  const byLevel: Record<number, number> = {};
+  let totalWeight = 0;
+  for (const l of ladder.levels) {
+    let w = 0;
+    for (const t of l.tasks) if (t.locked && !t.resolved) w += IMPACT_WEIGHT[t.impact];
+    if (w > 0) {
+      // ~1.5 percentage points per impact-weight, level capped at 12 and overall at 35.
+      byLevel[l.level] = Math.min(12, Math.round(w * 1.5));
+      totalWeight += w;
+    }
+  }
+  return { overall: Math.min(35, Math.round(totalWeight * 1.5)), byLevel };
+}
+
 // Insert missing tasks (by ladder_key) for every ACTIVE or OPEN level — i.e. the
 // active level plus any a subscriber unlocked ahead. Never seeds locked or
 // completed levels, preserving the anti-flood guarantee for the default path.
+// Paywalled tasks (t.locked — beyond a free user's frontier) are also skipped, so
+// a non-subscriber's only seeded tasks are Level 1 + the one Level 2 taster.
 // Returns inserted rows.
 export async function ensureLadderTasks(
   db: DB,
@@ -401,7 +451,7 @@ export async function ensureLadderTasks(
     .filter((l) => l.state === "active" || l.state === "open")
     .flatMap((l) =>
       l.tasks
-        .filter((t) => !existingKeys.has(t.key))
+        .filter((t) => !t.locked && !existingKeys.has(t.key))
         .map((t) => ({
           brand_id: brandId,
           title: t.title,

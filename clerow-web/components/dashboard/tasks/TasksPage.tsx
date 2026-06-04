@@ -13,6 +13,21 @@ export function TasksPage() {
   const { openTask, openUpgrade, openScan } = useOverlay();
   const [unlocking, setUnlocking] = React.useState<number | null>(null);
 
+  // The moment a free user clears the Level 2 taster, surface the upgrade sheet —
+  // once per brand (localStorage guard) so it nudges without nagging.
+  const nudged = React.useRef(false);
+  React.useEffect(() => {
+    if (nudged.current || !data || data.subscribed) return;
+    const active = data.ladder?.levels.find((l) => l.state === "active");
+    const tasterCleared = active && active.tasks.some((t) => t.locked) && !active.tasks.some((t) => !t.locked && !t.resolved);
+    if (!tasterCleared) return;
+    const key = `clerow_wall_${data.brand?.url ?? ""}`;
+    if (typeof window !== "undefined" && window.localStorage.getItem(key)) return;
+    nudged.current = true;
+    try { window.localStorage.setItem(key, "1"); } catch {}
+    openUpgrade();
+  }, [data, openUpgrade]);
+
   // Free, instant unlock: reveal a level's tasks (no scan). Refresh to show them.
   const unlock = async (level: number) => {
     if (unlocking != null) return;

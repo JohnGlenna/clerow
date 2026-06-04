@@ -45,10 +45,6 @@ export function DiscoverCard({
             <span>prompts</span>
           </span>
           <span className="dsc-stat">
-            <b>{data.engineCount}</b>
-            <span>AI models</span>
-          </span>
-          <span className="dsc-stat">
             <b>{data.queriesPerDay}</b>
             <span>queries / day</span>
           </span>
@@ -79,8 +75,7 @@ export function DiscoverCard({
       <div className="discovery-foot">
         <span className="dsc-arrow">↓</span>
         <span>
-          <b>Step 2:</b> we run each prompt through all {data.engineCount} AI models, then score how
-          you rank.
+          <b>Step 2:</b> we run each prompt through the AI models, then score how you rank.
         </span>
       </div>
     </div>
