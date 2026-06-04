@@ -35,11 +35,22 @@ export function TopBar({ data }: { data: DashboardData }) {
         <MascotClerow size={26} /> {domainOf(data.brand?.url)}
         <span className="mono">· scanned across</span>
         <span className="model-cluster">
-          {models.map((m) => (
-            <span key={m.id} className="mc" style={{ background: "#fff" }}>
-              <AiIcon id={m.id} size={16} letter={m.letter} />
-            </span>
-          ))}
+          {models.map((m) => {
+            // Free users scan one engine (ChatGPT); the other four sit behind the
+            // paywall, so badge them locked. Subscribers have run all five.
+            const locked = !data.subscribed && !m.scanned;
+            return (
+              <span
+                key={m.id}
+                className={`mc${locked ? " mc-locked" : ""}`}
+                style={{ background: "#fff" }}
+                title={locked ? `${m.label} — unlock with Premium` : `Scanned across ${m.label}`}
+              >
+                <AiIcon id={m.id} size={16} letter={m.letter} />
+                {locked && <span className="mc-lock">🔒</span>}
+              </span>
+            );
+          })}
         </span>
       </div>
       {data.score && (

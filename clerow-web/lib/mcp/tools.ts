@@ -9,12 +9,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "../supabase/admin";
 import type { Database } from "../supabase/database.types";
 import { loadBrandSnapshot } from "../scan/snapshot";
-import { ensureSiteAudit } from "../audit/ensure";
+import { ensureSiteAudit, refreshSiteAudit } from "../audit/ensure";
 import { buildLadder, ensureLadderTasks, projectLockedGain, type LadderTask } from "../ladder";
 import { assembleLadderContext } from "../scan/ladderContext";
-import { buildContentBrief } from "../content/generate";
+import { buildContentBrief, buildSiteContext, buildScanInsight } from "../content/generate";
 import { deterministicTaskContent } from "../content/files";
 import { getSubscription, isSubscribed } from "../billing/subscription";
+import { scanTopPrompts, MAX_SCAN_PROMPTS } from "../scan/run";
+import { synthesizeAndStore } from "../scan/synthesize";
+import { planFromSub, enginesForPlan, assertBudget, BudgetExceededError } from "../billing/limits";
+import { costForEngines } from "../billing/cost";
+import { enabledEngines } from "../engines";
 import type { BrandProfile } from "../types";
 
 type Db = SupabaseClient<Database>;
@@ -85,7 +90,7 @@ function higherLevel(level: number | null) {
 // re-locks a churned ex-subscriber's stale higher-level tasks).
 async function loadLadder(admin: Db, brand: BrandRow, subscribed: boolean) {
   const { data: tasks } = await admin.from("tasks").select("*").eq("brand_id", brand.id);
-  const { ctx, audit } = await assembleLadderContext(admin, brand);
+  const { ctx, audit, snapshot } = await assembleLadderContext(admin, brand);
   const unlockedThrough = !subscribed
     ? 0
     : (tasks ?? []).reduce(
@@ -99,7 +104,15 @@ async function loadLadder(admin: Db, brand: BrandRow, subscribed: boolean) {
   const inserted = await ensureLadderTasks(admin, brand.id, pre, new Set(existing.keys()));
   for (const r of inserted)
     if (r.ladder_key) existing.set(r.ladder_key, { id: r.id, done: r.done, resolved: r.done || r.archived });
-  return { ladder: buildLadder(ctx, existing, unlockedThrough, subscribed), primaryPrompt: ctx.primaryPrompt, competitorsAhead: ctx.competitorsAhead, audit };
+  return {
+    ladder: buildLadder(ctx, existing, unlockedThrough, subscribed),
+    primaryPrompt: ctx.primaryPrompt,
+    competitorsAhead: ctx.competitorsAhead,
+    audit,
+    // Scan signal for the content brief: domains AI cites + the multi-model verdict.
+    citedSources: ctx.sourceGaps,
+    scanInsight: buildScanInsight(snapshot.synthesis),
+  };
 }
 
 export function registerTools(server: McpServer) {
@@ -176,7 +189,7 @@ export function registerTools(server: McpServer) {
       if (!r.ok) return r.result;
       const { admin, brand, subscribed } = r.ctx;
 
-      const { ladder, primaryPrompt, competitorsAhead, audit } = await loadLadder(admin, brand, subscribed);
+      const { ladder, primaryPrompt, competitorsAhead, audit, citedSources, scanInsight } = await loadLadder(admin, brand, subscribed);
       const containing = ladder.levels.find((l) => l.tasks.some((t) => t.id === taskId));
       const match: LadderTask | undefined = containing?.tasks.find((t) => t.id === taskId);
 
@@ -217,6 +230,9 @@ export function registerTools(server: McpServer) {
         promptText: primaryPrompt?.text,
         intent: primaryPrompt?.intent,
         competitorsAhead,
+        siteContext: buildSiteContext(audit?.crawl),
+        citedSources,
+        scanInsight,
       });
       // Off-site authority tasks (Reddit, directories, press) can't be shipped as a
       // repo PR — make that explicit so the agent hands the draft to the user instead
@@ -265,6 +281,96 @@ export function registerTools(server: McpServer) {
       if (error) return fail(`Couldn't complete the task: ${error.message}`);
       if (!data) return fail("Task not found for this brand.");
       return json({ ok: true, task: data, message: `Completed "${data.title}" (+${data.xp} XP). Streak kept for today.` });
+    },
+  );
+
+  // --- ACT: run the full multi-model scan (Premium; budget-limited) ---
+  server.tool(
+    "run_full_scan",
+    "Run the full Clerow scan across ALL AI models (ChatGPT, Claude, Perplexity, Gemini, Grok) for the brand's top buyer questions, then return the fresh standings + multi-model verdict. PREMIUM ONLY — it uses one of the subscription's monthly scans (hard budget cap) and takes ~1–2 minutes (it runs to completion before returning). To read existing standings WITHOUT spending a scan, use get_visibility instead.",
+    async (extra) => {
+      const r = await resolveCtx(extra.authInfo);
+      if (!r.ok) return r.result;
+      const { admin, brand, userId } = r.ctx;
+
+      // Premium gate — re-fetch the sub to derive the plan's engines + budget.
+      const sub = await getSubscription(admin, userId);
+      if (!isSubscribed(sub)) {
+        return text(
+          "Running a full multi-model scan is a Clerow Premium feature. The free MCP can still run the cheap site audit (get_site_audit) and read your current standings (get_visibility). Upgrade in the Clerow dashboard to scan all 5 AI models from here.",
+        );
+      }
+      const plan = planFromSub(sub);
+      const engines = enabledEngines(enginesForPlan(plan));
+      if (engines.length === 0) return fail("No AI engines are configured on the server.");
+
+      // Don't start a scan while one is already running for this brand.
+      const inFlightSince = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { count: running } = await admin
+        .from("scans")
+        .select("id", { count: "exact", head: true })
+        .eq("brand_id", brand.id)
+        .eq("status", "running")
+        .gte("started_at", inFlightSince);
+      if (running && running > 0) {
+        return text("A scan is already running for this brand — give it a moment, then check get_visibility.");
+      }
+
+      // Count the prompts this scan will cover (primary first, then volume) for the
+      // upfront budget guard. runPromptScan re-checks the budget per prompt.
+      const { data: promptRows } = await admin
+        .from("prompts")
+        .select("id")
+        .eq("brand_id", brand.id)
+        .order("is_primary", { ascending: false })
+        .order("volume", { ascending: false })
+        .limit(MAX_SCAN_PROMPTS);
+      const promptCount = promptRows?.length ?? 0;
+      if (promptCount === 0) return fail("No prompts to scan yet. Run your first scan in the Clerow dashboard.");
+
+      // Budget guard (the money cap) — refuse cleanly before spending anything.
+      try {
+        await assertBudget(admin, userId, plan, costForEngines(engines) * promptCount, new Date());
+      } catch (err) {
+        if (err instanceof BudgetExceededError) {
+          return text("You're out of full scans for this month on your plan — they reset next billing cycle, or upgrade in the dashboard for more.");
+        }
+        throw err;
+      }
+
+      // (1) Refresh the cheap site audit (also re-crawls the grounding data), then
+      // (2) scan the top prompts across all engines (shared scanTopPrompts), then
+      // (3) synthesize each scan now so the multi-model verdict is ready
+      // immediately — it feeds get_task_content's brief.
+      try {
+        await refreshSiteAudit(admin, brand.id, brand.url);
+      } catch {
+        // best-effort — the prior audit stays.
+      }
+      const scanIds = await scanTopPrompts(admin, brand.id, engines);
+      if (scanIds.length === 0) return fail("The scan didn't complete — all engines failed for every prompt. Try again shortly.");
+      for (const id of scanIds) {
+        try {
+          await synthesizeAndStore(admin, id);
+        } catch {
+          // Non-fatal — the scores are saved; the verdict just stays null.
+        }
+      }
+
+      // Return the fresh standings (mirrors get_visibility) + the new verdict.
+      const s = await loadBrandSnapshot(admin, brand.id);
+      return json({
+        ok: true,
+        scanned: { models: engines.length, prompts: scanIds.length },
+        scannedAt: s.scannedAt,
+        score: s.score,
+        engines: s.engines.map((e) => ({ engine: e.label, visibility: e.visibility, position: e.position, sentiment: e.sentiment, locked: e.locked })),
+        competitors: s.competitors.map((c) => ({ name: c.name, rank: c.rank, visibility: c.visibility, isYou: c.isYou })),
+        citedDomains: s.citedDomains,
+        synthesis: s.synthesis,
+        message:
+          "Full multi-model scan complete. Standings, cited sources, and the multi-model verdict are updated — list_tasks and get_task_content now reflect the fresh data.",
+      });
     },
   );
 }

@@ -5,7 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, BrandSentiment, Citation, BrandSnapshotRow } from "../supabase/database.types";
-import type { DashboardCompetitor } from "../types";
+import type { DashboardCompetitor, ScanSynthesis } from "../types";
 import { ENGINES, ENGINE_META, PAID_ENGINES, type EngineId } from "../engines";
 import { overallScore } from "../score";
 import { domainsFrom, hostOf } from "./domains";
@@ -35,6 +35,9 @@ export type BrandSnapshot = {
   citedDomains: string[];
   primaryPromptId: string | null;
   primaryPromptText: string | null;
+  // The multi-model "what all the AIs collectively think" verdict for the latest
+  // scan. Only exists for multi-engine (paid) scans — null for free/single-engine.
+  synthesis: ScanSynthesis | null;
 };
 
 const SENTIMENT_RANK: BrandSentiment[] = ["neg", "warn", "neut", "pos"];
@@ -61,6 +64,7 @@ function emptySnapshot(): BrandSnapshot {
     citedDomains: [],
     primaryPromptId: null,
     primaryPromptText: null,
+    synthesis: null,
   };
 }
 
@@ -85,7 +89,7 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
   const { data: results } = await db
     .from("scan_results")
     .select(
-      "id, engine, created_at, citations, your_position, your_visibility, your_sentiment, scans!inner(brand_id, finished_at, status)",
+      "id, engine, created_at, citations, your_position, your_visibility, your_sentiment, scans!inner(brand_id, finished_at, status, synthesis)",
     )
     .eq("prompt_id", primary.id)
     .eq("scans.brand_id", brandId)
@@ -116,6 +120,7 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
   const posG: number[] = [];
   const sentG: number[] = [];
   let scannedAt: string | null = null;
+  let synthesis: ScanSynthesis | null = null;
   const citedDomains = new Set<string>();
 
   snap.engines = PAID_ENGINES.map((id: EngineId) => {
@@ -136,8 +141,11 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
     visG.push(visibility);
     if (position != null) posG.push(position);
     if (sentiment != null) sentG.push(sentiment);
-    const finishedAt = (r.scans as { finished_at: string | null }).finished_at;
-    if (finishedAt && (!scannedAt || finishedAt > scannedAt)) scannedAt = finishedAt;
+    const sc = r.scans as { finished_at: string | null; synthesis: ScanSynthesis | null };
+    if (sc.finished_at && (!scannedAt || sc.finished_at > scannedAt)) {
+      scannedAt = sc.finished_at;
+      synthesis = sc.synthesis ?? null; // the most-recently-finished scan's verdict
+    }
     for (const d of domainsFrom(r.citations as Citation[], ownHost)) citedDomains.add(d);
 
     return { ...base, scanned: true, visibility, position, sentiment };
@@ -146,6 +154,7 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
   snap.enginesScanned = [...latestByEngine.keys()] as EngineId[];
   snap.hasResult = true;
   snap.scannedAt = scannedAt;
+  snap.synthesis = synthesis;
   snap.citedDomains = [...citedDomains];
 
   const visibility = Math.round(avg(visG));

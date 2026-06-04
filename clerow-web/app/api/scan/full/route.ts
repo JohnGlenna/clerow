@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { runPromptScan } from "@/lib/scan/run";
+import { scanTopPrompts, MAX_SCAN_PROMPTS } from "@/lib/scan/run";
 import { streamScan, STREAM_HEADERS } from "@/lib/scan/events";
 import { synthesizeAndStore } from "@/lib/scan/synthesize";
 import { loadBrandSnapshot } from "@/lib/scan/snapshot";
@@ -36,10 +36,6 @@ import { costForEngines } from "@/lib/billing/cost";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-// How many of the brand's prompts a full scan runs across every model — the top 3
-// most-popular buyer queries (primary first, then volume). Bounds COGS/wall-clock.
-const MAX_SCAN_PROMPTS = 3;
 
 // The comprehensive "Scan all 5 models" action — refreshes data for the WHOLE
 // ladder in one pass: (1) re-crawl the site audit (cheap → Levels 1-2 data),
@@ -109,8 +105,6 @@ export async function POST() {
     }
     throw err;
   }
-
-  const total = prompts.length;
 
   return new Response(
     streamScan(async (emit) => {
@@ -187,22 +181,10 @@ export async function POST() {
       }
 
       // (2) Scan prompts one at a time so progress reads cleanly; engines within
-      // each prompt run concurrently inside runPromptScan.
+      // each prompt run concurrently inside runPromptScan. Shared with the MCP's
+      // run_full_scan tool via scanTopPrompts.
       emit({ type: "phase", phase: "scanning" });
-      const scanIds: string[] = [];
-      for (let i = 0; i < prompts.length; i++) {
-        const p = prompts[i];
-        // Announce the prompt up front so its query + model rows render before any
-        // engine ticks. Engine events carry promptId for grouping.
-        emit({ type: "prompt", promptId: p.id, text: p.text, index: i, total });
-        try {
-          const result = await runPromptScan(supabase, brand.id, p.id, engines, emit);
-          scanIds.push(result.scanId);
-        } catch {
-          // One prompt failing (e.g. all engines down for it) shouldn't abort the
-          // batch — its engine "failed" events already streamed via onEvent.
-        }
-      }
+      const scanIds = await scanTopPrompts(supabase, brand.id, engines, { onEvent: emit });
 
       // Master-AI synthesis per scan in the background so the score lands now and
       // the collective verdict fills in for the next dashboard load.

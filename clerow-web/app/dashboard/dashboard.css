@@ -48,8 +48,11 @@
 .stat-pill:hover .stat-tip, .stat-pill:focus-visible .stat-tip { opacity: 1; transform: translateY(0); }
 
 .model-cluster { display: inline-flex; align-items: center; }
-.model-cluster .mc { width: 27px; height: 27px; border-radius: 8px; border: 2px solid var(--bg); margin-left: -8px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: 11px; }
+.model-cluster .mc { position: relative; width: 27px; height: 27px; border-radius: 8px; border: 2px solid var(--bg); margin-left: -8px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 900; font-size: 11px; }
 .model-cluster .mc:first-child { margin-left: 0; }
+/* Paywalled engines: greyed logo + a corner lock badge (free users see only ChatGPT). */
+.model-cluster .mc-locked { filter: grayscale(1); opacity: .55; }
+.model-cluster .mc-lock { position: absolute; right: -4px; bottom: -4px; width: 13px; height: 13px; border-radius: 50%; background: var(--ink-3); border: 1.5px solid var(--bg); display: inline-flex; align-items: center; justify-content: center; font-size: 7px; line-height: 1; filter: none; }
 
 /* path */
 .ld-path { padding: 24px 26px 90px; }
@@ -206,8 +209,11 @@
 .upg-price b { font-size: 20px; color: var(--ink); font-weight: 900; }
 .upg-card h4 { margin: 0 0 10px; font-size: 16px; font-weight: 900; color: #fff; letter-spacing: -.01em; }
 .upg-list { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
-.btn-upg { width: 100%; height: 46px; border: 0; border-radius: 13px; background: var(--blue); color: #06222e; font-weight: 900; font-size: 14px; box-shadow: 0 4px 0 var(--blue-deep); text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
-.btn-upg:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--blue-deep); }
+/* Hardcoded hex (not var(--blue)/var(--blue-deep)): this button also renders in
+   the .upg-sheet modal, which mounts outside .ld-root where those tokens are
+   undefined — leaving the button transparent with invisible dark text. */
+.btn-upg { width: 100%; height: 46px; border: 0; border-radius: 13px; background: #38A9E0; color: #06222e; font-weight: 900; font-size: 14px; box-shadow: 0 4px 0 #1A5374; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; }
+.btn-upg:active { transform: translateY(2px); box-shadow: 0 2px 0 #1A5374; }
 .btn-upg:disabled { opacity: .7; cursor: default; }
 
 /* upgrade popup (modal) — pin the dark pop-up palette (mounts outside .ld-root, so

@@ -24,6 +24,11 @@ export type SiteCheckFix = {
   // Concrete, ordered actions shown as the "What to do" checklist in the task
   // modal. Optional — tasks without authored steps fall back to `detail`.
   steps: string[];
+  // When set, this fix is satisfied by a generated FILE (robots.txt / llms.txt),
+  // so get_task_content / the dashboard return the file. Fixes WITHOUT an
+  // artifact (e.g. "your robots.txt returns a 500") return the diagnostic steps
+  // instead — there's no file to ship for them.
+  artifact?: "robots" | "llms";
 };
 
 export type SiteCheck = {
@@ -34,11 +39,30 @@ export type SiteCheck = {
   fix: SiteCheckFix | null; // present when status is fail/warn
 };
 
+// A single crawled page, kept so content generation can be grounded in the
+// brand's REAL pages (titles, copy, voice) instead of guessing.
+export type CrawledPage = {
+  url: string;
+  title: string | null;
+  description: string | null;
+  text: string; // visible text, truncated
+};
+
+// The raw site data the audit fetches — retained (not just derived into checks)
+// so the file builders and the LLM content generator work from the real site.
+export type SiteCrawl = {
+  robotsTxt: string | null; // existing robots.txt body when reachable (200), else null
+  sitemapUrls: string[]; // URLs parsed from sitemap.xml <loc>, capped
+  home: CrawledPage | null;
+  pages: CrawledPage[]; // a few key inner pages
+};
+
 export type SiteAudit = {
   url: string;
   fetchedAt: string; // ISO
   ok: boolean; // did the homepage fetch succeed
   checks: SiteCheck[];
+  crawl?: SiteCrawl; // raw site data for grounding generation (optional: old blobs lack it)
 };
 
 const TIMEOUT_MS = 8000;
@@ -84,7 +108,8 @@ const fix = (
   minutes: number,
   impact: GeoStep["impact"],
   steps: string[] = [],
-): SiteCheckFix => ({ title, detail, minutes, impact, xp: impactXp(impact), steps });
+  artifact?: "robots" | "llms",
+): SiteCheckFix => ({ title, detail, minutes, impact, xp: impactXp(impact), steps, ...(artifact ? { artifact } : {}) });
 
 // --- individual signal derivations (all pure, given fetched text) ------------
 
@@ -155,7 +180,42 @@ function checkHttps(https: boolean): SiteCheck {
       };
 }
 
-function checkRobots(robots: Fetched | null): SiteCheck {
+function checkRobots(robots: Fetched | null, home: Fetched | null): SiteCheck {
+  // Server error (5xx/403/etc. — anything but a clean 404): robots.txt couldn't
+  // be read at all. Crawlers treat a robots.txt that errors as "disallow
+  // everything", so this matters — but the fix is to fix the SERVER, not to edit
+  // Disallow rules that we can't even see. Almost always the same root cause as a
+  // failing homepage, so point there. No artifact: there's no file to hand back.
+  if (robots && !robots.ok && robots.status !== 404) {
+    const homeBad = !home || !home.ok;
+    return {
+      id: "robots-ai",
+      label: "robots.txt for AI crawlers",
+      status: "fail",
+      detail: `Your robots.txt returned HTTP ${robots.status} to our crawler.`,
+      fix: fix(
+        "Fix the error your robots.txt returns",
+        homeBad
+          ? `Your /robots.txt returned HTTP ${robots.status} — the same kind of server error your homepage returns. This is almost certainly one underlying problem. Fix the homepage/server error first (see the "make your homepage respond to crawlers" task), then re-scan. Crawlers treat a robots.txt that returns 5xx as "disallow everything", so this is blocking them.`
+          : `Your /robots.txt returned HTTP ${robots.status}. Crawlers treat a robots.txt that errors (5xx) as "disallow everything", so AI bots may refuse to crawl you. Make /robots.txt return a 200 with valid text.`,
+        homeBad ? 30 : 20,
+        "high",
+        homeBad
+          ? [
+              `Reproduce it: \`curl -A "GPTBot" https://yoursite.com/robots.txt\` — you'll see the same HTTP ${robots.status}.`,
+              "Fix the underlying server error first — it's the same one hitting your homepage.",
+              "Confirm /robots.txt then returns a 200 with plain text (not an error page or a JS app shell).",
+              "Re-scan to confirm crawlers can read it.",
+            ]
+          : [
+              `Reproduce it: \`curl -A "GPTBot" https://yoursite.com/robots.txt\` — you'll see HTTP ${robots.status}.`,
+              "Serve /robots.txt as a static text file that returns 200 (check your host/CDN routing).",
+              "Re-scan to confirm crawlers can read it.",
+            ],
+      ),
+    };
+  }
+  // Missing: no file, a 404, or an empty 200.
   if (!robots || robots.status === 404 || !robots.text.trim()) {
     return {
       id: "robots-ai",
@@ -173,6 +233,7 @@ function checkRobots(robots: Fetched | null): SiteCheck {
           "Link your sitemap with a `Sitemap:` line.",
           "Re-scan — Clerow confirms all 5 crawlers can reach your key pages.",
         ],
+        "robots",
       ),
     };
   }
@@ -201,6 +262,7 @@ function checkRobots(robots: Fetched | null): SiteCheck {
           "Add explicit `Allow: /` rules for those AI crawlers.",
           "Re-scan to confirm the bots are no longer blocked.",
         ],
+        "robots",
       ),
     };
   }
@@ -227,6 +289,7 @@ function checkLlms(llms: Fetched | null): SiteCheck {
             "List your strongest pages — home, pricing, comparison and FAQ — each with a one-line description.",
             "Re-scan to confirm models pick it up.",
           ],
+          "llms",
         ),
       };
 }
@@ -260,6 +323,29 @@ function checkSitemap(sitemap: Fetched | null, robots: Fetched | null): SiteChec
 function tagText(html: string, re: RegExp): string | null {
   const m = html.match(re);
   return m ? m[1].replace(/\s+/g, " ").trim() : null;
+}
+
+function pageTitle(html: string): string | null {
+  return tagText(html, /<title[^>]*>([\s\S]*?)<\/title>/i);
+}
+
+function metaDescription(html: string): string | null {
+  return (
+    tagText(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i) ??
+    tagText(html, /<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i)
+  );
+}
+
+// Readable text after scripts/styles/tags are stripped — i.e. what a JS-less
+// crawler actually sees — truncated so a retained page stays a reasonable size.
+function visibleText(html: string, max = 1200): string {
+  const t = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
 function checkTitle(html: string): SiteCheck {
@@ -329,9 +415,7 @@ function checkH1(html: string): SiteCheck {
 }
 
 function checkMetaDescription(html: string): SiteCheck {
-  const re = /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i;
-  const alt = /<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i;
-  const desc = tagText(html, re) ?? tagText(html, alt);
+  const desc = metaDescription(html);
   if (!desc) {
     return {
       id: "meta-description",
@@ -362,15 +446,9 @@ function jsonLdTypes(html: string): string[] {
   return [...new Set(types)];
 }
 
-// Readable text remaining after scripts/styles/tags are stripped — i.e. what a
-// crawler that doesn't run JS actually sees.
+// Length of the readable text a JS-less crawler sees (used by the SSR check).
 function visibleTextLen(html: string): number {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim().length;
+  return visibleText(html, Number.MAX_SAFE_INTEGER).length;
 }
 
 function checkSsr(home: Fetched | null): SiteCheck {
@@ -428,6 +506,76 @@ function checkSchema(html: string): SiteCheck {
   return { id: "schema", label: "Structured data (schema)", status: "pass", detail: `Structured data present: ${types.slice(0, 5).join(", ")}.`, fix: null };
 }
 
+// --- deeper crawl (retained for grounding content generation) ---------------
+
+const MAX_SITEMAP_URLS = 50;
+const MAX_KEY_PAGES = 4;
+// Pages worth fetching so drafts can reference real product/positioning copy.
+const KEY_PAGE_RE = /\/(pricing|plans?|features?|product|compare|vs|alternativ|faq|docs?|about|solutions?|use-?cases?)\b/i;
+const ASSET_RE = /\.(xml|json|pdf|png|jpe?g|gif|svg|webp|ico|css|js|txt|rss|atom)$/i;
+
+function parseSitemapUrls(xml: string): string[] {
+  const urls: string[] = [];
+  const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) && urls.length < MAX_SITEMAP_URLS * 2) urls.push(m[1].trim());
+  return [...new Set(urls)].slice(0, MAX_SITEMAP_URLS);
+}
+
+function sameOriginLinks(html: string, origin: string): string[] {
+  const urls: string[] = [];
+  const re = /<a\b[^>]*\bhref=["']([^"'#]+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) && urls.length < 200) {
+    try {
+      const u = new URL(m[1], origin);
+      if (u.origin === origin) urls.push(`${u.origin}${u.pathname}`);
+    } catch {
+      // ignore unparseable hrefs (mailto:, javascript:, malformed)
+    }
+  }
+  return [...new Set(urls)];
+}
+
+function pathDepth(u: string): number {
+  try {
+    return new URL(u).pathname.replace(/\/$/, "").split("/").filter(Boolean).length;
+  } catch {
+    return 99;
+  }
+}
+
+// Choose a few representative inner pages: keyword-matched ones first (pricing,
+// features, compare, faq…), then the shallowest remaining, excluding the
+// homepage and non-HTML assets.
+function pickKeyPages(urls: string[], homeHref: string): string[] {
+  const norm = (u: string) => u.replace(/\/$/, "");
+  const home = norm(homeHref);
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+  for (const u of urls) {
+    if (!/^https?:/i.test(u) || ASSET_RE.test(u)) continue;
+    const n = norm(u);
+    if (n === home || seen.has(n)) continue;
+    seen.add(n);
+    candidates.push(n);
+  }
+  const keyed = candidates.filter((u) => KEY_PAGE_RE.test(u));
+  const rest = candidates.filter((u) => !KEY_PAGE_RE.test(u)).sort((a, b) => pathDepth(a) - pathDepth(b));
+  return [...keyed, ...rest].slice(0, MAX_KEY_PAGES);
+}
+
+// Guard against a SPA catch-all serving its HTML shell for /robots.txt — we only
+// want to retain (and later merge) a body that actually looks like robots.txt.
+function looksLikeRobots(t: string): boolean {
+  return /^\s*(user-agent|allow|disallow|sitemap|#)/im.test(t) && !/<html|<!doctype/i.test(t);
+}
+
+function toCrawledPage(url: string, f: Fetched | null): CrawledPage | null {
+  if (!f || !f.ok || !f.text.trim()) return null;
+  return { url, title: pageTitle(f.text), description: metaDescription(f.text), text: visibleText(f.text) };
+}
+
 // --- the audit -------------------------------------------------------------
 
 export async function auditSite(rawUrl: string): Promise<SiteAudit> {
@@ -447,7 +595,7 @@ export async function auditSite(rawUrl: string): Promise<SiteAudit> {
   const checks: SiteCheck[] = [
     checkCrawlable(home),
     checkHttps(norm.https),
-    checkRobots(robots),
+    checkRobots(robots, home),
     checkLlms(llms),
     checkSitemap(sitemap, robots),
   ];
@@ -468,5 +616,23 @@ export async function auditSite(rawUrl: string): Promise<SiteAudit> {
     }
   }
 
-  return { url: norm.href, fetchedAt, ok: !!home?.ok, checks };
+  // Deeper crawl: keep the real site data (existing robots.txt, sitemap URLs,
+  // homepage + a few key inner pages) so the file builders and the content
+  // generator are grounded in actual pages instead of guessing. Best-effort —
+  // a hostile/erroring site just yields less context and generation falls back.
+  const sitemapUrls = sitemap?.ok && sitemap.text ? parseSitemapUrls(sitemap.text) : [];
+  const linkUrls = html ? sameOriginLinks(html, norm.origin) : [];
+  const keyUrls = pickKeyPages(sitemapUrls.length ? sitemapUrls : linkUrls, norm.href);
+  const fetchedPages = await Promise.all(keyUrls.map((u) => fetchText(u)));
+  const pages = keyUrls
+    .map((u, i) => toCrawledPage(u, fetchedPages[i]))
+    .filter((p): p is CrawledPage => p !== null);
+  const crawl: SiteCrawl = {
+    robotsTxt: robots?.ok && looksLikeRobots(robots.text) ? robots.text : null,
+    sitemapUrls,
+    home: toCrawledPage(norm.href, home),
+    pages,
+  };
+
+  return { url: norm.href, fetchedAt, ok: !!home?.ok, checks, crawl };
 }

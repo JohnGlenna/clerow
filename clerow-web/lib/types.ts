@@ -72,7 +72,8 @@ export type DashboardModel = {
   label: string;
   swatch: string;
   letter: string;
-  locked: boolean;
+  locked: boolean; // engine has no API key configured
+  scanned: boolean; // this engine actually ran for the user (free = ChatGPT only)
   visibility: number | null;
   position: number | null;
   sentiment: number | null;

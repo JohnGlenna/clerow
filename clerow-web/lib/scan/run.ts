@@ -354,6 +354,51 @@ export async function runPromptScan(
   return { scanId: scan.id, promptId, prompt: prompt.text, outcomes };
 }
 
+// How many of the brand's prompts a full scan runs across every model — the top
+// most-popular buyer queries (primary first, then volume). Bounds COGS/wall-clock.
+export const MAX_SCAN_PROMPTS = 3;
+
+// Run a full multi-engine scan across the brand's top prompts: select them
+// (primary first, then volume), scan each across `engineIds`, and return the
+// scan ids. Shared by the dashboard full-scan route and the MCP run_full_scan
+// tool so the two can't drift. One prompt failing doesn't abort the batch.
+// `runPromptScan` budget-checks per prompt; callers should still assert the
+// whole batch's budget up front. Pass `onEvent` to stream progress (the route);
+// omit it for a silent run (the MCP).
+export async function scanTopPrompts(
+  db: DB,
+  brandId: string,
+  engineIds: EngineId[],
+  opts: { maxPrompts?: number; onEvent?: (e: ScanEvent) => void } = {},
+): Promise<string[]> {
+  const { maxPrompts = MAX_SCAN_PROMPTS, onEvent } = opts;
+  const { data: prompts } = await db
+    .from("prompts")
+    .select("id, text")
+    .eq("brand_id", brandId)
+    .order("is_primary", { ascending: false })
+    .order("volume", { ascending: false })
+    .limit(maxPrompts);
+  if (!prompts || prompts.length === 0) return [];
+
+  const total = prompts.length;
+  const scanIds: string[] = [];
+  for (let i = 0; i < prompts.length; i++) {
+    const p = prompts[i];
+    // Announce the prompt up front so its query + model rows render before any
+    // engine ticks. Engine events carry promptId for grouping.
+    onEvent?.({ type: "prompt", promptId: p.id, text: p.text, index: i, total });
+    try {
+      const result = await runPromptScan(db, brandId, p.id, engineIds, onEvent);
+      scanIds.push(result.scanId);
+    } catch {
+      // One prompt failing (e.g. all engines down for it) shouldn't abort the
+      // batch — its engine "failed" events already streamed via onEvent.
+    }
+  }
+  return scanIds;
+}
+
 // Seed 1–2 concrete teaser tasks off the free scan so the dashboard isn't empty.
 // Full task generation comes in the paid/gamification phase. Only seeds if the
 // brand has no scan-sourced tasks yet.

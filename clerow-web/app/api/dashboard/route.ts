@@ -267,6 +267,7 @@ export async function GET(req: Request) {
       swatch: m.swatch,
       letter: m.letter,
       locked: m.locked,
+      scanned: m.scanned,
       visibility: m.visibility,
       position: m.position,
       sentiment: m.sentiment,

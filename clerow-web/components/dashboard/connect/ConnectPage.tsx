@@ -113,8 +113,8 @@ export function ConnectPage() {
     <div className="ld-page">
       <LpHead
         eyebrow="⚡ Clerow MCP"
-        title="Let Claude do your GEO work — free"
-        sub="Connect Clerow to your AI agent for free — it reads where AI engines recommend your competitors instead of you, writes your Level 1 GEO foundations (robots.txt, llms.txt and more) into your repo, and checks them off to keep your streak. Levels 2–5 of the Climb live in the Clerow dashboard."
+        title="Let your AI agent do your GEO work"
+        sub="Clerow reads where the AI engines (ChatGPT, Claude, Perplexity, Gemini, Grok) recommend your competitors instead of you, then hands your agent a brief built from what all of them collectively found — plus your real crawled site — and your agent writes the fix into your repo and checks it off to keep your streak. Free covers your Level 1 foundations and a Level 2 taster; Premium unlocks the full Climb and full multi-model re-scans, right here in the MCP."
       />
 
       <div className="cnx-hero">
@@ -166,10 +166,11 @@ export function ConnectPage() {
       <h2 className="lp-sec">Ask Claude things like</h2>
       <div className="cnx-try">
         {[
-          "Where am I losing to competitors across ChatGPT, Claude and Perplexity?",
-          "What’s my highest-impact Level 1 task — and ship it for me.",
+          "Where am I losing to competitors across ChatGPT, Claude, Perplexity, Gemini and Grok?",
+          "What’s my highest-impact task — and ship it for me from the Clerow brief.",
           "Generate my llms.txt and robots.txt and write them to my repo.",
           "Run my site audit and fix what’s blocking AI crawlers, then commit it.",
+          "Run a full multi-model scan and refresh my tasks. (Premium)",
           "Mark that task done and keep my streak.",
         ].map((q) => (
           <div key={q} className="cnx-try-item">
@@ -179,41 +180,46 @@ export function ConnectPage() {
         ))}
       </div>
 
-      <h2 className="lp-sec">What the free MCP ships — and what’s Premium</h2>
+      <h2 className="lp-sec">What’s free — and what Premium unlocks in the MCP</h2>
       <div className="cnx-modes">
         <div className="cnx-mode">
-          <div className="cnx-mode-h"><span className="cnx-mode-ic on">🛠️</span><div><b>Free · Level 1 foundations</b><span>Your agent ships these</span></div></div>
-          <p>The technical groundwork that gets you read &amp; cited by AI: a robots.txt that welcomes AI crawlers, llms.txt, and your title / H1 / meta fixes — your agent gets the file (or a brief), writes it <b>into your repo</b>, and you review and merge.</p>
+          <div className="cnx-mode-h"><span className="cnx-mode-ic on">🛠️</span><div><b>Free · Level 1 + a Level 2 taster</b><span>Your agent ships these</span></div></div>
+          <p>The technical groundwork that gets you read &amp; cited by AI: a robots.txt that welcomes AI crawlers, llms.txt, your title / H1 / meta fixes, and one on-page structure task — your agent gets the ready file, the diagnostic steps, or a brief, writes it <b>into your repo</b>, and you review and merge.</p>
           <div className="cnx-mode-tags">{["robots.txt", "llms.txt", "title · H1 · meta", "site audit"].map((t) => <span key={t}>{t}</span>)}</div>
         </div>
         <div className="cnx-mode">
-          <div className="cnx-mode-h"><span className="cnx-mode-ic off">⭐</span><div><b>Premium · Levels 2–5</b><span>In the Clerow dashboard</span></div></div>
-          <p>The rest of the Climb: on-page structure &amp; JSON-LD schema, authority &amp; off-site citations (Reddit, G2, guest posts — drafted for you to post), and comparison / landing pages to win buyer queries. Unlock the full ladder and re-scans in the dashboard.</p>
-          <div className="cnx-mode-tags">{["JSON-LD schema", "FAQ + pages", "Reddit · G2", "comparison pages"].map((t) => <span key={t}>{t}</span>)}</div>
+          <div className="cnx-mode-h"><span className="cnx-mode-ic off">⭐</span><div><b>Premium · The full Climb + full scans</b><span>Right here in the MCP</span></div></div>
+          <p>Subscribe and your agent gets the whole ladder through the MCP: on-page structure &amp; JSON-LD schema, authority &amp; off-site citations (Reddit, G2, guest posts — drafted for you to post), and comparison / landing pages to win buyer queries — each as a brief built from all five engines’ data for your agent to ship. Plus <b>run_full_scan</b>: re-scan every AI model on demand. (The dashboard is still there for done-for-you content.)</p>
+          <div className="cnx-mode-tags">{["full Climb (L2–5)", "run_full_scan", "Reddit · G2", "comparison pages"].map((t) => <span key={t}>{t}</span>)}</div>
         </div>
       </div>
 
-      <h2 className="lp-sec">Five tools, one connector</h2>
+      <h2 className="lp-sec">Six tools, one connector</h2>
       <div className="cnx-tools">
         <CnxTool name="get_visibility">
-          Your live AI visibility across ChatGPT, Claude, Perplexity &amp; Gemini — score, rank, sentiment, the
-          competitors above you, and the domains AI cites. The moat.
+          Your live AI visibility across ChatGPT, Claude, Perplexity, Gemini &amp; Grok — score, rank, sentiment,
+          the competitors above you, and the domains AI cites. The moat.
         </CnxTool>
         <CnxTool name="list_tasks">
-          Your prioritized GEO ladder — “The Climb.” Your free <b>Level 1</b> tasks with impact and XP, plus a
-          summary of every level (Levels 2–5 are Premium, in the dashboard).
+          Your prioritized GEO ladder — “The Climb.” Free covers all of <b>Level 1</b> plus one <b>Level 2</b>
+          taster; <b>Premium unlocks the full ladder right here in the MCP</b> — each task with impact and XP.
         </CnxTool>
         <CnxTool name="get_site_audit">
           A technical audit of your own site: AI-crawler robots.txt, llms.txt, HTTPS, title, H1, meta, structured
           data — each with a concrete fix.
         </CnxTool>
         <CnxTool name="get_task_content">
-          For a <b>Level 1</b> task: the actual robots.txt / llms.txt file, or a brief — the GEO rules plus your
-          brand &amp; competitor context — for your agent to write the finished, repo-aware content from.
+          For an available task: the actual robots.txt / llms.txt file, the diagnostic steps for a technical fix,
+          or a <b>brief built from what all five engines found about you + your real crawled site</b> — for your
+          agent to write the finished, repo-aware content from.
         </CnxTool>
         <CnxTool name="complete_task">
-          Marks a <b>Level 1</b> task done after your agent ships it — stamps completion so it keeps your streak
-          and awards XP.
+          Marks a task done after your agent ships it — stamps completion so it keeps your streak and awards XP
+          (free: Level 1 + the Level 2 taster; Premium: the full Climb).
+        </CnxTool>
+        <CnxTool name="run_full_scan" pro>
+          Re-scan every AI model (ChatGPT, Claude, Perplexity, Gemini, Grok) across your top buyer queries and
+          refresh your standings, tasks &amp; briefs — Premium, uses one of your monthly scans, ~1–2 min.
         </CnxTool>
       </div>
     </div>

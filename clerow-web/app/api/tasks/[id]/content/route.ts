@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { streamFixContent } from "@/lib/content/generate";
+import { streamFixContent, buildSiteContext } from "@/lib/content/generate";
+import { loadContentSignal } from "@/lib/scan/contentSignal";
 import { streamContentBody, STREAM_HEADERS } from "@/lib/content/stream";
 import { deterministicTaskContent } from "@/lib/content/files";
 import { parseAudit } from "@/lib/audit/ensure";
@@ -77,9 +78,11 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Subscription required to generate this content. Level 1 fixes are free." }, { status: 402 });
   }
   const profile = toProfile(brand);
+  const siteContext = buildSiteContext(parseAudit(brand.site_audit)?.crawl);
+  const { citedSources, scanInsight } = await loadContentSignal(supabase, brand.id);
   const body = streamContentBody(async (emit) => {
     let full = "";
-    for await (const chunk of streamFixContent({ brand: profile, title: task.title, detail: task.meta })) {
+    for await (const chunk of streamFixContent({ brand: profile, title: task.title, detail: task.meta, siteContext, citedSources, scanInsight })) {
       full += chunk;
       emit({ type: "delta", text: chunk });
     }

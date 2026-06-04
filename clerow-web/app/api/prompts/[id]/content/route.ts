@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { loadPromptDetail } from "@/lib/scan/promptDetail";
-import { streamStepContent } from "@/lib/content/generate";
+import { streamStepContent, buildSiteContext } from "@/lib/content/generate";
+import { loadContentSignal } from "@/lib/scan/contentSignal";
+import { parseAudit } from "@/lib/audit/ensure";
 import { streamContentBody, STREAM_HEADERS } from "@/lib/content/stream";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -68,11 +70,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const step = detail.steps.find((s) => s.id === stepId);
   if (!step) return NextResponse.json({ error: "Step not found" }, { status: 404 });
 
+  const { citedSources, scanInsight } = await loadContentSignal(supabase, brand.id);
   const stepCtx = {
     brand: toProfile(brand),
     prompt: { text: detail.text, intent: detail.intent },
     step: { id: step.id, title: step.title, detail: step.detail },
     competitorsAhead: detail.competitorsAhead,
+    siteContext: buildSiteContext(parseAudit(brand.site_audit)?.crawl),
+    citedSources,
+    scanInsight,
   };
   const stream = streamContentBody(async (emit) => {
     let full = "";

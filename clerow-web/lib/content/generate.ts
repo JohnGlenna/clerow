@@ -8,9 +8,10 @@
 // and Grok (xAI). Both stream token deltas so the UI can fill in live, and both
 // drop the web_search tool: here we want the model to *write*, not browse.
 
-import type { BrandProfile } from "../types";
+import type { BrandProfile, ScanSynthesis } from "../types";
 import type { GeoStep } from "../geoSteps";
 import type { PromptIntent } from "../supabase/database.types";
+import type { SiteCrawl } from "../audit/site";
 import { geoWritingGuidelines } from "../geoFrameworks";
 
 // Writer provider — "anthropic" (default) or "grok". Each provider's model is
@@ -32,6 +33,13 @@ export type ContentContext = {
   // Competitor brand names ranked above the user for this prompt (most to least
   // prominent). Lets a comparison draft name the right rival.
   competitorsAhead: string[];
+  // Real crawled-site context (see buildSiteContext) so the draft references the
+  // brand's ACTUAL pages and voice instead of inventing them.
+  siteContext?: string;
+  // Domains the AI engines cite for this space, and the multi-model synthesis
+  // steer (see buildScanInsight) — present only with a real (esp. paid) scan.
+  citedSources?: string[];
+  scanInsight?: string;
 };
 
 // Generic "write the content for one fix" input. The prompt context is optional
@@ -44,7 +52,46 @@ export type FixContentInput = {
   promptText?: string;
   intent?: PromptIntent;
   competitorsAhead?: string[];
+  // Real crawled-site context (see buildSiteContext) — real pages + voice.
+  siteContext?: string;
+  // Domains the AI engines cite + the multi-model synthesis steer.
+  citedSources?: string[];
+  scanInsight?: string;
 };
+
+// Distil the multi-model synthesis (what all the AI engines collectively think)
+// into a compact steer for the writer. Returns undefined when there's no
+// synthesis — i.e. for free/single-engine scans — so paid drafts get a signal
+// free ones can't. Pure formatting (no I/O), like buildSiteContext.
+export function buildScanInsight(s?: ScanSynthesis | null): string | undefined {
+  if (!s) return undefined;
+  const parts = [
+    s.consensus && `What the AI engines agree on: ${s.consensus}`,
+    s.divergence && `Where they disagree: ${s.divergence}`,
+    s.bestFix && `Highest-leverage fix they point to: ${s.bestFix}`,
+  ].filter(Boolean);
+  return parts.length ? parts.join("\n") : undefined;
+}
+
+// Format the retained crawl into a compact context block for the writer model:
+// the homepage + a few real inner pages (URL, title, snippet) so it links real
+// pages and matches the site's voice. Returns undefined when there's nothing to
+// ground on, so callers can spread it in conditionally.
+export function buildSiteContext(crawl?: SiteCrawl | null): string | undefined {
+  if (!crawl) return undefined;
+  const pages = [crawl.home, ...crawl.pages].filter((p): p is NonNullable<typeof p> => !!p);
+  if (!pages.length && !crawl.sitemapUrls.length) return undefined;
+
+  const lines: string[] = [];
+  for (const p of pages.slice(0, 6)) {
+    const bits = [p.title, p.description].filter(Boolean).join(" — ");
+    lines.push(`- ${p.url}${bits ? `: ${bits}` : ""}`);
+    if (p.text) lines.push(`    excerpt: ${p.text.slice(0, 400)}`);
+  }
+  const extraUrls = crawl.sitemapUrls.filter((u) => !pages.some((p) => p.url.replace(/\/$/, "") === u.replace(/\/$/, "")));
+  if (extraUrls.length) lines.push(`Other real pages: ${extraUrls.slice(0, 15).join(", ")}`);
+  return lines.length ? lines.join("\n") : undefined;
+}
 
 const SYSTEM =
   "You are a senior AEO/GEO (Answer Engine Optimization) content writer for a SaaS company. " +
@@ -59,7 +106,9 @@ const SYSTEM =
   "'who each is best for', and a short verdict. " +
   "5) If the fix is a landing/how-to page, write the H1, opening paragraph, and section outline with real copy. " +
   "6) If the fix is about getting cited on a third-party source, write the actual submission/post/listing copy. " +
-  "7) Write in a confident, plain, non-fluffy voice. Honest about competitors — AI engines reward even-handed pages.\n\n" +
+  "7) Write in a confident, plain, non-fluffy voice. Honest about competitors — AI engines reward even-handed pages. " +
+  "8) When YOUR ACTUAL SITE context is provided, ground everything in it: link only real pages/URLs listed there, reuse the real product names and positioning, and match the site's voice. Never invent pages, URLs, or facts that aren't supported by it. " +
+  "9) When SOURCES THE AI ENGINES CITE or a multi-model read is provided, use them: write the kind of page those sources are, align with the angle the engines reward, and directly close the gap the multi-model read names.\n\n" +
   geoWritingGuidelines();
 
 function anthropicKey(): string {
@@ -75,7 +124,7 @@ function xaiKey(): string {
 }
 
 function buildUserPrompt(input: FixContentInput): string {
-  const { brand, title, detail, promptText, intent, competitorsAhead } = input;
+  const { brand, title, detail, promptText, intent, competitorsAhead, siteContext, citedSources, scanInsight } = input;
   const lines = [
     `BRAND: ${brand.company}`,
     `WEBSITE: ${brand.url}`,
@@ -85,6 +134,15 @@ function buildUserPrompt(input: FixContentInput): string {
     brand.competitors?.length ? `COMPETITORS: ${brand.competitors.join(", ")}` : "",
     competitorsAhead?.length ? `CURRENTLY RANKED ABOVE THEM FOR THIS QUERY: ${competitorsAhead.join(", ")}` : "",
     "",
+    siteContext
+      ? `YOUR ACTUAL SITE (from our crawl — reference these real pages and voice; never invent pages or URLs):\n${siteContext}\n`
+      : "",
+    citedSources?.length
+      ? `SOURCES THE AI ENGINES ALREADY CITE FOR THIS SPACE (aim to be the kind of page these are; reference/align with them where credible): ${citedSources.join(", ")}`
+      : "",
+    scanInsight
+      ? `HOW THE AI MODELS COLLECTIVELY SEE YOU (from a multi-model scan — use this to target the draft):\n${scanInsight}\n`
+      : "",
     promptText ? `BUYER'S QUESTION TO AI: "${promptText}"` : "",
     intent ? `QUESTION INTENT: ${intent}` : "",
     `THE FIX TO WRITE: ${title}`,
@@ -103,6 +161,8 @@ function buildUserPrompt(input: FixContentInput): string {
 export function buildContentBrief(input: FixContentInput): string {
   return [
     `You are writing AEO/GEO content for ${input.brand.company}. Follow the rules below, then write the finished file and save it into the repo.`,
+    "",
+    "This brief is built from Clerow's multi-model scan — what ChatGPT, Claude, Perplexity, Gemini and Grok collectively returned about this brand (see the multi-model read + the sources they cite in the Context below) plus the brand's real crawled site. Write to win exactly those gaps, ground everything in the real pages, and integrate the result into this repo (right file, matching the existing components and voice).",
     "",
     "## Writing rules",
     SYSTEM,
@@ -235,6 +295,9 @@ function stepInput(ctx: ContentContext): FixContentInput {
     promptText: ctx.prompt.text,
     intent: ctx.prompt.intent,
     competitorsAhead: ctx.competitorsAhead,
+    siteContext: ctx.siteContext,
+    citedSources: ctx.citedSources,
+    scanInsight: ctx.scanInsight,
   };
 }
 
