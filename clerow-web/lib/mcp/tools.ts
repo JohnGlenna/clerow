@@ -10,7 +10,7 @@ import { createAdminClient } from "../supabase/admin";
 import type { Database } from "../supabase/database.types";
 import { loadBrandSnapshot } from "../scan/snapshot";
 import { ensureSiteAudit, refreshSiteAudit } from "../audit/ensure";
-import { buildLadder, ensureLadderTasks, projectLockedGain, type LadderTask } from "../ladder";
+import { buildLadder, ensureLadderTasks, projectLockedGain, LADDER_DEPTH, type LadderTask } from "../ladder";
 import { assembleLadderContext } from "../scan/ladderContext";
 import { buildContentBrief, buildSiteContext, buildScanInsight } from "../content/generate";
 import { deterministicTaskContent } from "../content/files";
@@ -72,7 +72,7 @@ function brandProfile(b: BrandRow): BrandProfile {
 // with the rest worked after upgrading in the dashboard. The note explains which.
 function tierNote(subscribed: boolean) {
   return subscribed
-    ? "You're on Clerow Premium — the full climb (Levels 1–5) is available here. Work the active level's tasks in order; unlock levels ahead from the dashboard."
+    ? "You're on Clerow Premium — the full climb (Levels 1–5) is available right here in the MCP, every level unlocked. Work them in order for the best results; your progress syncs to the dashboard automatically."
     : "The Clerow MCP is free and covers the foundations — all of Level 1 plus your first Level 2 (on-page structure) task. The rest of Level 2 and Levels 3–5 — authority & citations, winning buyer queries, and measuring — require a Clerow Premium subscription and are worked in the dashboard.";
 }
 
@@ -85,18 +85,16 @@ function higherLevel(level: number | null) {
 }
 
 // Build the same ladder the dashboard shows (idempotently seeds active/open levels).
-// A subscriber gets the full climb (real unlockedThrough, nothing locked); a free
-// user is pinned to the frontier (subscribed=false, unlockedThrough=0 — which also
-// re-locks a churned ex-subscriber's stale higher-level tasks).
+// A subscriber gets the WHOLE climb at once through the MCP — unlockedThrough is the
+// full ladder depth, so every level is "open" and seeded on the first call, no
+// dashboard "unlock" required. (The dashboard then derives its own unlockedThrough
+// from the highest seeded ladder task, so this shows up as unlocked there too.) A
+// free user is pinned to the frontier (subscribed=false, unlockedThrough=0 — which
+// also re-locks a churned ex-subscriber's stale higher-level tasks).
 async function loadLadder(admin: Db, brand: BrandRow, subscribed: boolean) {
   const { data: tasks } = await admin.from("tasks").select("*").eq("brand_id", brand.id);
   const { ctx, audit, snapshot } = await assembleLadderContext(admin, brand);
-  const unlockedThrough = !subscribed
-    ? 0
-    : (tasks ?? []).reduce(
-        (max, t) => (t.source === "ladder" && (t.level ?? 0) > max ? t.level ?? 0 : max),
-        0,
-      );
+  const unlockedThrough = subscribed ? LADDER_DEPTH : 0;
   const existing = new Map<string, { id: string; done: boolean; resolved: boolean }>();
   for (const t of tasks ?? [])
     if (t.ladder_key) existing.set(t.ladder_key, { id: t.id, done: t.done, resolved: t.done || t.archived });

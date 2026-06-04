@@ -38,6 +38,12 @@ export function buildLadderContext(
       .filter((p) => p.is_tracked && p.id !== snapshot.primaryPromptId)
       .map((p) => p.text)
       .slice(0, 5),
+    // Multi-model consensus signal — lets the ladder say "N of your 5 AI models …".
+    modelsScanned: snapshot.enginesScanned.length,
+    competitorEngines: Object.fromEntries(
+      snapshot.competitors.filter((c) => !c.isYou).map((c) => [c.name, c.enginesCount]),
+    ),
+    sourceEngines: snapshot.citedDomainEngines,
   };
 }
 

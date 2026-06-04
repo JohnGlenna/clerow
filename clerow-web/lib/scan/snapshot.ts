@@ -33,6 +33,8 @@ export type BrandSnapshot = {
   score: { overall: number; visibility: number; position: number | null; sentiment: number | null };
   competitors: DashboardCompetitor[];
   citedDomains: string[];
+  // domain → how many of the scanned models cited it (consensus signal for tasks).
+  citedDomainEngines: Record<string, number>;
   primaryPromptId: string | null;
   primaryPromptText: string | null;
   // The multi-model "what all the AIs collectively think" verdict for the latest
@@ -62,6 +64,7 @@ function emptySnapshot(): BrandSnapshot {
     score: { overall: 0, visibility: 0, position: null, sentiment: null },
     competitors: [],
     citedDomains: [],
+    citedDomainEngines: {},
     primaryPromptId: null,
     primaryPromptText: null,
     synthesis: null,
@@ -121,7 +124,9 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
   const sentG: number[] = [];
   let scannedAt: string | null = null;
   let synthesis: ScanSynthesis | null = null;
-  const citedDomains = new Set<string>();
+  // domain → the set of engines that cited it, so we can rank sources by how many
+  // of the 5 models pull from each (a 5-model scan surfaces consensus sources).
+  const citedDomains = new Map<string, Set<string>>();
 
   snap.engines = PAID_ENGINES.map((id: EngineId) => {
     const r = latestByEngine.get(id);
@@ -146,7 +151,11 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
       scannedAt = sc.finished_at;
       synthesis = sc.synthesis ?? null; // the most-recently-finished scan's verdict
     }
-    for (const d of domainsFrom(r.citations as Citation[], ownHost)) citedDomains.add(d);
+    for (const d of domainsFrom(r.citations as Citation[], ownHost)) {
+      let engines = citedDomains.get(d);
+      if (!engines) { engines = new Set<string>(); citedDomains.set(d, engines); }
+      engines.add(id);
+    }
 
     return { ...base, scanned: true, visibility, position, sentiment };
   });
@@ -155,7 +164,9 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
   snap.hasResult = true;
   snap.scannedAt = scannedAt;
   snap.synthesis = synthesis;
-  snap.citedDomains = [...citedDomains];
+  // Most-cited-across-models first, so source tasks target consensus sources.
+  snap.citedDomains = [...citedDomains.entries()].sort((a, b) => b[1].size - a[1].size).map(([d]) => d);
+  snap.citedDomainEngines = Object.fromEntries([...citedDomains].map(([d, set]) => [d, set.size]));
 
   const visibility = Math.round(avg(visG));
   const position = posG.length ? Math.round(avg(posG)) : null;
@@ -204,7 +215,10 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
       enginesCount: a.engines.size,
       rank: 0,
     }))
-    .sort((x, y) => y.visibility - x.visibility || (x.position ?? 99) - (y.position ?? 99))
+    // Consensus first: a brand more models recommend is the more confident target,
+    // then averaged visibility, then best position. (Single-model scans: enginesCount
+    // is 1 for all, so this is a no-op and the free scan ordering is unchanged.)
+    .sort((x, y) => y.enginesCount - x.enginesCount || y.visibility - x.visibility || (x.position ?? 99) - (y.position ?? 99))
     .map((c, i) => ({ ...c, rank: i + 1 }));
 
   return snap;

@@ -508,6 +508,10 @@
 
 /* ---- Centered task modal — high-contrast navy (matches the Claude design).
    Modal-local palette so contrast reads regardless of the page behind it. */
+/* The modal layer wrapper: defines the dashboard vars (via .ld-root) but paints
+   no box of its own, so popups inherit the dark theme even outside the shell. */
+.ld-overlays { display: contents; }
+
 .tm-scrim { position: fixed; inset: 0; background: rgba(6,12,15,.82); backdrop-filter: blur(6px); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 28px; animation: ldfade .16s; }
 .tm-modal {
   /* Match the dashboard (.ld-root) palette — teal-cyan accent, not royal blue.
@@ -585,6 +589,8 @@
 .tm-cmd pre { margin: 0; padding: 15px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: #CDE7F2; white-space: pre-wrap; word-break: break-word; }
 /* footer + buttons */
 .tm-foot { display: flex; gap: 12px; padding: 16px 22px; border-top: 1px solid var(--tm-line); background: #0C171B; flex: none; }
+.tm-foot--end { justify-content: flex-end; }
+.tm-foot--end > .tm-btn { flex: 0 0 auto; }
 .tm-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; font-weight: 800; font-size: 14px; padding: 13px 18px; border-radius: 12px; border: 0; cursor: pointer; transition: filter .12s, border-color .12s, color .12s; }
 .tm-foot > .tm-btn { flex: 1; }
 .tm-btn--wide { flex: 1; }

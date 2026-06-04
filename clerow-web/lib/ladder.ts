@@ -86,12 +86,27 @@ export type LadderContext = {
   competitorsAhead: string[];
   sourceGaps: string[]; // third-party domains AI cited
   promptGaps: string[]; // prompt texts not yet won
+  // Multi-model consensus signal (optional — absent/1 for single-engine free scans),
+  // used to sharpen task copy ("All 5 of your AI models recommend X").
+  modelsScanned?: number; // engines that actually ran
+  competitorEngines?: Record<string, number>; // competitor name → # models recommending it
+  sourceEngines?: Record<string, number>; // cited domain → # models citing it
 };
 
 const MIN = (m: number) => (m >= 60 ? `${Math.round(m / 60)} h` : `${m} min`);
 const metaFor = (minutes: number, impact: Impact) => `≈ ${MIN(minutes)} · impact: ${impact}`;
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 56);
+
+// Phrase a multi-model consensus signal for task copy. With ≥2 models agreeing it
+// reads "All 5 of your AI models <subject>" / "3 of your 5 AI models <subject>";
+// otherwise (single-engine free scan, or a one-off mention) the singular fallback.
+function consensus(n: number | undefined, total: number | undefined, subject: string, singular: string): string {
+  if (n && total && n >= 2) {
+    return n >= total ? `All ${total} of your AI models ${subject}` : `${n} of your ${total} AI models ${subject}`;
+  }
+  return singular;
+}
 
 // Where a fix happens, and therefore who can do it:
 //   "onsite"  — a file/page on the user's own site → Clerow MCP can ship it (or DIY).
@@ -261,7 +276,7 @@ function level3(ctx: LadderContext): Spec[] {
       spec(
         `l3-source-${slug(d)}`,
         `Get ${ctx.company} cited on ${d}`,
-        `AI cited ${d} when answering your prompts. Earn a presence there — a listing, a review, or a substantive contribution — to enter the model's source set.`,
+        `${consensus(ctx.sourceEngines?.[d], ctx.modelsScanned, `cite ${d}`, `AI cited ${d}`)} when answering your prompts. Earn a presence there — a listing, a review, or a substantive contribution — to enter the model's source set.`,
         d.includes("reddit") ? 20 : 30,
         "high",
         "offsite",
@@ -285,7 +300,7 @@ function level4(ctx: LadderContext): Spec[] {
       spec(
         `l4-compare-${slug(comp)}`,
         `Publish a comparison page: ${ctx.company} vs ${comp}`,
-        `AI currently leads with ${comp}. A dedicated, honest comparison page — feature table, "who each is best for", migration notes — is the single asset most likely to win you these queries.`,
+        `${consensus(ctx.competitorEngines?.[comp], ctx.modelsScanned, `recommend ${comp} ahead of you`, `AI currently leads with ${comp}`)}. A dedicated, honest comparison page — feature table, "who each is best for", migration notes — is the single asset most likely to win you these queries.`,
         45,
         "very high",
       ),
@@ -320,6 +335,11 @@ const LEVEL_META: { title: string; blurb: string; build: (c: LadderContext) => S
   { title: "Win the queries", blurb: "Ship the pages that win you the big buyer questions.", build: level4 },
   { title: "Measure & repeat", blurb: "Re-scan, see your gains, and unlock the next climb.", build: level5 },
 ];
+
+// Total number of levels in the climb — used to unlock the whole ladder at once
+// (e.g. a Premium MCP user, who gets the full climb without the dashboard's
+// progressive unlock).
+export const LADDER_DEPTH = LEVEL_META.length;
 
 function toTask(s: Spec, existing: Map<string, { id: string; done: boolean; resolved: boolean }>): LadderTask {
   const e = existing.get(s.key);

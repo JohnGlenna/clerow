@@ -72,19 +72,24 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {children}
-      {task && (
-        <TaskModal
-          task={task}
-          modelCount={data?.models?.length ?? 0}
-          brandUrl={data?.brand?.url ?? null}
-          onClose={() => setTask(null)}
-          onChanged={refresh}
-          onAddContext={() => setContext(true)}
-        />
-      )}
-      {upgrade && <UpgradeSheet onClose={() => setUpgrade(false)} />}
-      {context && <ContextSheet onClose={() => setContext(false)} />}
-      {justSubscribed && <SubscribedToast onClose={() => setJustSubscribed(false)} />}
+      {/* The modal layer renders outside the .ld-root shell, so it carries the
+          dashboard's dark palette itself (display:contents → no box painted, but
+          the .ld-root custom props still inherit to the popups). */}
+      <div className="ld-root ld-overlays">
+        {task && (
+          <TaskModal
+            task={task}
+            modelCount={data?.models?.length ?? 0}
+            brandUrl={data?.brand?.url ?? null}
+            onClose={() => setTask(null)}
+            onChanged={refresh}
+            onAddContext={() => setContext(true)}
+          />
+        )}
+        {upgrade && <UpgradeSheet onClose={() => setUpgrade(false)} />}
+        {context && <ContextSheet onClose={() => setContext(false)} />}
+        {justSubscribed && <SubscribedToast onClose={() => setJustSubscribed(false)} />}
+      </div>
     </Ctx.Provider>
   );
 }

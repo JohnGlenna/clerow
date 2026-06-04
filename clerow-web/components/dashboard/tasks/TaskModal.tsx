@@ -185,7 +185,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   };
   const close = () => { onChanged(); onClose(); };
 
-  // ---- Full-screen scan takeover --------------------------------------------
+  // ---- Live scan (popup, non-dismissable while running) ---------------------
   if (view === "scanning") {
     const cells = scan.prompts.flatMap((p) => p.engines);
     const total = cells.length || 1;
@@ -199,44 +199,48 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
     const curPhase = PHASES.findIndex((p) => p.key === scan.phase);
     const steps = PHASES.map((p, i) => ({ label: p.label, state: (curPhase < 0 || i < curPhase ? "done" : i === curPhase ? "active" : "pending") as "done" | "active" | "pending" }));
     return (
-      <div className="sheet-back">
-        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={pct} /></div><span className="lesson-heart">📡 Live</span></div>
-        <div className="lesson-body"><div className="lesson-inner">
-          <div className="lesson-tag"><span className="dot">🚩</span>Scanning</div>
-          <h1 className="lesson-h">Reading your site &amp; querying 5 models…</h1>
-          <p className="lesson-why">Clerow reads your site, AI-grades your pages, then watches every model answer your buyer queries — your score updates the moment they finish.</p>
-          <ScanProgress steps={steps} engines={scan.engines} prompts={scan.prompts} elapsedMs={scan.elapsedMs} showOrbit={false} />
-        </div></div>
+      <div className="tm-scrim">
+        <div className="tm-modal" role="dialog" aria-modal="true">
+          <div className="tm-head"><span className="tm-crumb">Scanning · 📡 Live</span></div>
+          <div className="tm-body">
+            <div style={{ marginBottom: 18 }}><PixelProgress value={pct} /></div>
+            <h2 className="tm-title">Reading your site &amp; querying 5 models…</h2>
+            <p className="tm-why">Clerow reads your site, AI-grades your pages, then watches every model answer your buyer queries — your score updates the moment they finish.</p>
+            <ScanProgress steps={steps} engines={scan.engines} prompts={scan.prompts} elapsedMs={scan.elapsedMs} showOrbit={false} />
+          </div>
+        </div>
       </div>
     );
   }
 
-  // ---- Full-scan results (checkpoint) full-screen ----------------------------
+  // ---- Full-scan results (checkpoint) popup ----------------------------------
   if (view === "done" && task.kind === "checkpoint") {
     const overall = scan.result && "score" in scan.result ? scan.result.score.overall : null;
     const groups = scan.prompts.filter((p) => p.text).sort((a, b) => a.index - b.index);
     const siteGaps = scan.site.filter((c) => c.status !== "pass" && c.status !== "unknown");
     const mark = (s: string) => (s === "pass" ? "✓" : s === "warn" ? "⚠" : s === "unknown" ? "–" : "✕");
     return (
-      <div className="sheet-back">
-        <div className="lesson-top"><button className="lesson-x" onClick={close}>✕</button><div style={{ flex: 1 }}><PixelProgress value={100} /></div><span className="lesson-heart">✓ Done</span></div>
-        <div className="lesson-body lesson-body--steps"><div className="lesson-inner lesson-inner--steps">
-          <div className="results-head">
-            <div className="results-score">{overall ?? "—"}</div>
-            <div><div className="results-h">Scan complete</div><div className="results-sub">Your AI visibility score{overall != null ? ` is ${overall}` : ""} · finish this level&apos;s tasks to unlock the next.</div></div>
-          </div>
-          {scan.site.length > 0 && (
-            <div className="results-card">
-              <div className="results-card-h">🔎 Your website scan {siteGaps.length > 0 && <span>{siteGaps.length} to fix</span>}</div>
-              <div className="results-checks">{scan.site.map((c) => (<div key={c.id} className={`results-check ${c.status}`}><span className="rc-mark">{mark(c.status)}</span><span>{c.label}</span></div>))}</div>
+      <div className="tm-scrim" onClick={close}>
+        <div className="tm-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="tm-head"><span className="tm-crumb">Scan complete · ✓ Done</span><button className="tm-x" onClick={close} aria-label="Close">✕</button></div>
+          <div className="tm-body">
+            <div className="results-head">
+              <div className="results-score">{overall ?? "—"}</div>
+              <div><div className="results-h">Scan complete</div><div className="results-sub">Your AI visibility score{overall != null ? ` is ${overall}` : ""} · finish this level&apos;s tasks to unlock the next.</div></div>
             </div>
-          )}
-          {groups.length > 0 && (
-            <div className="results-card"><div className="results-card-h">💬 What each model said</div><ScanProgress done engines={scan.engines} prompts={scan.prompts} elapsedMs={0} showOrbit={false} /></div>
-          )}
-          <div className="results-card results-next"><div className="results-card-h">✅ We turned this into your tasks</div><p className="results-next-p">Everything to make your site rank higher is now in your tasks. Work through them top to bottom — <b>copy Clerow&apos;s ready-made fix</b> for each, or let the <b>Clerow MCP</b> ship them for you automatically.</p></div>
-        </div></div>
-        <div className="lesson-foot"><div className="lesson-foot-in"><button className="btn-check" onClick={close}>See my tasks</button></div></div>
+            {scan.site.length > 0 && (
+              <div className="results-card">
+                <div className="results-card-h">🔎 Your website scan {siteGaps.length > 0 && <span>{siteGaps.length} to fix</span>}</div>
+                <div className="results-checks">{scan.site.map((c) => (<div key={c.id} className={`results-check ${c.status}`}><span className="rc-mark">{mark(c.status)}</span><span>{c.label}</span></div>))}</div>
+              </div>
+            )}
+            {groups.length > 0 && (
+              <div className="results-card"><div className="results-card-h">💬 What each model said</div><ScanProgress done engines={scan.engines} prompts={scan.prompts} elapsedMs={0} showOrbit={false} /></div>
+            )}
+            <div className="results-card results-next"><div className="results-card-h">✅ We turned this into your tasks</div><p className="results-next-p">Everything to make your site rank higher is now in your tasks. Work through them top to bottom — <b>copy Clerow&apos;s ready-made fix</b> for each, or let the <b>Clerow MCP</b> ship them for you automatically.</p></div>
+          </div>
+          <div className="tm-foot tm-foot--end"><button className="tm-btn tm-btn--go" onClick={close}>See my tasks →</button></div>
+        </div>
       </div>
     );
   }
