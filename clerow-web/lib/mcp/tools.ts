@@ -12,7 +12,7 @@ import { loadBrandSnapshot } from "../scan/snapshot";
 import { ensureSiteAudit, refreshSiteAudit } from "../audit/ensure";
 import { buildLadder, ensureLadderTasks, projectLockedGain, LADDER_DEPTH, type LadderTask } from "../ladder";
 import { assembleLadderContext } from "../scan/ladderContext";
-import { buildContentBrief, buildSiteContext, buildScanInsight } from "../content/generate";
+import { buildContentBrief, buildSiteContext, buildScanInsight, buildVoiceContext } from "../content/generate";
 import { deterministicTaskContent } from "../content/files";
 import { getSubscription, isSubscribed } from "../billing/subscription";
 import { scanTopPrompts, MAX_SCAN_PROMPTS } from "../scan/run";
@@ -231,6 +231,7 @@ export function registerTools(server: McpServer) {
         siteContext: buildSiteContext(audit?.crawl),
         citedSources,
         scanInsight,
+        brandVoice: buildVoiceContext(brand.about),
       });
       // Off-site authority tasks (Reddit, directories, press) can't be shipped as a
       // repo PR — make that explicit so the agent hands the draft to the user instead

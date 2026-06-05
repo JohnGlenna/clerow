@@ -12,7 +12,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../supabase/database.types";
 import type { Ladder } from "../ladder";
 import type { BrandProfile } from "../types";
-import { generateFixContent, buildSiteContext } from "./generate";
+import { buildSiteContext, buildVoiceContext } from "./generate";
+import { generateGatedContent } from "./gate";
 import { parseAudit } from "../audit/ensure";
 import { loadContentSignal } from "../scan/contentSignal";
 
@@ -53,11 +54,12 @@ export async function prewarmActiveLevel(db: DB, brand: BrandRow, ladder: Ladder
 
   const profile = toProfile(brand);
   const siteContext = buildSiteContext(parseAudit(brand.site_audit)?.crawl);
+  const brandVoice = buildVoiceContext(brand.about);
   const { citedSources, scanInsight } = await loadContentSignal(db, brand.id);
   await Promise.allSettled(
     todo.map(async (t) => {
       try {
-        const { content } = await generateFixContent({ brand: profile, title: t.title, detail: t.detail, siteContext, citedSources, scanInsight });
+        const { content } = await generateGatedContent({ brand: profile, title: t.title, detail: t.detail, siteContext, citedSources, scanInsight, brandVoice });
         await db.from("tasks").update({ content, content_at: new Date().toISOString() }).eq("id", t.id!);
       } catch {
         // Best-effort warm; the content route will generate live on click.

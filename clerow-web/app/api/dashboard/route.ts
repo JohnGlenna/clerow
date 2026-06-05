@@ -8,6 +8,8 @@ import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/st
 import { levelFromXp } from "@/lib/xp";
 import { ensureSiteAudit } from "@/lib/audit/ensure";
 import { buildLadder, ensureLadderTasks, refreshLadderTaskContent, projectLockedGain } from "@/lib/ladder";
+import { buildJourney } from "@/lib/journey";
+import { buildRoadmap } from "@/lib/roadmap";
 import { buildLadderContext } from "@/lib/scan/ladderContext";
 import { budgetStatus, planFromSub } from "@/lib/billing/limits";
 import { getSubscription, isSubscribed } from "@/lib/billing/subscription";
@@ -166,6 +168,9 @@ export async function GET(req: Request) {
   // The "finish the climb for ~+N%" carrot — estimated visibility upside still
   // behind the paywall. Null for subscribers (nothing locked).
   const lockedGain = subscribed ? null : projectLockedGain(ladder);
+  // The 90-day plan overlay: Day N of 90 + phase/checkpoint progress, anchored on
+  // the brand's created_at (day 0) so no migration is needed. Pure derivation.
+  const journey = buildJourney(dayKey(new Date(brand.created_at), tz), today, ladder);
   // Rewrite seeded tasks whose spec changed since last scan (e.g. generic L2 →
   // the AI page-grader's page-specific version), so a full scan visibly updates them.
   await refreshLadderTaskContent(supabase, ladder, (tasks ?? []).filter((t) => t.source === "ladder"));
@@ -195,6 +200,21 @@ export async function GET(req: Request) {
       });
     }
   }
+
+  // Per-prompt standing, mapped once and reused for both the Prompts list and the
+  // content roadmap (so the two can't disagree about what's a gap).
+  const dashPrompts = (prompts ?? []).map((p) => ({
+    id: p.id,
+    text: p.text,
+    intent: p.intent,
+    volume: p.volume,
+    isPrimary: p.is_primary,
+    scanned: scannedPromptIds.has(p.id),
+    yourPosition: promptStand.get(p.id)?.position ?? null,
+    yourVisibility: promptStand.get(p.id)?.visibility ?? null,
+  }));
+  // Cluster the discovered prompts into a sequenced content roadmap.
+  const roadmap = buildRoadmap(dashPrompts);
 
   const streak = await evalAndPersistStreak(allTasks);
 
@@ -273,16 +293,8 @@ export async function GET(req: Request) {
       sentiment: m.sentiment,
     })),
     competitors: snapshot.competitors,
-    prompts: (prompts ?? []).map((p) => ({
-      id: p.id,
-      text: p.text,
-      intent: p.intent,
-      volume: p.volume,
-      isPrimary: p.is_primary,
-      scanned: scannedPromptIds.has(p.id),
-      yourPosition: promptStand.get(p.id)?.position ?? null,
-      yourVisibility: promptStand.get(p.id)?.visibility ?? null,
-    })),
+    prompts: dashPrompts,
+    roadmap,
     tasks: orderedTasks.map((t) => ({
       id: t.id,
       title: t.title,
@@ -294,6 +306,7 @@ export async function GET(req: Request) {
       level: t.level,
     })),
     ladder,
+    journey,
     lockedGain,
     scansLeft: budget.scansLeft,
     budget: { spent: Math.round(budget.spent * 100) / 100, ceiling: budget.ceiling },

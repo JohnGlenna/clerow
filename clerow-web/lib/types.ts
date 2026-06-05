@@ -2,8 +2,12 @@
 import type { PromptIntent, PromptVolume, BrandSentiment, Citation } from "./supabase/database.types";
 import type { GeoStep } from "./geoSteps";
 import type { Ladder, LockedGain } from "./ladder";
+import type { Journey } from "./journey";
+import type { Roadmap } from "./roadmap";
 
 export type { Ladder, LadderLevel, LadderTask, LevelState, Channel, LockedGain } from "./ladder";
+export type { Journey, JourneyPhase } from "./journey";
+export type { Roadmap, RoadmapCluster, RoadmapPrompt } from "./roadmap";
 
 // The brand profile the scan reasons about (subset of the `brands` row).
 export type BrandProfile = {
@@ -198,6 +202,10 @@ export type DashboardData = {
   prompts?: DashboardPrompt[];
   tasks?: DashboardTask[];
   ladder?: Ladder;
+  // 90-day plan overlay on the climb (Day N of 90 + phase/checkpoint progress).
+  journey?: Journey;
+  // Discovered prompts clustered into a sequenced content roadmap.
+  roadmap?: Roadmap;
   // Estimated AI-visibility upside still behind the paywall (the "+N%" carrot at
   // the wall). Null/absent for subscribers. Computed from the locked tasks.
   lockedGain?: LockedGain | null;

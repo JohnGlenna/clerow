@@ -4,6 +4,7 @@ import React from "react";
 import { useDashboard } from "@/lib/useDashboard";
 import { useOverlay } from "../shell/OverlayProvider";
 import { INTENT, Stat, ModelDots } from "../shared/PageBits";
+import { RoadmapView } from "./RoadmapView";
 import type { DashboardPrompt } from "@/lib/types";
 
 // The real questions buyers ask AI, checked across every model. "Fix" opens the
@@ -17,7 +18,7 @@ export function PromptsPage() {
   const models = data?.models ?? [];
   const prompts = data?.prompts ?? [];
 
-  const onFix = (p: DashboardPrompt) =>
+  const onFix = (p: { id: string; text: string }) =>
     openTask({
       kind: "task",
       id: null,
@@ -69,6 +70,8 @@ export function PromptsPage() {
         <Stat v={String(winning)} l="Winning" c="var(--blue)" />
         <Stat v={String(invisible)} l="Invisible" c="var(--red)" />
       </div>
+
+      <RoadmapView onFix={onFix} />
 
       <div className="lp-card">
         {prompts.length === 0 && <div className="lp-row" style={{ color: "var(--ink-2)" }}>No prompts yet — run a scan to discover them.</div>}

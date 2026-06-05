@@ -40,6 +40,9 @@ export type ContentContext = {
   // steer (see buildScanInsight) — present only with a real (esp. paid) scan.
   citedSources?: string[];
   scanInsight?: string;
+  // The founder's own words about the business (see buildVoiceContext) — the
+  // voice/tone sample that stops the draft reading like generic AI.
+  brandVoice?: string;
 };
 
 // Generic "write the content for one fix" input. The prompt context is optional
@@ -57,6 +60,11 @@ export type FixContentInput = {
   // Domains the AI engines cite + the multi-model synthesis steer.
   citedSources?: string[];
   scanInsight?: string;
+  // The founder's own words about the business (see buildVoiceContext).
+  brandVoice?: string;
+  // Set on a quality-gate revision pass: the specific problems the judge flagged
+  // in the previous draft, so the rewrite is targeted (see lib/content/quality.ts).
+  revisionNote?: string;
 };
 
 // Distil the multi-model synthesis (what all the AI engines collectively think)
@@ -93,6 +101,18 @@ export function buildSiteContext(crawl?: SiteCrawl | null): string | undefined {
   return lines.length ? lines.join("\n") : undefined;
 }
 
+// Distil the founder's own "about" text (the business-context upload, stored on
+// brands.about) into a voice/tone sample for the writer. The crawled site copy
+// already grounds *facts* via buildSiteContext; this grounds *how the brand
+// sounds* — the missing signal that otherwise leaves paid drafts reading like
+// generic AI. Returns undefined when there's nothing usable so callers can
+// spread it in conditionally. Pure formatting, no I/O.
+export function buildVoiceContext(about?: string | null): string | undefined {
+  const text = about?.trim();
+  if (!text || text.length < 12) return undefined;
+  return text.slice(0, 1200);
+}
+
 const SYSTEM =
   "You are a senior AEO/GEO (Answer Engine Optimization) content writer for a SaaS company. " +
   "Your job is to produce FINISHED, copy-paste-ready content that helps a brand get recommended by " +
@@ -108,7 +128,8 @@ const SYSTEM =
   "6) If the fix is about getting cited on a third-party source, write the actual submission/post/listing copy. " +
   "7) Write in a confident, plain, non-fluffy voice. Honest about competitors — AI engines reward even-handed pages. " +
   "8) When YOUR ACTUAL SITE context is provided, ground everything in it: link only real pages/URLs listed there, reuse the real product names and positioning, and match the site's voice. Never invent pages, URLs, or facts that aren't supported by it. " +
-  "9) When SOURCES THE AI ENGINES CITE or a multi-model read is provided, use them: write the kind of page those sources are, align with the angle the engines reward, and directly close the gap the multi-model read names.\n\n" +
+  "9) When SOURCES THE AI ENGINES CITE or a multi-model read is provided, use them: write the kind of page those sources are, align with the angle the engines reward, and directly close the gap the multi-model read names. " +
+  "10) When HOW THIS BRAND DESCRIBES ITSELF (the founder's own words) is provided, treat it as the voice reference: mirror its tone, vocabulary, level of formality and the specific way it frames the product, so the output sounds like this brand and not generic AI. The facts in it about the product and audience override any generic assumption.\n\n" +
   geoWritingGuidelines();
 
 function anthropicKey(): string {
@@ -124,7 +145,7 @@ function xaiKey(): string {
 }
 
 function buildUserPrompt(input: FixContentInput): string {
-  const { brand, title, detail, promptText, intent, competitorsAhead, siteContext, citedSources, scanInsight } = input;
+  const { brand, title, detail, promptText, intent, competitorsAhead, siteContext, citedSources, scanInsight, brandVoice, revisionNote } = input;
   const lines = [
     `BRAND: ${brand.company}`,
     `WEBSITE: ${brand.url}`,
@@ -134,6 +155,9 @@ function buildUserPrompt(input: FixContentInput): string {
     brand.competitors?.length ? `COMPETITORS: ${brand.competitors.join(", ")}` : "",
     competitorsAhead?.length ? `CURRENTLY RANKED ABOVE THEM FOR THIS QUERY: ${competitorsAhead.join(", ")}` : "",
     "",
+    brandVoice
+      ? `HOW THIS BRAND DESCRIBES ITSELF (the founder's own words — mirror this tone, vocabulary and positioning so the draft sounds like them, not generic AI):\n${brandVoice}\n`
+      : "",
     siteContext
       ? `YOUR ACTUAL SITE (from our crawl — reference these real pages and voice; never invent pages or URLs):\n${siteContext}\n`
       : "",
@@ -147,6 +171,7 @@ function buildUserPrompt(input: FixContentInput): string {
     intent ? `QUESTION INTENT: ${intent}` : "",
     `THE FIX TO WRITE: ${title}`,
     detail ? `FIX DETAILS: ${detail}` : "",
+    revisionNote ? `\nREVISION REQUEST (a quality review of your previous draft):\n${revisionNote}` : "",
     "",
     "Write the finished content for this fix now.",
   ];
@@ -287,7 +312,7 @@ export async function generateFixContent(input: FixContentInput): Promise<{ cont
 }
 
 // Map a prompt's playbook-step context onto the generic fix input.
-function stepInput(ctx: ContentContext): FixContentInput {
+export function stepInput(ctx: ContentContext): FixContentInput {
   return {
     brand: ctx.brand,
     title: ctx.step.title,
@@ -298,6 +323,7 @@ function stepInput(ctx: ContentContext): FixContentInput {
     siteContext: ctx.siteContext,
     citedSources: ctx.citedSources,
     scanInsight: ctx.scanInsight,
+    brandVoice: ctx.brandVoice,
   };
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { streamFixContent, buildSiteContext } from "@/lib/content/generate";
+import { buildSiteContext, buildVoiceContext } from "@/lib/content/generate";
+import { streamGatedContent } from "@/lib/content/gate";
 import { loadContentSignal } from "@/lib/scan/contentSignal";
 import { streamContentBody, STREAM_HEADERS } from "@/lib/content/stream";
 import { deterministicTaskContent } from "@/lib/content/files";
@@ -80,17 +81,10 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const profile = toProfile(brand);
   const siteContext = buildSiteContext(parseAudit(brand.site_audit)?.crawl);
   const { citedSources, scanInsight } = await loadContentSignal(supabase, brand.id);
+  const input = { brand: profile, title: task.title, detail: task.meta, siteContext, citedSources, scanInsight, brandVoice: buildVoiceContext(brand.about) };
   const body = streamContentBody(async (emit) => {
-    let full = "";
-    for await (const chunk of streamFixContent({ brand: profile, title: task.title, detail: task.meta, siteContext, citedSources, scanInsight })) {
-      full += chunk;
-      emit({ type: "delta", text: chunk });
-    }
-    full = full.trim();
-    if (!full) {
-      emit({ type: "error", message: "No content was generated. Try again." });
-      return;
-    }
+    const full = await streamGatedContent(input, emit);
+    if (!full) return; // an error event was already emitted
     // Write through to the cache so the next open is instant.
     await supabase.from("tasks").update({ content: full, content_at: new Date().toISOString() }).eq("id", id);
     emit({ type: "done" });

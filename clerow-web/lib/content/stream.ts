@@ -7,10 +7,14 @@ import { STREAM_HEADERS } from "../scan/events";
 
 export { STREAM_HEADERS };
 
-// `delta` carries the next chunk of generated markdown; `done` closes a clean
-// run; `error` is the terminal failure frame.
+// `delta` carries the next chunk of generated markdown; `reset` tells the client
+// to discard what it has and re-fill (a quality-gate revision is re-streaming);
+// `score` reports the pre-publish quality grade; `done` closes a clean run;
+// `error` is the terminal failure frame.
 export type ContentEvent =
   | { type: "delta"; text: string }
+  | { type: "reset" }
+  | { type: "score"; score: number; verdict: string; issues: string[]; revised: boolean }
   | { type: "done" }
   | { type: "error"; message: string };
 

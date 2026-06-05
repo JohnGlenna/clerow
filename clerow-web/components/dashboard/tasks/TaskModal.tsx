@@ -88,6 +88,10 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   const [content, setContent] = React.useState<string>("");
   const [genBusy, setGenBusy] = React.useState(false);
   const [genErr, setGenErr] = React.useState<string | null>(null);
+  // Pre-publish quality gate: the grade the draft earned, and whether we're mid
+  // re-stream of a revised draft.
+  const [quality, setQuality] = React.useState<{ score: number; verdict: string; revised: boolean } | null>(null);
+  const [improving, setImproving] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [mcpClient, setMcpClient] = React.useState<"claudecode" | "codex" | "ide" | "web">("claudecode");
   const scan = useScanStream();
@@ -104,7 +108,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   // files / cached / free audit fixes) and the token-streamed paid LLM draft.
   const generate = async () => {
     if (genBusy) return;
-    setGenBusy(true); setGenErr(null); setContent("");
+    setGenBusy(true); setGenErr(null); setContent(""); setQuality(null); setImproving(false);
     try {
       let res: Response;
       if (task.promptId) {
@@ -137,9 +141,11 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
           const line = buffer.slice(0, nl).trim();
           buffer = buffer.slice(nl + 1);
           if (!line) continue;
-          let evt: { type: string; text?: string; message?: string };
+          let evt: { type: string; text?: string; message?: string; score?: number; verdict?: string; revised?: boolean };
           try { evt = JSON.parse(line); } catch { continue; }
           if (evt.type === "delta" && evt.text) { acc += evt.text; setContent(acc); }
+          else if (evt.type === "reset") { acc = ""; setContent(""); setImproving(true); }
+          else if (evt.type === "score") { setImproving(false); setQuality({ score: evt.score ?? 0, verdict: evt.verdict ?? "", revised: !!evt.revised }); }
           else if (evt.type === "error") throw new Error(evt.message ?? "Couldn't generate content");
         }
       }
@@ -264,7 +270,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   // ---- MCP hand-off view -----------------------------------------------------
   if (view === "mcp") {
     const taskCmd = task.kind === "mcp"
-      ? `Using the Clerow MCP, work through all my open Clerow tasks for ${domainOf(brandUrl)}, lowest-effort first.\nShip the on-site fixes as a PR. For off-site tasks (Reddit, directories, guest posts), draft the copy and tell me where to post it.`
+      ? `Using the Clerow MCP, work through all my open Clerow tasks for ${domainOf(brandUrl)}, lowest-effort first.\nFor off-site tasks (Reddit, directories, guest posts), draft the copy and tell me where to post it.`
       : `Using the Clerow MCP, complete this task for ${domainOf(brandUrl)}:\n"${task.title}"`;
     return (
       <div className="tm-scrim" onClick={close}>
@@ -365,9 +371,19 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
               <button className="tm-gen" onClick={generate} disabled={genBusy}>{genBusy ? "Writing…" : content ? "Regenerate" : fileName ? `Generate ${fileName}` : "Generate the content"}</button>
             </div>
             {genErr && <div className="tm-gen-err">{genErr}</div>}
+            {improving && <div className="tm-gen-note">✦ Quality check flagged some gaps — rewriting a stronger draft…</div>}
             {content && (
               <>
                 <pre className="tm-content-box">{content}</pre>
+                {quality && (
+                  <div className={`tm-quality ${quality.score >= 85 ? "is-high" : quality.score >= 72 ? "is-ok" : "is-low"}`}>
+                    <span className="tm-quality-score">{quality.score}<span className="tm-quality-max">/100</span></span>
+                    <span className="tm-quality-txt">
+                      <b>AI citation-readiness{quality.revised ? " · improved" : ""}</b>
+                      {quality.verdict ? <span className="tm-quality-verdict">{quality.verdict}</span> : null}
+                    </span>
+                  </div>
+                )}
                 <div className="tm-content-actions">
                   <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={copyContent}>{copied ? "Copied ✓" : "⧉ Copy"}</button>
                   {fileName && <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={download}>⤓ Download {fileName}</button>}

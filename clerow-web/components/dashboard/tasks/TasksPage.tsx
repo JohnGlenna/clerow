@@ -5,6 +5,7 @@ import { useDashboard } from "@/lib/useDashboard";
 import { useOverlay } from "../shell/OverlayProvider";
 import { TaskPath } from "./TaskPath";
 import { NextMoveHero } from "./NextMoveHero";
+import { JourneyCard } from "./JourneyCard";
 
 // The Tasks page (the Climb). The right rail and the task modal live in the
 // layout; this page owns the path and the free level-unlock action.
@@ -57,6 +58,7 @@ export function TasksPage() {
   return (
     <div className="ld-path-wrap">
       <NextMoveHero />
+      <JourneyCard />
       <TaskPath
         data={data}
         subscribed={!!data.subscribed}

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { loadPromptDetail } from "@/lib/scan/promptDetail";
-import { streamStepContent, buildSiteContext } from "@/lib/content/generate";
+import { stepInput, buildSiteContext, buildVoiceContext } from "@/lib/content/generate";
+import { streamGatedContent } from "@/lib/content/gate";
 import { loadContentSignal } from "@/lib/scan/contentSignal";
 import { parseAudit } from "@/lib/audit/ensure";
 import { streamContentBody, STREAM_HEADERS } from "@/lib/content/stream";
@@ -79,17 +80,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     siteContext: buildSiteContext(parseAudit(brand.site_audit)?.crawl),
     citedSources,
     scanInsight,
+    brandVoice: buildVoiceContext(brand.about),
   };
   const stream = streamContentBody(async (emit) => {
-    let full = "";
-    for await (const chunk of streamStepContent(stepCtx)) {
-      full += chunk;
-      emit({ type: "delta", text: chunk });
-    }
-    if (!full.trim()) {
-      emit({ type: "error", message: "No content was generated. Try again." });
-      return;
-    }
+    const full = await streamGatedContent(stepInput(stepCtx), emit);
+    if (!full) return; // an error event was already emitted
     emit({ type: "done" });
   });
   return new Response(stream, { headers: STREAM_HEADERS });
