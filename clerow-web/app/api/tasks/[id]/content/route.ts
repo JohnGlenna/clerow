@@ -42,6 +42,35 @@ function toProfile(b: Database["public"]["Tables"]["brands"]["Row"]): BrandProfi
   };
 }
 
+// GET: "peek" — return content that's ALREADY available (cached on the task, or
+// free/deterministic) WITHOUT ever calling the LLM. Lets the task modal show
+// ready content on open so the user skips a redundant "Generate" click. Never
+// generates, never charges, no paywall side-effects.
+export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const brand = await resolveBrand(supabase, user.id);
+  if (!brand) return NextResponse.json({ error: "No brand" }, { status: 400 });
+
+  const { id } = await ctx.params;
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("ladder_key, content")
+    .eq("id", id)
+    .eq("brand_id", brand.id)
+    .maybeSingle();
+  if (!task) return NextResponse.json({ error: "Quest not found" }, { status: 404 });
+
+  if (task.content) return NextResponse.json({ content: task.content, ready: true });
+  const ready = deterministicTaskContent(task.ladder_key ?? "", brand, parseAudit(brand.site_audit));
+  if (ready) return NextResponse.json({ content: ready, ready: true });
+  return NextResponse.json({ content: null, ready: false });
+}
+
 // POST: content for one quest/task.
 //  • Level-1 audit fixes (robots.txt, llms.txt, and the on-page instructions) are
 //    FREE — deterministic files or the stored audit fix text, no LLM, no plan.

@@ -78,6 +78,7 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
       <div className="ld-root ld-overlays">
         {task && (
           <TaskModal
+            key={task.id ?? task.title}
             task={task}
             modelCount={data?.models?.length ?? 0}
             brandUrl={data?.brand?.url ?? null}

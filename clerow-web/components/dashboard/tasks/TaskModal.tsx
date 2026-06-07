@@ -100,17 +100,38 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   // not the AI scan). null = not checked yet.
   const [verifying, setVerifying] = React.useState(false);
   const [verifyLive, setVerifyLive] = React.useState<boolean | null>(null);
+  // Auto-load: peek for content that's already available (free/deterministic or
+  // cached) so the user skips a redundant "Generate" click.
+  const [autoLoading, setAutoLoading] = React.useState(false);
   const scan = useScanStream();
 
   const fileName = task.ladderKey ? TASK_FILE[task.ladderKey] : undefined;
   // Only audit-* on-site tasks are mechanically verifiable with a page fetch.
   const canVerify = !offsite && !!task.id && !!task.ladderKey && task.ladderKey.startsWith("audit-");
+  // Deterministic = computed instantly & locally (files + any audit-* fix), so it
+  // never needs a (re)generate button once shown.
+  const isDeterministic = !offsite && (!!fileName || (!!task.ladderKey && task.ladderKey.startsWith("audit-")));
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && view !== "scanning") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, view]);
+
+  // On open, pull any ready content (no LLM call). Standard tasks only — prompt
+  // "Fix" tasks need a stepId first, so they keep the manual generate flow.
+  React.useEffect(() => {
+    if (!task.id || task.promptId || offsite || content || genBusy) return;
+    let cancelled = false;
+    setAutoLoading(true);
+    fetch(`/api/tasks/${task.id}/content`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && j?.ready && j.content) setContent(j.content); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setAutoLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.id]);
 
   // Generate the copy-ready fix. Handles both the instant JSON (deterministic
   // files / cached / free audit fixes) and the token-streamed paid LLM draft.
@@ -170,14 +191,19 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
     navigator.clipboard?.writeText(buildBuilderPrompt({ content, fileName, title: task.title }));
     setCopiedBuilder(true); window.setTimeout(() => setCopiedBuilder(false), 1600);
   };
-  const download = () => {
-    if (!content || !fileName) return;
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const saveFile = (name: string, mime: string) => {
+    if (!content) return;
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = fileName; document.body.appendChild(a); a.click();
+    a.href = url; a.download = name; document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
   };
+  const download = () => { if (fileName) saveFile(fileName, "text/plain;charset=utf-8"); };
+  // Slug for the .md download of prose content tasks (FAQ, comparison, …).
+  const mdSlug = (task.ladderKey || task.title || "clerow-content")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "clerow-content";
+  const downloadMd = () => saveFile(`${mdSlug}.md`, "text/markdown;charset=utf-8");
 
   const checkLive = async () => {
     if (!task.id || verifying) return;
@@ -406,7 +432,15 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
           <div className="tm-content">
             <div className="tm-content-h">
               <span>{offsite ? "Part A — Clerow writes your post" : fileName ? `Your ${fileName}` : "Copy-ready content"}</span>
-              <button className="tm-gen" onClick={generate} disabled={genBusy}>{genBusy ? "Writing…" : content ? "Regenerate" : fileName ? `Generate ${fileName}` : "Generate the content"}</button>
+              {(() => {
+                // Deterministic content auto-loads and never needs (re)generating;
+                // LLM content can be (re)generated on demand.
+                if (genBusy) return <button className="tm-gen" disabled>Writing…</button>;
+                if (autoLoading && !content) return <button className="tm-gen" disabled>Loading…</button>;
+                if (!content) return <button className="tm-gen" onClick={generate}>{isDeterministic ? "Show content" : "✨ Write my content"}</button>;
+                if (!isDeterministic) return <button className="tm-gen" onClick={generate}>Regenerate</button>;
+                return null;
+              })()}
             </div>
             {genErr && <div className="tm-gen-err">{genErr}</div>}
             {improving && <div className="tm-gen-note">✦ Quality check flagged some gaps — rewriting a stronger draft…</div>}
@@ -425,7 +459,9 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
                 <div className="tm-content-actions">
                   {!offsite && <button className="tm-btn tm-btn--go tm-btn--sm" onClick={copyForBuilder}>{copiedBuilder ? "Copied ✓" : "⧉ Copy for AI builder"}</button>}
                   <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={copyContent}>{copied ? "Copied ✓" : "⧉ Copy raw"}</button>
-                  {fileName && <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={download}>⤓ Download {fileName}</button>}
+                  {fileName
+                    ? <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={download}>⤓ Download {fileName}</button>
+                    : !offsite && <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={downloadMd}>⤓ Download .md</button>}
                 </div>
                 {!offsite && <div className="tm-gen-note">Paste into Lovable, AI Studio, Bolt, v0, ChatGPT or Claude — your builder does the rest.</div>}
               </>
