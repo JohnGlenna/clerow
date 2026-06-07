@@ -1560,6 +1560,10 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
 }
 .input-with-prefix input::placeholder { color: var(--ink-3); }
 
+/* The two stacked fields in the onboarding "confirm your profile" step. */
+.confirm-fields { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.confirm-fields .px { min-width: 92px; }
+
 .divider {
   display: flex; align-items: center; gap: 12px;
   color: var(--ink-3);

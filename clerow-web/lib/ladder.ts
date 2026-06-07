@@ -152,25 +152,25 @@ function gradedContentSpecs(audit: SiteAudit | null): Spec[] {
 // If we've never crawled the site, Level 1 still needs content — fall back to the
 // universal foundations as prescriptive (self-reported) tasks.
 const L1_FALLBACK: Spec[] = [
-  spec("audit-robots-ai", "Add a robots.txt that allows AI crawlers", "Create /robots.txt allowing GPTBot, ClaudeBot, PerplexityBot, Google-Extended and OAI-SearchBot with \"Allow: /\". If a bot can't crawl you, it can't cite you.", 10, "medium", "onsite", [
+  spec("audit-robots-ai", "Let AI crawlers read your site", "Create /robots.txt allowing GPTBot, ClaudeBot, PerplexityBot, Google-Extended and OAI-SearchBot with \"Allow: /\". If a bot can't crawl you, it can't cite you.", 10, "medium", "onsite", [
     "Create a `/robots.txt` at your site root (Clerow generates a ready-to-use one below).",
     "Add explicit allow rules for `GPTBot`, `ClaudeBot`, `PerplexityBot` and `Google-Extended`.",
     "Link your sitemap with a `Sitemap:` line.",
     "Re-scan — Clerow confirms all 5 crawlers can reach your key pages.",
   ]),
-  spec("audit-llms-txt", "Add an llms.txt file", "Publish /llms.txt: a short plain-text summary of what you do, who it's for, and links to your key pages — a sitemap written for language models.", 15, "medium", "onsite", [
+  spec("audit-llms-txt", "Add an AI-readable map of your site (llms.txt)", "Publish /llms.txt: a short plain-text summary of what you do, who it's for, and links to your key pages — a sitemap written for language models.", 15, "medium", "onsite", [
     "Create a `/llms.txt` at your site root (Clerow generates a ready-to-use one below).",
     "Lead with a one-line summary of what you do and who it's for.",
     "List your strongest pages — home, pricing, comparison, FAQ — each with a one-line description.",
     "Re-scan to confirm models pick it up.",
   ]),
-  spec("audit-h1", "Add a single clear H1", "Give your homepage one H1 that states, in plain words, what you do — engines use it as the page's headline claim.", 10, "medium", "onsite", [
+  spec("audit-h1", "Add one clear headline for your homepage", "Give your homepage one H1 that states, in plain words, what you do — engines use it as the page's headline claim.", 10, "medium", "onsite", [
     "Add one `<h1>` near the top of your homepage.",
     "State, in plain words, what you do — not a clever slogan.",
     "Make sure there's only one `<h1>`; demote any others to `<h2>`.",
     "Re-scan to confirm.",
   ]),
-  spec("audit-meta-description", "Add a meta description", "Add a 120–160 character meta description that summarizes the page in a sentence an engine could quote.", 10, "low", "onsite", [
+  spec("audit-meta-description", "Write the one-line summary AI shows for your site", "Add a 120–160 character meta description that summarizes the page in a sentence an engine could quote.", 10, "low", "onsite", [
     "Add a `<meta name=\"description\">` tag to your homepage `<head>`.",
     "Write 120–160 characters summarizing the page in one quotable sentence.",
     "Include the core thing you do and who it's for.",
@@ -208,7 +208,7 @@ function level2(ctx: LadderContext): Spec[] {
     ),
     spec(
       "l2-h2-queries",
-      "Add H2s that mirror how buyers ask",
+      "Add subheadings that match how buyers ask",
       "Break the page into H2/H3 sections phrased the way real buyers ask (\"How does it work?\", \"Best for…\", \"Pricing\"). Descriptive headings make your content extractable.",
       20,
       "medium",
@@ -307,7 +307,7 @@ function level4(ctx: LadderContext): Spec[] {
     );
   }
   for (const p of ctx.promptGaps.slice(0, 2)) {
-    out.push(spec(`l4-prompt-${slug(p)}`, `Win the query "${p}"`, `Ship a focused page that answers "${p}" directly and names ${ctx.company} as a top option, then get it cited. This is how you enter the answer for a query you don't win yet.`, 45, "very high"));
+    out.push(spec(`l4-prompt-${slug(p)}`, `Win the search "${p}"`, `Ship a focused page that answers "${p}" directly and names ${ctx.company} as a top option, then get it cited. This is how you enter the answer for a query you don't win yet.`, 45, "very high"));
   }
   if (ctx.primaryPrompt && out.length < 4) {
     const q = ctx.primaryPrompt.text;

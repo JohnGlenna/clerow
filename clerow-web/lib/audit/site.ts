@@ -223,7 +223,7 @@ function checkRobots(robots: Fetched | null, home: Fetched | null): SiteCheck {
       status: "fail",
       detail: "No robots.txt found — AI crawlers have no explicit allow rule.",
       fix: fix(
-        "Add a robots.txt that allows AI crawlers",
+        "Let AI crawlers read your site",
         `Create /robots.txt allowing the AI answer-engine bots (${AI_CRAWLERS.join(", ")}) with "Allow: /", and link your sitemap. If a bot can't crawl you, it can't cite you.`,
         10,
         "medium",
@@ -279,7 +279,7 @@ function checkLlms(llms: Fetched | null): SiteCheck {
         status: "fail",
         detail: "No llms.txt found — there's no LLM-facing roadmap of your site.",
         fix: fix(
-          "Add an llms.txt file",
+          "Add an AI-readable map of your site (llms.txt)",
           "Publish /llms.txt: a short, plain-text summary of what your product is, who it's for, and links to your key pages (home, pricing, comparisons, FAQ). It's a sitemap written for language models.",
           15,
           "medium",
@@ -356,7 +356,7 @@ function checkTitle(html: string): SiteCheck {
       label: "Page title",
       status: "fail",
       detail: "Your homepage has no <title> tag.",
-      fix: fix("Add a clear, specific <title>", "Write a 30–60 character title that names what you do and for whom — it's the first thing both search and AI read.", 10, "medium", [
+      fix: fix("Write a clear page title", "Write a 30–60 character title that names what you do and for whom — it's the first thing both search and AI read.", 10, "medium", [
         "Add a `<title>` tag inside your homepage `<head>`.",
         "Write 30–60 characters that name what you do and for whom (e.g. \"Acme — invoicing software for freelancers\").",
         "Lead with the concrete value, not a tagline.",
@@ -370,7 +370,7 @@ function checkTitle(html: string): SiteCheck {
       label: "Page title",
       status: "warn",
       detail: `Your title is ${title.length} characters (aim for ~30–60).`,
-      fix: fix("Tighten your <title>", "Rewrite the title to ~30–60 characters, leading with what you do and for whom.", 10, "low", [
+      fix: fix("Tighten your page title", "Rewrite the title to ~30–60 characters, leading with what you do and for whom.", 10, "low", [
         "Trim or expand your `<title>` to ~30–60 characters.",
         "Lead with what you do and for whom; drop filler words.",
         "Keep your brand name at the end, not the start.",
@@ -389,7 +389,7 @@ function checkH1(html: string): SiteCheck {
       label: "H1 heading",
       status: "fail",
       detail: "No H1 heading found on your homepage.",
-      fix: fix("Add a single clear H1", "Give the page one H1 that states, in plain words, what you do — answer-engines use it as the page's headline claim.", 10, "medium", [
+      fix: fix("Add one clear headline for your homepage", "Give the page one H1 that states, in plain words, what you do — answer-engines use it as the page's headline claim.", 10, "medium", [
         "Add one `<h1>` near the top of your homepage.",
         "State, in plain words, what you do — not a clever slogan.",
         "Make sure there's only one `<h1>`; demote any others to `<h2>`.",
@@ -403,7 +403,7 @@ function checkH1(html: string): SiteCheck {
       label: "H1 heading",
       status: "warn",
       detail: `Found ${count} H1s — a page should have exactly one.`,
-      fix: fix("Use exactly one H1", "Keep a single H1 as the page's headline and demote the rest to H2/H3 so the structure is unambiguous.", 10, "low", [
+      fix: fix("Keep just one main headline", "Keep a single H1 as the page's headline and demote the rest to H2/H3 so the structure is unambiguous.", 10, "low", [
         "Pick the one heading that best states what the page is about — keep it as `<h1>`.",
         "Change every other `<h1>` to `<h2>` or `<h3>`.",
         "Keep headings in a logical order (h1 → h2 → h3).",
@@ -422,7 +422,7 @@ function checkMetaDescription(html: string): SiteCheck {
       label: "Meta description",
       status: "fail",
       detail: "No meta description on your homepage.",
-      fix: fix("Add a meta description", "Add a 120–160 character meta description that summarizes the page in a sentence an engine could quote.", 10, "low", [
+      fix: fix("Write the one-line summary AI shows for your site", "Add a 120–160 character meta description that summarizes the page in a sentence an engine could quote.", 10, "low", [
         "Add a `<meta name=\"description\">` tag to your homepage `<head>`.",
         "Write 120–160 characters summarizing the page in one quotable sentence.",
         "Include the core thing you do and who it's for.",
@@ -465,7 +465,7 @@ function checkSsr(home: Fetched | null): SiteCheck {
       status: "warn",
       detail: `Your homepage's raw HTML has very little readable text (${textLen} chars) — it looks rendered client-side by JavaScript.`,
       fix: fix(
-        "Server-render the content AI bots read",
+        "Make sure AI bots can see your page content",
         "Several AI crawlers (notably GPTBot) don't run JavaScript — they see only your raw HTML. Server-side render or pre-render your key content (or return static HTML to bot user-agents) so the facts you want cited are in the initial response. Test with View Source: if the facts aren't there, the bot never sees them.",
         60,
         "high",
@@ -490,7 +490,7 @@ function checkSchema(html: string): SiteCheck {
       status: "fail",
       detail: "No JSON-LD structured data found on your homepage.",
       fix: fix(
-        "Add JSON-LD structured data",
+        "Add structured data AI engines can read",
         "Add Organization and SoftwareApplication (or Product) JSON-LD, plus FAQPage on a page with a Q&A block. Schema feeds your brand entity straight into the AI knowledge graph.",
         25,
         "medium",

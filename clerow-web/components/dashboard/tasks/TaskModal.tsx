@@ -7,6 +7,7 @@ import { useScanStream } from "@/lib/useScanStream";
 import { playCheck } from "@/lib/sound";
 import { TASK_FILE, type SheetTask } from "./types";
 import { MascotClerow } from "../../Mascot";
+import { buildBuilderPrompt } from "@/lib/content/builderPrompt";
 
 const AGENTS = ["Claude Code", "Codex", "Cursor", "Any MCP agent"];
 
@@ -93,10 +94,17 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   const [quality, setQuality] = React.useState<{ score: number; verdict: string; revised: boolean } | null>(null);
   const [improving, setImproving] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const [copiedBuilder, setCopiedBuilder] = React.useState(false);
   const [mcpClient, setMcpClient] = React.useState<"claudecode" | "codex" | "ide" | "web">("claudecode");
+  // "Check it's live" — confirms a technical fix actually shipped (single re-fetch,
+  // not the AI scan). null = not checked yet.
+  const [verifying, setVerifying] = React.useState(false);
+  const [verifyLive, setVerifyLive] = React.useState<boolean | null>(null);
   const scan = useScanStream();
 
   const fileName = task.ladderKey ? TASK_FILE[task.ladderKey] : undefined;
+  // Only audit-* on-site tasks are mechanically verifiable with a page fetch.
+  const canVerify = !offsite && !!task.id && !!task.ladderKey && task.ladderKey.startsWith("audit-");
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && view !== "scanning") onClose(); };
@@ -157,6 +165,11 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   };
 
   const copyContent = () => { if (!content) return; navigator.clipboard?.writeText(content); setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
+  const copyForBuilder = () => {
+    if (!content) return;
+    navigator.clipboard?.writeText(buildBuilderPrompt({ content, fileName, title: task.title }));
+    setCopiedBuilder(true); window.setTimeout(() => setCopiedBuilder(false), 1600);
+  };
   const download = () => {
     if (!content || !fileName) return;
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -164,6 +177,17 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
     const a = document.createElement("a");
     a.href = url; a.download = fileName; document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+
+  const checkLive = async () => {
+    if (!task.id || verifying) return;
+    setVerifying(true);
+    try {
+      const r = await fetch(`/api/tasks/${task.id}/verify`, { method: "POST" }).then((x) => x.json()).catch(() => null);
+      setVerifyLive(r && r.verifiable ? !!r.live : null);
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const markDone = async () => {
@@ -260,6 +284,20 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
             <div className="tm-done-check">✓</div>
             <h2 className="tm-title tm-title--sm">Nice! Quest cleared</h2>
             <p className="tm-why" style={{ textAlign: "center" }}>+{task.xp || 20} XP · streak kept 🔥</p>
+            {canVerify && (
+              <>
+                <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={checkLive} disabled={verifying}>
+                  {verifying ? "Checking…" : verifyLive ? "✓ Live" : verifyLive === false ? "↻ Re-check" : "✓ Check it's live"}
+                </button>
+                {verifyLive !== null && (
+                  <div className="tm-gen-note" style={{ textAlign: "center" }}>
+                    {verifyLive
+                      ? "✓ We can see it live on your site."
+                      : "We can't see it live yet — it can take a minute after you publish. Re-check."}
+                  </div>
+                )}
+              </>
+            )}
             <button className="tm-btn tm-btn--go" onClick={close}>Continue</button>
           </div>
         </div>
@@ -385,9 +423,11 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
                   </div>
                 )}
                 <div className="tm-content-actions">
-                  <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={copyContent}>{copied ? "Copied ✓" : "⧉ Copy"}</button>
+                  {!offsite && <button className="tm-btn tm-btn--go tm-btn--sm" onClick={copyForBuilder}>{copiedBuilder ? "Copied ✓" : "⧉ Copy for AI builder"}</button>}
+                  <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={copyContent}>{copied ? "Copied ✓" : "⧉ Copy raw"}</button>
                   {fileName && <button className="tm-btn tm-btn--ghost tm-btn--sm" onClick={download}>⤓ Download {fileName}</button>}
                 </div>
+                {!offsite && <div className="tm-gen-note">Paste into Lovable, AI Studio, Bolt, v0, ChatGPT or Claude — your builder does the rest.</div>}
               </>
             )}
           </div>

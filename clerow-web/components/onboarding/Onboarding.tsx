@@ -15,7 +15,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // landing page via ?url=); we derive their profile, discover the prompts their
 // customers ask, run the primary prompt through Perplexity, and show where they
 // stand — then point them at the (mostly locked) dashboard to rank higher.
-type Phase = "idle" | "reading" | "discovering" | "discovered" | "scanning" | "done" | "error";
+type Phase = "idle" | "reading" | "confirming" | "discovering" | "discovered" | "scanning" | "done" | "error";
 
 export function Onboarding() {
   const router = useRouter();
@@ -24,15 +24,18 @@ export function Onboarding() {
   const [discover, setDiscover] = React.useState<DiscoverResponse | null>(null);
   const [result, setResult] = React.useState<RunResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  // What we derived from the site, for the "did we get this right?" confirm step.
+  const [derived, setDerived] = React.useState<{ company: string; industry: string }>({ company: "", industry: "" });
+  const brandId = React.useRef<string | null>(null);
   const started = React.useRef(false);
   const scan = useScanStream();
 
+  // Step 1: read the site → derive + persist the profile → pause for confirmation.
   const run = React.useCallback(async (siteUrl: string) => {
     const clean = siteUrl.trim();
     if (!clean) return;
     setError(null);
     try {
-      // 1. Read the site → derive + persist the profile, get a brandId.
       setPhase("reading");
       const brandRes = await fetch("/api/brand", {
         method: "POST",
@@ -40,14 +43,37 @@ export function Onboarding() {
         body: JSON.stringify({ url: clean }),
       });
       if (!brandRes.ok) throw new Error((await brandRes.json()).error ?? "Could not read your site");
-      const { brandId } = await brandRes.json();
+      const b = await brandRes.json();
+      brandId.current = b.brandId;
+      setDerived({ company: b.company ?? "", industry: b.industry ?? "" });
+      setPhase("confirming");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+      setPhase("error");
+    }
+  }, []);
 
-      // 2. Discover the prompt set (Step 1 card).
+  // Step 2 (after the user confirms/edits): save edits, discover prompts, scan.
+  const confirmAndScan = React.useCallback(async (edited: { company: string; industry: string }) => {
+    const id = brandId.current;
+    if (!id) return;
+    setError(null);
+    try {
+      // Persist confirmed edits when they changed anything.
+      if (edited.company !== derived.company || edited.industry !== derived.industry) {
+        await fetch("/api/brand", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(edited),
+        }).catch(() => {});
+      }
+
+      // Discover the prompt set (Step 1 card).
       setPhase("discovering");
       const dRes = await fetch("/api/scan/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandId }),
+        body: JSON.stringify({ brandId: id }),
       });
       if (!dRes.ok) throw new Error((await dRes.json()).error ?? "Prompt discovery failed");
       const d: DiscoverResponse = await dRes.json();
@@ -55,11 +81,11 @@ export function Onboarding() {
       setPhase("discovered");
       await sleep(1800); // let the user read Step 1
 
-      // 3. Stream the primary prompt through Perplexity, showing it query live.
+      // Stream the primary prompt through Perplexity, showing it query live.
       setPhase("scanning");
       const outcome = await scan.run("/api/scan/run", {
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandId }),
+        body: JSON.stringify({ brandId: id }),
       });
       if (!outcome.ok) throw new Error(outcome.error || "Scan failed");
       setResult(outcome.result as RunResponse);
@@ -68,7 +94,7 @@ export function Onboarding() {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setPhase("error");
     }
-  }, [scan]);
+  }, [scan, derived]);
 
   // Auto-start when the landing page handed us a URL via ?url=.
   React.useEffect(() => {
@@ -110,6 +136,8 @@ export function Onboarding() {
       <div className="onboard-body">
         {phase === "idle" ? (
           <UrlStep url={url} setUrl={setUrl} onStart={start} />
+        ) : phase === "confirming" ? (
+          <ConfirmProfileStep derived={derived} onConfirm={confirmAndScan} />
         ) : (
           <ScanStep
             url={url}
@@ -124,6 +152,73 @@ export function Onboarding() {
             onContinue={() => router.push("/dashboard")}
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+// One quick confirmation so a wrong auto-detection doesn't silently skew the
+// prompt set. Only company + what-you-do — competitors are left to the scan to
+// discover (telling you who AI recommends instead of you is the whole point).
+function ConfirmProfileStep({
+  derived,
+  onConfirm,
+}: {
+  derived: { company: string; industry: string };
+  onConfirm: (edited: { company: string; industry: string }) => void;
+}) {
+  const [company, setCompany] = React.useState(derived.company);
+  const [industry, setIndustry] = React.useState(derived.industry);
+  const submit = () => onConfirm({ company: company.trim(), industry: industry.trim() });
+
+  return (
+    <div className="onboard-card">
+      <div className="onboard-mascot">
+        <MascotClerow size={96} float />
+      </div>
+      <h1 className="onboard-h">Quick check — did we get this right?</h1>
+      <p className="onboard-sub">
+        We read your site and pulled this out. Fix anything that&apos;s off so your scan is accurate.
+      </p>
+
+      <div className="confirm-fields">
+        <div className="input-with-prefix">
+          <span className="px">You are</span>
+          <input
+            autoFocus
+            spellCheck={false}
+            value={company}
+            onChange={(e) => setCompany(e.target.value)}
+            placeholder="Your company"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && company.trim()) submit();
+            }}
+          />
+        </div>
+        <div className="input-with-prefix">
+          <span className="px">You make</span>
+          <input
+            spellCheck={false}
+            value={industry}
+            onChange={(e) => setIndustry(e.target.value)}
+            placeholder="e.g. AI music generator"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && company.trim()) submit();
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="onboard-actions">
+        <span style={{ fontSize: 12.5, color: "var(--ink-3)", fontWeight: 600 }}>
+          We&apos;ll find who AI recommends instead of you in the scan.
+        </span>
+        <div className="right">
+          <button className="btn btn--primary btn--lg" onClick={submit} disabled={!company.trim()}>
+            Looks right — scan my site
+            <span className="arrow">→</span>
+          </button>
+        </div>
       </div>
     </div>
   );

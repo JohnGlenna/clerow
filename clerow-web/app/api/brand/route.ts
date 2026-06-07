@@ -62,10 +62,10 @@ export async function POST(req: Request) {
       .from("brands")
       .update(patch)
       .eq("id", existing.id)
-      .select("id")
+      .select("id, company, industry")
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ brandId: data.id });
+    return NextResponse.json({ brandId: data.id, company: data.company, industry: data.industry });
   }
 
   const fields = {
@@ -94,8 +94,41 @@ export async function POST(req: Request) {
   const { data, error } = await supabase
     .from("brands")
     .insert({ ...fields, user_id: user.id })
-    .select("id")
+    .select("id, company, industry")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ brandId: data.id });
+  return NextResponse.json({ brandId: data.id, company: data.company, industry: data.industry });
+}
+
+// PATCH: save the user's confirmed profile edits during onboarding (the "did we
+// get this right?" step). Only company + industry — competitors stay on
+// auto-discovery, since surfacing the real competitive set is the product's job.
+export async function PATCH(req: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const { data: existing } = await supabase
+    .from("brands")
+    .select("id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!existing) return NextResponse.json({ error: "No brand" }, { status: 404 });
+
+  const body = await req.json().catch(() => ({}));
+  const patch: { company?: string; industry?: string; updated_at: string } = {
+    updated_at: new Date().toISOString(),
+  };
+  const company = String(body.company ?? "").trim();
+  const industry = String(body.industry ?? "").trim();
+  if (company) patch.company = company;
+  if (industry) patch.industry = industry;
+
+  const { error } = await supabase.from("brands").update(patch).eq("id", existing.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }
