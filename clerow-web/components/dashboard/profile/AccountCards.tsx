@@ -6,6 +6,8 @@ import { Icon } from "../../Icon";
 import { GameIcon } from "../../GameIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useSubscription, startCheckout, openBillingPortal } from "@/lib/useSubscription";
+import { PLANS } from "@/lib/billing/plans";
+import { LAUNCH_PROMO, promoFirstMonth } from "@/lib/billing/promo";
 
 // The account/billing/brand controls — moved out of the (deleted) Settings page
 // and rendered on the Profile page. Notifications (mock) and the MCP-key card
@@ -175,7 +177,7 @@ function BillingCard() {
             {subscribed ? (
               <button className="btn btn--ghost btn--sm" onClick={() => openBillingPortal()}><Icon name="external" size={14} /> Manage billing</button>
             ) : (
-              <button className="btn btn--primary btn--sm" onClick={() => startCheckout("founder")}><Icon name="bolt" size={14} /> Upgrade to Premium — $29/mo</button>
+              <button className="btn btn--primary btn--sm" onClick={() => startCheckout("founder")}><Icon name="bolt" size={14} /> {LAUNCH_PROMO.active ? `Upgrade to Premium — ${promoFirstMonth(PLANS.founder.price)} first month` : `Upgrade to Premium — $${PLANS.founder.price}/mo`}</button>
             )}
           </div>
         </>

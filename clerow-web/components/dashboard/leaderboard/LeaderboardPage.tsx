@@ -6,6 +6,8 @@ import { BrandLogoChip } from "../shared/BrandLogoChip";
 import { logoDomain } from "../shell/util";
 import { LDIcon } from "../shell/LDIcon";
 import { useOverlay } from "../shell/OverlayProvider";
+import { PLANS } from "@/lib/billing/plans";
+import { LAUNCH_PROMO, promoFirstMonth } from "@/lib/billing/promo";
 import type { DashboardCompetitor } from "@/lib/types";
 
 // Free users see the full standings, but only the top few rows in the clear —
@@ -83,7 +85,7 @@ function UnlockBanner({ count, onUpgrade }: { count: number; onUpgrade: () => vo
         <b>See your full category leaderboard</b>
         <span>{count} more {count === 1 ? "brand" : "brands"} AI recommends in your space — and exactly who&apos;s beating you.</span>
       </div>
-      <button className="lb-unlock-btn" onClick={onUpgrade}>Unlock — $29/mo</button>
+      <button className="lb-unlock-btn" onClick={onUpgrade}>{LAUNCH_PROMO.active ? `Unlock — ${promoFirstMonth(PLANS.founder.price)} first month` : `Unlock — $${PLANS.founder.price}/mo`}</button>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import { AiIcon } from "../../ui/AiIcon";
 import { LDIcon } from "./LDIcon";
 import { logoDomain } from "./util";
 import { useOverlay } from "./OverlayProvider";
+import { PLANS } from "@/lib/billing/plans";
+import { LAUNCH_PROMO, promoFirstMonth } from "@/lib/billing/promo";
 import type { DashboardData, DashboardModel } from "@/lib/types";
 
 // A brand's identity cell: the fetched logo (via Clearbit) + brand name when a
@@ -142,21 +144,38 @@ export function RightRail({ data }: { data: DashboardData }) {
         </div>
       )}
 
-      {!data.subscribed && (
-        <div className="upg-card">
-          <div className="upg-head">
-            <span className="upg-tag">⭐ Premium plan</span>
-            <span className="upg-price"><b>$29</b>/mo</span>
+      {!data.subscribed && (() => {
+        const base = PLANS.founder.price;
+        const promo = LAUNCH_PROMO.active;
+        const first = promoFirstMonth(base);
+        return (
+          <div className="upg-card">
+            <div className="upg-head">
+              <span className="upg-tag">⭐ Premium plan</span>
+              {promo ? (
+                <span className="upg-price upg-price--promo"><b>{first}</b><span className="upg-old">${base}</span>/mo</span>
+              ) : (
+                <span className="upg-price"><b>${base}</b>/mo</span>
+              )}
+            </div>
+            {promo && (
+              <div className="upg-promo-line">
+                <span className="upg-promo-badge">⚡ {LAUNCH_PROMO.label} · {LAUNCH_PROMO.percentOff}% off</span>
+                <span className="upg-promo-note">first month, then ${base}/mo</span>
+              </div>
+            )}
+            <h4>Unlock every level &amp; all 5 models</h4>
+            <ul className="upg-list">
+              <li>✓ All quest levels &amp; re-scans</li>
+              <li>✓ All AI models tracked</li>
+              <li>✓ Leaderboard &amp; weekly reports</li>
+            </ul>
+            <button className="btn-upg" onClick={openUpgrade}>
+              {promo ? `Upgrade — ${first} first month` : `Upgrade — $${base}/mo`}
+            </button>
           </div>
-          <h4>Unlock every level &amp; all 5 models</h4>
-          <ul className="upg-list">
-            <li>✓ All quest levels &amp; re-scans</li>
-            <li>✓ All AI models tracked</li>
-            <li>✓ Leaderboard &amp; weekly reports</li>
-          </ul>
-          <button className="btn-upg" onClick={openUpgrade}>Upgrade — $29/mo</button>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="mcp-card">
         <span className="mcp-tag">⚡ Clerow MCP</span>

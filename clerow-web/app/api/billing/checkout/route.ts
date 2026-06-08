@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/server";
 import { PLANS, isPlanKey, priceIdFor } from "@/lib/billing/plans";
+import { LAUNCH_PROMO, promoAppliesTo } from "@/lib/billing/promo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,8 +41,8 @@ export async function POST(req: Request) {
       customerId = customer.id;
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
+    const base = {
+      mode: "subscription" as const,
       customer: customerId,
       line_items: [{ price: priceIdFor(plan), quantity: 1 }],
       // Carry user_id on the subscription so every subscription.* webhook can
@@ -50,8 +51,27 @@ export async function POST(req: Request) {
       metadata: { user_id: user.id, plan },
       success_url: `${siteUrl}/dashboard?checkout=success`,
       cancel_url: `${siteUrl}/dashboard?checkout=cancelled`,
-      allow_promotion_codes: true,
-    });
+    };
+
+    // Auto-apply the early-adopter promo when it's live and applies to this plan,
+    // so the charge matches the discounted price we advertise. Stripe forbids
+    // combining `discounts` with `allow_promotion_codes`, so it's one or the other.
+    const usePromo = promoAppliesTo(plan) && Boolean(LAUNCH_PROMO.promotionCodeId);
+
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create(
+        usePromo
+          ? { ...base, discounts: [{ promotion_code: LAUNCH_PROMO.promotionCodeId }] }
+          : { ...base, allow_promotion_codes: true },
+      );
+    } catch (promoErr) {
+      // A stale/expired/invalid promo code would otherwise hard-fail checkout.
+      // Fall back to a normal session (manual promo entry still works).
+      if (!usePromo) throw promoErr;
+      console.warn("[billing/checkout] promo apply failed, retrying without it:", promoErr);
+      session = await stripe.checkout.sessions.create({ ...base, allow_promotion_codes: true });
+    }
 
     return NextResponse.json({ url: session.url });
   } catch (err) {

@@ -33,7 +33,6 @@ export function TopBar({ data }: { data: DashboardData }) {
     <div className="ld-top">
       <div className="dom">
         <MascotClerow size={26} /> {domainOf(data.brand?.url)}
-        <span className="mono">· scanned across</span>
         <span className="model-cluster">
           {models.map((m) => {
             // Free users scan one engine (ChatGPT); the other four sit behind the
@@ -44,7 +43,7 @@ export function TopBar({ data }: { data: DashboardData }) {
                 key={m.id}
                 className={`mc${locked ? " mc-locked" : ""}`}
                 style={{ background: "#fff" }}
-                title={locked ? `${m.label} — unlock with Premium` : `Scanned across ${m.label}`}
+                title={locked ? `${m.label} · go Premium to scan` : `${m.label} · scanned`}
               >
                 <AiIcon id={m.id} size={16} letter={m.letter} />
                 {locked && <span className="mc-lock">🔒</span>}

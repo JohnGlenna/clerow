@@ -232,6 +232,19 @@
 .upg-sheet-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; font-weight: 700; color: #F3F7F8; }
 .upg-sheet-list .ck { color: #38A9E0; font-weight: 900; flex: 0 0 auto; }
 .btn-upg--lg { height: 54px; font-size: 15px; }
+/* Launch-promo price treatment — shared by the right-rail card and the upgrade sheet.
+   Both sit on dark surfaces, so colors are pinned (the sheet mounts outside .ld-root). */
+.upg-promo-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,150,0,.15); color: #FFB454; font-weight: 900; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.upg-old { text-decoration: line-through; color: #6E848C; font-weight: 800; }
+/* right-rail: stack the new price over the struck-through old price */
+.upg-price--promo { display: inline-flex; align-items: baseline; gap: 6px; }
+.upg-price--promo .upg-old { font-size: 13px; }
+.upg-promo-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: -2px 0 10px; }
+.upg-promo-note { font-size: 11.5px; color: #A7BCC4; font-weight: 700; }
+/* upgrade sheet: big discounted price + struck-through old price + note */
+.upg-price-big .upg-old { font-size: 20px; margin-left: 8px; }
+.upg-price-big .upg-promo-foot { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.upg-price-big .upg-promo-foot .upg-promo-note { font-size: 12.5px; }
 .upg-later { background: none; border: 0; color: #6E848C; font-weight: 800; font-size: 13.5px; margin-top: 12px; cursor: pointer; }
 .rail-mini-q { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
 .rail-mini-q:last-child { border-bottom: 0; }
@@ -719,11 +732,13 @@
 
 /* ---- Account/brand/billing cards moved from Settings — dark theme ---- */
 .ld-root .settings-stack { display: flex; flex-direction: column; gap: 14px; }
-/* Each row pairs a wide primary card with a slimmer side card (billing / actions). */
-.ld-root .settings-row { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 14px; align-items: start; }
-@media (max-width: 900px) { .ld-root .settings-row { grid-template-columns: 1fr; } }
+/* Each row pairs a wide primary card with a slimmer side card (billing / actions).
+   Stacks to one column before the side card gets too narrow to read. */
+.ld-root .settings-row { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1023px) { .ld-root .settings-row { grid-template-columns: 1fr; } }
 .ld-root .app-card { background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 18px; color: var(--ink); box-shadow: none; }
-.ld-root .app-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+/* flex-wrap lets the .sub drop below the title in a narrow card instead of the h4 breaking mid-phrase. */
+.ld-root .app-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 4px 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .ld-root .app-card-head h4 { font-size: 15px; font-weight: 900; color: var(--ink); margin: 0; }
 .ld-root .app-card-head .sub { font-size: 12px; font-weight: 700; color: var(--ink-3); }
 .ld-root .form-stack { display: flex; flex-direction: column; gap: 14px; }
@@ -752,7 +767,9 @@
 .ld-root .settings-plan-desc { font-size: 12.5px; color: var(--ink-2); font-weight: 600; margin-top: 3px; }
 .ld-root .settings-danger { border-color: rgba(255,75,75,.34); }
 .ld-root .settings-danger-rows { display: flex; flex-direction: column; gap: 14px; }
-.ld-root .settings-danger-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.ld-root .settings-danger-row { display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; }
+.ld-root .settings-danger-row > div:first-child { min-width: 0; flex: 1 1 200px; }
+.ld-root .settings-danger-row > .btn { flex: none; margin-left: auto; }
 .ld-root .settings-toggle-title { font-weight: 800; font-size: 14px; color: var(--ink); }
 .ld-root .settings-toggle-desc { font-size: 12px; color: var(--ink-3); font-weight: 600; margin-top: 2px; }
 .ld-root .settings-btn-danger { background: var(--red); color: #fff; border: 0; box-shadow: 0 3px 0 #B0303A; }
