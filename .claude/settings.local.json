@@ -1,10 +1,11 @@
 {
-  "enabledMcpjsonServers": [
-    "supabase"
-  ],
   "permissions": {
     "allow": [
-      "mcp__stripe__stripe_api_execute"
+      "mcp__stripe__stripe_api_execute",
+      "Bash(npx vercel *)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

@@ -38,7 +38,6 @@ export function NextMoveHero() {
                 🤖 Auto-fix with Clerow MCP
               </button>
             )}
-            <button className="nm-btn nm-btn--ghost" onClick={(e) => { e.stopPropagation(); open(); }}>See the steps</button>
           </div>
         </div>
         <div className="nm-foot">
