@@ -22,10 +22,14 @@ type BrandProfile = { company: string; url: string; industry: string; descriptio
 export function AccountSettings() {
   return (
     <div className="settings-stack">
-      <BrandCard />
-      <BillingCard />
-      <AccountCard />
-      <DangerCard />
+      <div className="settings-row">
+        <BrandCard />
+        <BillingCard />
+      </div>
+      <div className="settings-row">
+        <AccountCard />
+        <DangerCard />
+      </div>
     </div>
   );
 }
@@ -185,11 +189,17 @@ function DangerCard() {
   const supabase = React.useMemo(() => createClient(), []);
   const [signingOut, setSigningOut] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [confirmText, setConfirmText] = React.useState("");
+
+  const canDelete = confirmText.trim().toLowerCase() === "delete";
 
   const signOut = async () => { setSigningOut(true); await supabase.auth.signOut(); router.push("/"); };
 
+  const closeConfirm = () => { if (deleting) return; setConfirmOpen(false); setConfirmText(""); };
+
   const deleteAccount = async () => {
-    if (!window.confirm("Permanently delete your Clerow account, brand, and all scan data, and cancel any subscription? This can't be undone.")) return;
+    if (!canDelete || deleting) return;
     setDeleting(true);
     const res = await fetch("/api/account", { method: "DELETE" });
     if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error ?? "Couldn't delete your account. Please contact support."); setDeleting(false); return; }
@@ -206,10 +216,38 @@ function DangerCard() {
           <button className="btn btn--ghost btn--sm" onClick={signOut} disabled={signingOut}><Icon name="lock" size={14} /> {signingOut ? "Signing out…" : "Sign out"}</button>
         </div>
         <div className="settings-danger-row">
-          <div><div className="settings-toggle-title" style={{ color: "var(--red)" }}>Delete account</div><div className="settings-toggle-desc">Cancel your subscription and remove your account, brand profile, and all scan history.</div></div>
-          <button className="btn btn--sm settings-btn-danger" onClick={deleteAccount} disabled={deleting}><Icon name="x" size={14} /> {deleting ? "Deleting…" : "Delete"}</button>
+          <div><div className="settings-toggle-title">Delete account</div><div className="settings-toggle-desc">Cancel your subscription and remove your account, brand profile, and all scan history.</div></div>
+          <button className="btn btn--sm settings-delete-trigger" onClick={() => setConfirmOpen(true)} disabled={deleting}>Delete…</button>
         </div>
       </div>
+
+      {confirmOpen && (
+        <div className="settings-confirm-scrim" role="dialog" aria-modal="true" aria-labelledby="del-title" onMouseDown={closeConfirm}>
+          <div className="settings-confirm" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="settings-confirm-icon"><Icon name="x" size={20} /></div>
+            <h4 className="settings-confirm-title" id="del-title">Are you sure you want to delete your account?</h4>
+            <p className="settings-confirm-body">
+              This permanently deletes your account, brand profile, and <b>all your scan history</b>. You&apos;ll lose your <b>streak, points, and every bit of progress</b>, and any active subscription will be cancelled. This <b>can&apos;t be undone</b>.
+            </p>
+            <label className="settings-confirm-label" htmlFor="del-confirm">Type <b>delete</b> to confirm</label>
+            <input
+              id="del-confirm"
+              className="input"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") deleteAccount(); }}
+              placeholder="delete"
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <div className="settings-confirm-actions">
+              <button className="btn btn--ghost btn--sm" onClick={closeConfirm} disabled={deleting}>Cancel</button>
+              <button className="btn btn--sm settings-btn-danger" onClick={deleteAccount} disabled={!canDelete || deleting}>{deleting ? "Deleting…" : "Delete account"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
