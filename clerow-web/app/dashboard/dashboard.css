@@ -24,7 +24,7 @@
 
 /* left nav */
 .ld-nav { padding: 20px 14px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; }
-.ld-brand { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 25px; letter-spacing: -.02em; color: var(--blue); padding: 6px 10px 20px; }
+.ld-brand { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 25px; letter-spacing: -.02em; color: var(--blue); padding: 6px 10px 20px; text-decoration: none; cursor: pointer; }
 .ld-navitem { display: flex; align-items: center; gap: 14px; padding: 11px 14px; border-radius: 14px; font-weight: 800; font-size: 14px; letter-spacing: .02em; color: var(--ink-2); border: 2px solid transparent; text-transform: uppercase; background: none; width: 100%; text-align: left; }
 .ld-navitem .ic { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-3); }
 .ld-navitem.on { background: var(--blue-soft); color: var(--blue); border-color: var(--blue-mid); }

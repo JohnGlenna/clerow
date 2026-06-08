@@ -20,7 +20,7 @@ export function Sidebar() {
   const pathname = usePathname();
   return (
     <nav className="ld-nav">
-      <div className="ld-brand"><MascotClerow size={34} /><span>Clerow</span></div>
+      <Link href="/dashboard/tasks" className="ld-brand"><MascotClerow size={34} /><span>Clerow</span></Link>
       {NAV.map((it) => {
         const on = pathname === it.href || (it.href === "/dashboard/tasks" && pathname === "/dashboard");
         return (
