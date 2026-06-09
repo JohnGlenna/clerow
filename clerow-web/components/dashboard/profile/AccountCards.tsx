@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "../../Icon";
 import { GameIcon } from "../../GameIcon";
 import { createClient } from "@/lib/supabase/client";
-import { useSubscription, startCheckout, openBillingPortal } from "@/lib/useSubscription";
+import { useSubscription, startCheckout, openBillingPortal, submitCancelFeedback } from "@/lib/useSubscription";
 import { PLANS } from "@/lib/billing/plans";
 import { LAUNCH_PROMO, promoFirstMonth } from "@/lib/billing/promo";
 
@@ -150,11 +150,41 @@ function BrandCard() {
   );
 }
 
+// The churn survey — kept short so it informs us without nagging someone who's
+// already decided to leave. "Other" is last by convention.
+const CANCEL_REASONS = [
+  "Too expensive",
+  "I didn't see results / not enough value",
+  "Missing a feature I need",
+  "Too hard to use / no time to keep up",
+  "Found a better alternative",
+  "Just testing it out",
+  "Other",
+] as const;
+
 function BillingCard() {
   const { subscription, loading } = useSubscription();
   const subscribed = subscription?.subscribed ?? false;
   const plan = subscription?.plan ? PLAN_LABELS[subscription.plan] : null;
   const cancelling = subscription?.cancelAtPeriodEnd ?? false;
+
+  const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [reason, setReason] = React.useState("");
+  const [detail, setDetail] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+
+  const closeCancel = () => { if (busy) return; setCancelOpen(false); setReason(""); setDetail(""); };
+
+  const continueToCancel = async () => {
+    if (!reason || busy) return;
+    setBusy(true);
+    await submitCancelFeedback(reason, detail);
+    const ok = await openBillingPortal(); // redirects on success
+    if (!ok) {
+      alert("Couldn't open the billing page. Please try again.");
+      setBusy(false);
+    }
+  };
 
   return (
     <section className="app-card">
@@ -175,12 +205,50 @@ function BillingCard() {
           </div>
           <div className="settings-actions">
             {subscribed ? (
-              <button className="btn btn--ghost btn--sm" onClick={() => openBillingPortal()}><Icon name="external" size={14} /> Manage billing</button>
+              <>
+                <button className="btn btn--ghost btn--sm" onClick={() => openBillingPortal()}><Icon name="external" size={14} /> Manage billing</button>
+                {!cancelling && (
+                  <button className="btn btn--ghost btn--sm" onClick={() => setCancelOpen(true)}>Cancel subscription</button>
+                )}
+              </>
             ) : (
               <button className="btn btn--primary btn--sm" onClick={() => startCheckout("founder")}><Icon name="bolt" size={14} /> {LAUNCH_PROMO.active ? `Upgrade to Premium — ${promoFirstMonth(PLANS.founder.price)} first month` : `Upgrade to Premium — $${PLANS.founder.price}/mo`}</button>
             )}
           </div>
         </>
+      )}
+
+      {cancelOpen && (
+        <div className="settings-confirm-scrim" role="dialog" aria-modal="true" aria-labelledby="cancel-title" onMouseDown={closeCancel}>
+          <div className="settings-confirm" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="settings-confirm-icon"><GameIcon name="rocket" size={22} /></div>
+            <h4 className="settings-confirm-title" id="cancel-title">Cancel your subscription?</h4>
+            <p className="settings-confirm-body">
+              You&apos;ll keep Premium until the end of your current billing period, then drop to the free plan — losing <b>daily scans across all 5 AI models</b> and the tasks that keep your <b>streak</b> alive. Your progress so far stays put.
+            </p>
+            <label className="settings-confirm-label">Before you go — what&apos;s the main reason?</label>
+            <div className="cancel-reasons">
+              {CANCEL_REASONS.map((r) => (
+                <label key={r} className={`cancel-reason ${reason === r ? "is-selected" : ""}`}>
+                  <input type="radio" name="cancel-reason" value={r} checked={reason === r} onChange={() => setReason(r)} disabled={busy} />
+                  <span>{r}</span>
+                </label>
+              ))}
+            </div>
+            <textarea
+              className="input"
+              value={detail}
+              onChange={(e) => setDetail(e.target.value)}
+              placeholder="Anything else we could've done better? (optional)"
+              rows={2}
+              disabled={busy}
+            />
+            <div className="settings-confirm-actions">
+              <button className="btn btn--ghost btn--sm" onClick={closeCancel} disabled={busy}>Never mind</button>
+              <button className="btn btn--sm settings-btn-danger" onClick={continueToCancel} disabled={!reason || busy}>{busy ? "Taking you to Stripe…" : "Continue to cancel"}</button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

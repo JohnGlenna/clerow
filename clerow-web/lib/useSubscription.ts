@@ -50,6 +50,20 @@ export async function startCheckout(plan: "founder" | "team") {
   else alert(json.error ?? "Could not start checkout. Please try again.");
 }
 
+// Record why someone is cancelling before we hand them to Stripe. Best-effort:
+// resolves either way so a failure here never blocks the cancel flow.
+export async function submitCancelFeedback(reason: string, detail?: string): Promise<void> {
+  try {
+    await fetch("/api/billing/cancel-feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason, detail: detail ?? "" }),
+    });
+  } catch {
+    // Swallow — the user is leaving; don't trap them on a network hiccup.
+  }
+}
+
 // Redirect the browser to the Stripe Billing Portal to manage/cancel.
 export async function openBillingPortal(): Promise<boolean> {
   const res = await fetch("/api/billing/portal", { method: "POST" });

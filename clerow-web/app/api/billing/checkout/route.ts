@@ -70,8 +70,11 @@ export async function POST(req: Request) {
       // resolve the owner without a customer lookup.
       subscription_data: { metadata: { user_id: user.id } },
       metadata: { user_id: user.id, plan },
-      success_url: `${siteUrl}/dashboard?checkout=success`,
-      cancel_url: `${siteUrl}/dashboard?checkout=cancelled`,
+      // Land on the Tasks page (not /dashboard, which server-redirects and would
+      // drop the query param) so the success popup mounts with the right rail's
+      // "Run full scan" CTA present as its fly-to target.
+      success_url: `${siteUrl}/dashboard/tasks?checkout=success`,
+      cancel_url: `${siteUrl}/dashboard/tasks?checkout=cancelled`,
     };
 
     // Auto-apply the early-adopter promo when it's live and applies to this plan,

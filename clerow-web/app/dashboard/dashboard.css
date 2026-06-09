@@ -80,9 +80,19 @@
 .scan-cta-txt span { font-size: 12.5px; font-weight: 600; opacity: .9; line-height: 1.45; }
 .scan-cta-add { align-self: flex-start; margin: 4px 0 0; background: rgba(255,255,255,.14); color: #fff; border: 0; font-weight: 800; font-size: 12px; padding: 6px 11px; border-radius: 10px; cursor: pointer; }
 .scan-cta-add:hover { background: rgba(255,255,255,.26); }
-.scan-cta-btn { width: 100%; margin-top: 12px; background: #fff; color: var(--blue-deep); border: 0; font-weight: 900; font-size: 13.5px; padding: 12px 18px; border-radius: 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.18); animation: scan-cta-pulse 2.4s ease-in-out infinite; }
+.scan-cta-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 12px; background: #fff; color: var(--blue-deep); border: 0; font-weight: 900; font-size: 13.5px; padding: 12px 18px; border-radius: 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.18); animation: scan-cta-pulse 2.4s ease-in-out infinite; }
 .scan-cta-btn:hover { transform: translateY(-1px); animation: none; }
 .scan-cta-btn:disabled { opacity: .55; cursor: not-allowed; animation: none; transform: none; }
+.scan-cta-ic { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; }
+/* the destination CTA flashes when the dismissed full-scan popup lands on it */
+.scan-cta-btn--land { animation: scan-cta-land 1.5s cubic-bezier(.2,.9,.3,1.4); }
+@keyframes scan-cta-land {
+  0% { transform: scale(1); box-shadow: 0 3px 0 rgba(0,0,0,.18); }
+  18% { transform: scale(1.09); box-shadow: 0 0 0 5px rgba(56,169,224,.5), 0 3px 0 rgba(0,0,0,.18); }
+  45% { transform: scale(.98); }
+  70% { transform: scale(1.03); box-shadow: 0 0 0 3px rgba(56,169,224,.28), 0 3px 0 rgba(0,0,0,.18); }
+  100% { transform: scale(1); box-shadow: 0 3px 0 rgba(0,0,0,.18); }
+}
 .scan-cta-note { margin-top: 8px; font-size: 11.5px; font-weight: 700; opacity: .82; text-align: center; }
 @keyframes scan-cta-pulse {
   0%, 100% { box-shadow: 0 3px 0 rgba(0,0,0,.18), 0 0 0 0 rgba(255,255,255,.45); }
@@ -99,6 +109,31 @@
 .sub-toast-x { margin-left: auto; flex: 0 0 auto; background: rgba(255,255,255,.16); color: #fff; border: 0; width: 24px; height: 24px; border-radius: 8px; font-size: 12px; cursor: pointer; }
 .sub-toast-x:hover { background: rgba(255,255,255,.3); }
 @keyframes sub-toast-in { from { opacity: 0; transform: translate(-50%, -16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* Full-scan welcome popup — centered the moment a new subscriber lands, flies to
+   the right-rail CTA when dismissed. */
+.fsp-scrim { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(6,12,15,.78); backdrop-filter: blur(6px); transition: background .45s ease, backdrop-filter .45s ease; }
+.fsp-scrim.is-flying { background: rgba(6,12,15,0); backdrop-filter: blur(0); pointer-events: none; }
+.fsp-card { position: relative; width: 420px; max-width: 100%; text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 30px 26px 24px; box-shadow: 0 40px 90px -28px rgba(0,0,0,.85); animation: fspPop .34s cubic-bezier(.2,.9,.3,1.4); will-change: transform, opacity; }
+.fsp-card--fly { animation: fspFly .62s cubic-bezier(.6,.04,.98,.34) forwards; }
+.fsp-x { position: absolute; top: 14px; right: 14px; width: 28px; height: 28px; border-radius: 9px; background: var(--surface-2); color: var(--ink-3); border: 1px solid var(--line); font-size: 12px; cursor: pointer; transition: background .12s, color .12s; }
+.fsp-x:hover { background: var(--surface-3); color: var(--ink); }
+.fsp-mascot { display: flex; justify-content: center; margin-bottom: 8px; }
+.fsp-badge { display: inline-block; font-size: 11.5px; font-weight: 800; letter-spacing: .01em; color: var(--blue); background: var(--blue-soft); border: 1px solid var(--blue-mid); padding: 4px 11px; border-radius: 999px; margin-bottom: 12px; }
+.fsp-title { font-size: 21px; font-weight: 900; letter-spacing: -.01em; color: var(--ink); margin: 0 0 9px; }
+.fsp-body { font-size: 13.5px; line-height: 1.6; font-weight: 600; color: var(--ink-2); margin: 0 0 20px; }
+.fsp-cta { display: inline-flex; align-items: center; justify-content: center; gap: 9px; width: 100%; background: linear-gradient(135deg, var(--blue-2), var(--blue-deep)); color: #fff; border: 0; font-weight: 900; font-size: 15px; padding: 14px 18px; border-radius: 13px; cursor: pointer; box-shadow: 0 4px 0 var(--blue-deep); transition: transform .1s; }
+.fsp-cta:hover { transform: translateY(-1px); }
+.fsp-cta:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--blue-deep); }
+.fsp-cta-ic { width: 26px; height: 26px; object-fit: contain; flex: 0 0 auto; }
+.fsp-later { margin-top: 12px; background: none; border: 0; color: var(--ink-3); font-weight: 700; font-size: 12.5px; cursor: pointer; }
+.fsp-later:hover { color: var(--ink-2); text-decoration: underline; }
+@keyframes fspPop { from { opacity: 0; transform: translateY(14px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes fspFly { from { transform: translate(0,0) scale(1); opacity: 1; } to { transform: translate(var(--fly-x, 40vw), var(--fly-y, -32vh)) scale(var(--fly-s, .18)); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .fsp-card, .fsp-card--fly { animation: none; }
+  .fsp-scrim.is-flying { transition: none; }
+}
 
 /* Business-context sheet (screenshots + about text for the full scan). */
 .ctx-sheet { position: relative; width: 100%; max-width: 460px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 26px 24px; box-shadow: 0 24px 60px rgba(0,0,0,.5); text-align: center; }
@@ -801,6 +836,12 @@
 .ld-root .settings-confirm-label { display: block; font-size: 12px; font-weight: 700; color: var(--ink-3); margin-bottom: 7px; }
 .ld-root .settings-confirm-label b { color: var(--ink); font-weight: 800; }
 .ld-root .settings-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+/* cancellation survey — the reason list inside the cancel-subscription modal */
+.ld-root .cancel-reasons { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.ld-root .cancel-reason { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1.5px solid var(--line); border-radius: 11px; cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--ink-2); transition: border-color .12s, background .12s; }
+.ld-root .cancel-reason:hover { border-color: var(--ink-4); }
+.ld-root .cancel-reason.is-selected { border-color: var(--blue); background: rgba(56,189,248,.1); color: var(--ink); }
+.ld-root .cancel-reason input { accent-color: var(--blue); margin: 0; }
 /* dashboard-scoped button skins for the ported cards */
 .ld-root .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-family: inherit; font-weight: 800; border: 0; cursor: pointer; border-radius: 12px; }
 .ld-root .btn--sm { font-size: 12.5px; padding: 9px 14px; }

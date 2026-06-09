@@ -18,6 +18,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      cancellation_feedback: {
+        Row: {
+          created_at: string
+          detail: string | null
+          id: string
+          plan: string | null
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          plan?: string | null
+          reason: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          plan?: string | null
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       api_keys: {
         Row: {
           brand_id: string | null

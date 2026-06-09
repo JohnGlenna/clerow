@@ -78,7 +78,7 @@ export function RightRail({ data }: { data: DashboardData }) {
       {data.subscribed && !data.hasFullScan && (
         <div className="scan-cta">
           <div className="scan-cta-txt"><b>Scan all 5 AI models</b></div>
-          <button className="scan-cta-btn" onClick={openScan}>🔄 Run full scan</button>
+          <button className="scan-cta-btn" onClick={openScan}><img src="/assets/clerow-mascot.png" alt="" className="scan-cta-ic" /> Run full scan</button>
         </div>
       )}
       {data.subscribed && allTasksDone && (
@@ -87,7 +87,7 @@ export function RightRail({ data }: { data: DashboardData }) {
             <b>You&apos;ve cleared every task 🎉</b>
             <span>Re-scan to see your new score across all 5 models.</span>
           </div>
-          <button className="scan-cta-btn" onClick={openScan} disabled={outOfScans}>🔄 Re-scan now</button>
+          <button className="scan-cta-btn" onClick={openScan} disabled={outOfScans}><img src="/assets/clerow-mascot.png" alt="" className="scan-cta-ic" /> Re-scan now</button>
           {outOfScans && <span className="scan-cta-note">No scans left this month</span>}
         </div>
       )}

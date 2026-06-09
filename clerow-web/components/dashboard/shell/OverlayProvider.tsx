@@ -6,7 +6,7 @@ import { playCheck } from "@/lib/sound";
 import { TaskModal } from "../tasks/TaskModal";
 import { UpgradeSheet } from "../tasks/UpgradeSheet";
 import { ContextSheet } from "../tasks/ContextSheet";
-import { SubscribedToast } from "../tasks/SubscribedToast";
+import { FullScanPrompt } from "../tasks/FullScanPrompt";
 import type { SheetTask } from "../tasks/types";
 
 // The dashboard's modal layer. Because pages are now separate routes, the task
@@ -89,7 +89,16 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
         )}
         {upgrade && <UpgradeSheet onClose={() => setUpgrade(false)} />}
         {context && <ContextSheet onClose={() => setContext(false)} />}
-        {justSubscribed && <SubscribedToast onClose={() => setJustSubscribed(false)} />}
+        {justSubscribed && (
+          <FullScanPrompt
+            hasFullScan={!!data?.hasFullScan}
+            onRun={() => {
+              setJustSubscribed(false);
+              openScan();
+            }}
+            onClose={() => setJustSubscribed(false)}
+          />
+        )}
       </div>
     </Ctx.Provider>
   );
