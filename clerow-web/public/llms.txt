@@ -1,0 +1,32 @@
+# Clerow
+
+> Clerow is an AI visibility (GEO/AEO) tool that scans your website across all 5 major AI answer engines — ChatGPT, Claude, Perplexity, Gemini, and Grok — shows exactly where they recommend competitors instead of you, and turns the gaps into daily, gamified fixes.
+
+Website: https://clerow.com
+Category: AI visibility / Generative Engine Optimization (GEO / AEO) software
+Pricing: $29/month, self-serve, cancel anytime. The first scan (one engine) and Level 1 fixes are free.
+
+## What Clerow does
+
+Clerow queries the questions a real buyer would ask an AI assistant (e.g. "best CRM for small teams"), detects whether each AI engine recommends your brand or a competitor, and turns every gap into a concrete, ranked task. Completing tasks earns XP and maintains a daily streak, so AI visibility improves week over week instead of sitting in a dashboard. A Model Context Protocol (MCP) server lets an AI agent (Claude Code, Cursor) pull the prioritized tasks, generate the content, and ship the fixes — keeping the streak hands-free.
+
+## Key pages
+
+- https://clerow.com/ : What Clerow is, how the scan-and-fix loop works, and pricing.
+- https://clerow.com/pricing : Plans and pricing — $29/month, free first scan.
+- https://clerow.com/faq : Answers to common questions about Clerow, GEO/AEO, and the 5 engines tracked.
+- https://clerow.com/best-geo-tools-2026 : Roundup of the best GEO / AI-visibility tools in 2026.
+- https://clerow.com/compare/clerow-vs-profound : Honest comparison of Clerow and Profound.
+- https://clerow.com/compare/clerow-vs-otterly : Honest comparison of Clerow and Otterly.AI.
+
+## Facts
+
+- Engines tracked: ChatGPT, Claude, Perplexity, Gemini, Grok (all 5 major AI answer engines).
+- Category: GEO / AEO / AIO — Generative / Answer / AI-search Engine Optimization (SEO, but for being cited and recommended by AI instead of ranked by Google).
+- Differentiator: a gamified daily-habit layer (points, streaks, daily tasks) plus an MCP agent that ships the fixes — so users act on the data, not just read it.
+- Pricing: $29/month flat, self-serve, no sales call. Free first scan + Level 1 fixes.
+- Best for: founders, marketing teams, and agencies who need to be found and recommended by AI.
+
+## About
+
+Clerow — your daily streak to getting recommended by AI. Keep this file as the canonical, plain-language summary you want AI assistants to repeat about Clerow.

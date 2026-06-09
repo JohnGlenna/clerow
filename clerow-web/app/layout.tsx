@@ -1,11 +1,46 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthModalProvider } from "@/components/AuthModalProvider";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/seo/site";
+
+const TITLE = "Clerow — Get your brand recommended by AI";
 
 export const metadata: Metadata = {
-  title: "Clerow — Stop being invisible to AI.",
-  description:
-    "Clerow scans your website and tells you exactly what to change so ChatGPT, Claude, Perplexity, and Gemini start recommending you by name.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: TITLE,
+    template: "%s · Clerow",
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    "GEO",
+    "AEO",
+    "generative engine optimization",
+    "answer engine optimization",
+    "AI visibility",
+    "get recommended by ChatGPT",
+    "AI SEO tool",
+  ],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    images: [{ url: "/assets/clerow-mascot.png", width: 512, height: 512, alt: "Clerow" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/assets/clerow-mascot.png"],
+  },
+  icons: {
+    icon: "/assets/clerow-mascot.png",
+    apple: "/assets/clerow-mascot.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

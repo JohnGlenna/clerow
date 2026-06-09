@@ -9,7 +9,8 @@ type BrandRow = Database["public"]["Tables"]["brands"]["Row"];
 type BrandFile = Pick<BrandRow, "company" | "url" | "description" | "industry">;
 
 // The AI answer-engine crawlers robots.txt should welcome (mirrors lib/audit/site.ts).
-const AI_CRAWLERS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "PerplexityBot", "Google-Extended"];
+// Exported so our own app/robots.ts welcomes the exact same set — single source of truth.
+export const AI_CRAWLERS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "PerplexityBot", "Google-Extended"];
 
 function origin(url: string): string | null {
   try {

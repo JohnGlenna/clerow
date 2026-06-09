@@ -1,14 +1,16 @@
-"use client";
-
 import React from "react";
 import { MascotClerow } from "../Mascot";
 import { AiIcon } from "../ui/AiIcon";
-import { useAuthModal } from "../AuthModalProvider";
+import { StartButton, SignInButton } from "./Cta";
+import { FAQS } from "@/lib/seo/faq";
 
 // Clerow Welcome — Duolingo-style landing, ported from the v2 design
 // (_design_extract/clerow-v2/project/components/welcome.jsx). Scoped under
-// .wl-root (see app/welcome/welcome.css). CTAs open the auth modal; the modal
-// routes into onboarding.
+// .wl-root (see app/welcome/welcome.css).
+//
+// This is a SERVER component so the full marketing copy ships in the raw HTML that
+// AI crawlers read. The only interactive bits — the CTA buttons that open the auth
+// modal — are the <StartButton>/<SignInButton> client islands from ./Cta.
 
 // [letter, color, name, engineId]
 const MODELS: [string, string, string, string][] = [
@@ -19,18 +21,18 @@ const MODELS: [string, string, string, string][] = [
   ["P", "#1CB0F6", "Perplexity", "perplexity"],
 ];
 
-function Nav({ onStart }: { onStart: () => void }) {
+function Nav() {
   return (
     <header className="wl-nav">
       <div className="shell in">
         <a className="brand"><MascotClerow size={34} /> Clerow</a>
-        <button className="btn btn-primary btn-sm" onClick={onStart}>Get started</button>
+        <StartButton className="btn btn-primary btn-sm">Get started</StartButton>
       </div>
     </header>
   );
 }
 
-function Hero({ onStart, onSignIn }: { onStart: () => void; onSignIn: () => void }) {
+function Hero() {
   return (
     <section className="hero">
       <div className="hero-main shell">
@@ -44,10 +46,14 @@ function Hero({ onStart, onSignIn }: { onStart: () => void; onSignIn: () => void
           <div className="hero-copy">
             <span className="hero-badge">📱 iOS &amp; Android coming soon</span>
             <h1>Get your brand <span className="b">recommended by AI.</span></h1>
-            <p>See where you rank across all 5 AI models — and exactly what to fix to get named.</p>
+            <p>
+              Clerow is an AI visibility (GEO/AEO) tool that scans your website across all 5 major
+              AI answer engines — ChatGPT, Claude, Perplexity, Gemini, and Grok — shows exactly where
+              they recommend competitors instead of you, and turns the gaps into daily fixes.
+            </p>
             <div className="hero-cta">
-              <button className="btn btn-primary" onClick={onStart}>Get started</button>
-              <button className="btn btn-ghost" onClick={onSignIn}>I already have an account</button>
+              <StartButton className="btn btn-primary">Get started</StartButton>
+              <SignInButton className="btn btn-ghost">I already have an account</SignInButton>
             </div>
           </div>
         </div>
@@ -205,7 +211,7 @@ function WhoFor() {
   );
 }
 
-function Pricing({ onStart }: { onStart: () => void }) {
+function Pricing() {
   const lines = [
     "Scan across all 5 AI models",
     "Discover + add custom prompts",
@@ -228,7 +234,7 @@ function Pricing({ onStart }: { onStart: () => void }) {
             <div className="amt"><span className="c">$</span>29</div>
             <div className="per">per month · cancel anytime</div>
             <ul>{lines.map((f, j) => <li key={j}><span className="ck">✓</span>{f}</li>)}</ul>
-            <button className="btn btn-primary" onClick={onStart}>Subscribe — $29/mo</button>
+            <StartButton className="btn btn-primary">Subscribe — $29/mo</StartButton>
             <p style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 700, margin: "12px 0 0", textAlign: "center" }}>
               Free: your first scan (ChatGPT) + Level 1 fixes.
             </p>
@@ -239,24 +245,42 @@ function Pricing({ onStart }: { onStart: () => void }) {
   );
 }
 
-function Final({ onStart }: { onStart: () => void }) {
+function Faq() {
+  return (
+    <section id="faq" className="whofor">
+      <div className="shell">
+        <div className="wf-head"><h2>Frequently asked questions</h2></div>
+        <div className="faq-list">
+          {FAQS.map((f, i) => (
+            <details key={i} className="faq-item" {...(i === 0 ? { open: true } : {})}>
+              <summary>{f.q}</summary>
+              <p>{f.a}</p>
+            </details>
+          ))}
+        </div>
+        <p style={{ textAlign: "center", marginTop: 18 }}>
+          <a className="lk" href="/faq">See all FAQs →</a>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function Final() {
   return (
     <section className="final shell">
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}><MascotClerow size={110} float /></div>
       <h2>Ready to get cited by every AI?</h2>
-      <button className="btn btn-primary" onClick={onStart}>Get started</button>
+      <StartButton className="btn btn-primary">Get started</StartButton>
     </section>
   );
 }
 
 export function WelcomePage() {
-  const { open } = useAuthModal();
-  const onStart = () => open("signup");
-  const onSignIn = () => open("signin");
   return (
     <div className="wl-root">
-      <Nav onStart={onStart} />
-      <Hero onStart={onStart} onSignIn={onSignIn} />
+      <Nav />
+      <Hero />
       <StatsBand />
       <Row title="Scan every AI at once." art={<IllScan />}>
         Paste your URL and Clerow checks all 5 engines — not just one. See exactly which prompts you show up in and which ones your rivals own.
@@ -270,11 +294,19 @@ export function WelcomePage() {
       <Results />
       <AppSection />
       <WhoFor />
-      <Pricing onStart={onStart} />
-      <Final onStart={onStart} />
+      <Pricing />
+      <Faq />
+      <Final />
       <footer className="foot">
         <div className="shell">
           <div className="brand"><MascotClerow size={28} /> Clerow</div>
+          <nav className="foot-links">
+            <a href="/best-geo-tools-2026">Best GEO tools 2026</a>
+            <a href="/compare/clerow-vs-profound">Clerow vs Profound</a>
+            <a href="/compare/clerow-vs-otterly">Clerow vs Otterly.AI</a>
+            <a href="/pricing">Pricing</a>
+            <a href="/faq">FAQ</a>
+          </nav>
           <p>© 2026 Clerow · Get recommended by ChatGPT, Claude, Gemini, Grok &amp; Perplexity · Kristiansand 🇳🇴</p>
         </div>
       </footer>
