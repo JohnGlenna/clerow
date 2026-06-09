@@ -1,5 +1,5 @@
-// Early-adopter launch promo: 80% off the FIRST MONTH of Premium.
-// Backed by Stripe coupon W4cxC4w0 / promotion code EARLY80 (duration: once,
+// Early-adopter launch promo: 90% off the FIRST MONTH of Premium.
+// Backed by Stripe coupon 7i1Amf9U / promotion code EARLY90 (duration: once,
 // Premium-only, expires ~2026-09-06). Single source of truth so the UI and the
 // checkout route never drift. To end the campaign: set `active: false` and unset
 // STRIPE_LAUNCH_PROMOTION_CODE.
@@ -9,8 +9,8 @@
 
 export const LAUNCH_PROMO = {
   active: true,
-  code: "EARLY80",
-  percentOff: 80,
+  code: "EARLY90",
+  percentOff: 90,
   label: "Early access", // small badge shown next to the discounted price
   appliesTo: "founder" as const,
   promotionCodeId: process.env.STRIPE_LAUNCH_PROMOTION_CODE ?? "",
