@@ -756,12 +756,21 @@
 .ld-root .settings-identity-name { font-weight: 900; font-size: 15px; color: var(--ink); }
 .ld-root .settings-identity-email { font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
 .ld-root .settings-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+/* Buttons here can carry long labels (e.g. the upgrade CTA) inside narrow cards.
+   Override the global .btn nowrap so they wrap + shrink instead of overflowing the card. */
+.ld-root .settings-actions .btn { min-width: 0; max-width: 100%; white-space: normal; text-align: center; line-height: 1.25; }
+/* A lone action (e.g. the billing card's upgrade CTA) reads better spanning the card
+   than hugging the right edge — and never overflows on narrow widths. */
+.ld-root .settings-actions .btn:only-child { width: 100%; }
+.ld-root .btn > svg { flex: none; }
 .ld-root .settings-empty { text-align: center; padding: 20px 0; color: var(--ink-2); display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .ld-root .settings-meta-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .ld-root .settings-meta-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
 .ld-root .settings-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ld-root .chip--ghost { font-size: 12px; font-weight: 700; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; }
 .ld-root .settings-plan { display: flex; align-items: center; gap: 14px; padding: 16px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+.ld-root .settings-plan-body { min-width: 0; }
+.ld-root .settings-plan-name { flex-wrap: wrap; }
 .ld-root .settings-plan-icon { width: 48px; height: 48px; border-radius: 14px; background: var(--surface-3); border: 1px solid var(--line); color: var(--xp); display: grid; place-items: center; flex: none; }
 .ld-root .settings-plan-name { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 15px; color: var(--ink); }
 .ld-root .settings-plan-badge { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--green); background: rgba(56,169,224,.16); padding: 3px 9px; border-radius: 999px; }
