@@ -39,6 +39,27 @@ export async function POST(req: Request) {
         metadata: { user_id: user.id },
       });
       customerId = customer.id;
+    } else {
+      // Block a second checkout when this customer already has a live
+      // subscription. We check Stripe directly rather than our own
+      // `subscriptions` row because a broken webhook leaves that row unwritten —
+      // exactly the case where a user would otherwise subscribe twice.
+      const active = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "active",
+        limit: 1,
+      });
+      const trialing = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "trialing",
+        limit: 1,
+      });
+      if (active.data.length > 0 || trialing.data.length > 0) {
+        return NextResponse.json(
+          { error: "You already have an active subscription. Manage it from Settings → billing." },
+          { status: 409 },
+        );
+      }
     }
 
     const base = {
