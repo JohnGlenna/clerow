@@ -95,6 +95,9 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   const [improving, setImproving] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [copiedBuilder, setCopiedBuilder] = React.useState(false);
+  // Diagnostic technical fixes hide their raw markdown box by default (it just
+  // re-states the title/why/steps above); this toggles it back into view.
+  const [showRaw, setShowRaw] = React.useState(false);
   const [mcpClient, setMcpClient] = React.useState<"claudecode" | "codex" | "ide" | "web">("claudecode");
   // "Check it's live" — confirms a technical fix actually shipped (single re-fetch,
   // not the AI scan). null = not checked yet.
@@ -111,6 +114,9 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
   // Deterministic = computed instantly & locally (files + any audit-* fix), so it
   // never needs a (re)generate button once shown.
   const isDeterministic = !offsite && (!!fileName || (!!task.ladderKey && task.ladderKey.startsWith("audit-")));
+  // Diagnostic technical fix (audit-* with no robots/llms file): its deterministic
+  // content just re-states the title/why/steps already shown above, so collapse it.
+  const isDiagnostic = isDeterministic && !fileName;
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && view !== "scanning") onClose(); };
@@ -431,8 +437,10 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
           {/* Generate the ready-to-ship content (copy + download). */}
           <div className="tm-content">
             <div className="tm-content-h">
-              <span>{offsite ? "Part A — Clerow writes your post" : fileName ? `Your ${fileName}` : "Copy-ready content"}</span>
-              {(() => {
+              <span>{offsite ? "Part A — Clerow writes your post" : fileName ? `Your ${fileName}` : isDiagnostic ? "Hand-off content" : "Copy-ready content"}</span>
+              {content && isDiagnostic ? (
+                <button className="tm-raw-toggle" onClick={() => setShowRaw((v) => !v)}>{showRaw ? "▾ Hide raw markdown" : "▸ View raw markdown"}</button>
+              ) : (() => {
                 // Deterministic content auto-loads and never needs (re)generating;
                 // LLM content can be (re)generated on demand.
                 if (genBusy) return <button className="tm-gen" disabled>Writing…</button>;
@@ -446,7 +454,7 @@ export function TaskModal({ task, modelCount, brandUrl, onClose, onChanged, onAd
             {improving && <div className="tm-gen-note">✦ Quality check flagged some gaps — rewriting a stronger draft…</div>}
             {content && (
               <>
-                <pre className="tm-content-box">{content}</pre>
+                {(!isDiagnostic || showRaw) && <pre className="tm-content-box">{content}</pre>}
                 {quality && (
                   <div className={`tm-quality ${quality.score >= 85 ? "is-high" : quality.score >= 72 ? "is-ok" : "is-low"}`}>
                     <span className="tm-quality-score">{quality.score}<span className="tm-quality-max">/100</span></span>
