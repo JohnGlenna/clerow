@@ -7,7 +7,7 @@ import { loadBrandSnapshot, captureDailySnapshot, loadSnapshotHistory } from "@/
 import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/streak";
 import { levelFromXp } from "@/lib/xp";
 import { ensureSiteAudit } from "@/lib/audit/ensure";
-import { buildLadder, ensureLadderTasks, refreshLadderTaskContent, projectLockedGain } from "@/lib/ladder";
+import { buildLadder, ensureLadderTasks, refreshLadderTaskContent, projectLockedGain, LADDER_DEPTH } from "@/lib/ladder";
 import { buildJourney } from "@/lib/journey";
 import { buildRoadmap } from "@/lib/roadmap";
 import { buildLadderContext } from "@/lib/scan/ladderContext";
@@ -145,17 +145,31 @@ export async function GET(req: Request) {
   const sub = await getSubscription(supabase, user.id);
   const subscribed = isSubscribed(sub);
 
-  // How far the user has unlocked the climb: the highest level any seeded ladder
-  // task belongs to. Unlocking a level seeds its tasks, so the tasks are the
-  // record — incomplete levels at/below this render "open" instead of "locked".
-  // Only subscribers can unlock ahead, so a free (or churned) user is pinned to 0,
-  // which re-locks any higher-level tasks left seeded from a lapsed subscription.
+  // Has the user ever run a full (multi-model) scan? A full scan is the moment the
+  // whole climb opens up — every level unlocks at once so they can tackle tasks in
+  // any order, not one level at a time. (Also gates the re-scan CTA below.)
+  const { count: fullScans } = await supabase
+    .from("scans")
+    .select("id", { count: "exact", head: true })
+    .eq("brand_id", brand.id)
+    .eq("tier", "full")
+    .eq("status", "done");
+  const hasFullScan = (fullScans ?? 0) > 0;
+
+  // How far the user has unlocked the climb. A subscriber who's run a full scan
+  // gets the entire ladder unlocked (LADDER_DEPTH) — every level "open", all tasks
+  // seeded and actionable in any order. Before a full scan, it's derived from the
+  // highest seeded ladder task (incomplete levels at/below render "open"). A free
+  // (or churned) user is pinned to 0, which re-locks higher-level tasks left over
+  // from a lapsed subscription.
   const unlockedThrough = !subscribed
     ? 0
-    : (tasks ?? []).reduce(
-        (max, t) => (t.source === "ladder" && (t.level ?? 0) > max ? t.level ?? 0 : max),
-        0,
-      );
+    : hasFullScan
+      ? LADDER_DEPTH
+      : (tasks ?? []).reduce(
+          (max, t) => (t.source === "ladder" && (t.level ?? 0) > max ? t.level ?? 0 : max),
+          0,
+        );
 
   const ladderExisting = new Map<string, { id: string; done: boolean; resolved: boolean }>();
   for (const t of tasks ?? [])
@@ -259,18 +273,9 @@ export async function GET(req: Request) {
       return ad - bd;
     });
 
-  // Has the user ever run a full (multi-model) scan? Gates level-unlocking and
-  // hides the "Scan all 5 models" CTA once done.
-  const { count: fullScans } = await supabase
-    .from("scans")
-    .select("id", { count: "exact", head: true })
-    .eq("brand_id", brand.id)
-    .eq("tier", "full")
-    .eq("status", "done");
-
   return NextResponse.json({
     hasScan: true,
-    hasFullScan: (fullScans ?? 0) > 0,
+    hasFullScan,
     brand: brandHead,
     scannedAt: snapshot.scannedAt ?? scan.finished_at,
     engine: engineLabel,

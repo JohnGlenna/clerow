@@ -109,6 +109,11 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
   const ladder = data.ladder;
   if (!ladder) return <div className="ld-path" style={{ color: "var(--ink-2)" }}>Run a scan to start your climb.</div>;
 
+  // After a full scan the whole climb is open: every unresolved task — even later
+  // ones in the active level — is actionable, so users can work in any order
+  // rather than one-thing-at-a-time.
+  const freeRoam = subscribed && hasFullScan;
+
   return (
     <div className="ld-path">
       {ladder.levels.map((lvl: LadderLevel, li: number) => {
@@ -130,11 +135,11 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
             ? "done"
             : paywalled
               ? "locked"
-              : active && ti === firstCurrent
-                ? "current"
-                : open
-                  ? "current" // every unresolved task in an unlocked-ahead level is actionable
-                  : "locked"; // active level's later tasks stay greyed (one-thing-at-a-time)
+              : open || freeRoam
+                ? "current" // unlocked-ahead level, or full climb open: every task actionable
+                : active && ti === firstCurrent
+                  ? "current"
+                  : "locked"; // pre-full-scan active level: one thing at a time
           const clickable = paywalled || ((kind === "done" || kind === "current") && !!t.id);
           return (
             <PathNode
