@@ -389,9 +389,17 @@
   font-size: 13px;
   margin-top: 8px;
 }
-.ps-pager {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
+.ps-subtabs {
+  margin-bottom: 14px;
+}
+.ps-subtabs .ps-tab {
+  padding: 6px 13px;
+  font-size: 13px;
+  border-radius: 999px;
+}
+.ps-sentinel {
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  padding: 14px 0 4px;
 }

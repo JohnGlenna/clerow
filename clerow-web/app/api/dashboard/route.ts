@@ -1,4 +1,5 @@
 import { NextResponse, after } from "next/server";
+import { isAdminEmail } from "@/lib/adminGate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { prewarmActiveLevel } from "@/lib/content/prewarm";
@@ -37,6 +38,7 @@ export async function GET(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const isAdmin = isAdminEmail(user.email);
 
   const { data: brand } = await supabase
     .from("brands")
@@ -46,7 +48,7 @@ export async function GET(req: Request) {
     .limit(1)
     .maybeSingle();
 
-  if (!brand) return NextResponse.json({ hasScan: false, brand: null });
+  if (!brand) return NextResponse.json({ hasScan: false, brand: null, isAdmin });
 
   // Keep the brand's timezone in sync with the browser so streak day boundaries
   // match the user's "today".
@@ -109,6 +111,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       hasScan: false,
       brand: brandHead,
+      isAdmin,
       streak,
       xp,
       prompts: (prompts ?? []).map((p) => ({
@@ -277,6 +280,7 @@ export async function GET(req: Request) {
     hasScan: true,
     hasFullScan,
     brand: brandHead,
+    isAdmin,
     scannedAt: snapshot.scannedAt ?? scan.finished_at,
     engine: engineLabel,
     // Master-AI synthesis of the latest scan (null until the background job fills it in).

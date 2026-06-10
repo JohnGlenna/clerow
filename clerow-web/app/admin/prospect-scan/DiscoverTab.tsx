@@ -1,10 +1,11 @@
 "use client";
 
-// Discover tab: find prospects from Brønnøysund / Product Hunt / Show HN,
-// persist them as leads with a 5-stage status (the entire CRM), and hand any
-// row off to the scanner in one click.
+// Discover tab: find prospects from Brønnøysund / Product Hunt / Show HN —
+// one source sub-tab at a time, infinite scroll instead of paging — persist
+// them as leads with a 5-stage status (the entire CRM), and hand any row off
+// to the scanner in one click.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { LEAD_STATUSES, type LeadRow, type LeadStatus, type PageInfo } from "@/lib/leads/types";
 
@@ -27,6 +28,14 @@ const NAERING_PRESETS = [
 
 const KRISTIANSAND = "4204";
 
+type Source = "brreg" | "producthunt" | "shownh";
+
+const SOURCE_TABS: { id: Source; label: string }[] = [
+  { id: "brreg", label: "Brønnøysund" },
+  { id: "producthunt", label: "Product Hunt" },
+  { id: "shownh", label: "Show HN" },
+];
+
 function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
@@ -40,6 +49,7 @@ function suggestCategory(lead: LeadRow): string {
 
 export function DiscoverTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
+  const [source, setSource] = useState<Source>("brreg");
 
   const refreshCounts = useCallback(() => {
     fetchCounts().then(setCounts).catch(() => setCounts(null));
@@ -59,9 +69,27 @@ export function DiscoverTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
         <span className="ps-comps">total {counts?.total ?? "–"}</span>
       </div>
 
-      <BrregPanel onScan={onScan} onChanged={refreshCounts} />
-      <ProductHuntPanel onScan={onScan} onChanged={refreshCounts} />
-      <ShowHnPanel onScan={onScan} onChanged={refreshCounts} />
+      <nav className="ps-tabs ps-subtabs">
+        {SOURCE_TABS.map((t) => (
+          <button
+            key={t.id}
+            className={`ps-tab ${source === t.id ? "on" : ""}`}
+            onClick={() => setSource(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      <div style={{ display: source === "brreg" ? "block" : "none" }}>
+        <BrregPanel onScan={onScan} onChanged={refreshCounts} />
+      </div>
+      <div style={{ display: source === "producthunt" ? "block" : "none" }}>
+        <ProductHuntPanel onScan={onScan} onChanged={refreshCounts} />
+      </div>
+      <div style={{ display: source === "shownh" ? "block" : "none" }}>
+        <ShowHnPanel onScan={onScan} onChanged={refreshCounts} />
+      </div>
     </div>
   );
 }
@@ -74,19 +102,23 @@ function usePanelFetch(onChanged: () => void) {
   const [notConfigured, setNotConfigured] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const busyRef = useRef(false);
 
-  const run = async (params: URLSearchParams) => {
+  const run = async (params: URLSearchParams, append = false) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
       const res = await discover(params);
       setNotConfigured(!!res.notConfigured);
-      setLeads(res.leads);
+      setLeads((prev) => (append && prev ? [...prev, ...res.leads] : res.leads));
       setPageInfo(res.page);
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fetch failed");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -94,17 +126,40 @@ function usePanelFetch(onChanged: () => void) {
   return { leads, setLeads, pageInfo, notConfigured, busy, error, run };
 }
 
+/** Calls onMore whenever the sentinel scrolls near the viewport. */
+function ScrollSentinel({ onMore, active }: { onMore: () => void; active: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!active || !el) return;
+    const ob = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) onMore();
+      },
+      { rootMargin: "500px" },
+    );
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [onMore, active]);
+  if (!active) return null;
+  return (
+    <div ref={ref} className="ps-sentinel">
+      Loading more…
+    </div>
+  );
+}
+
 function BrregPanel({ onScan, onChanged }: { onScan: (h: ScanHandoff) => void; onChanged: () => void }) {
   const [from, setFrom] = useState(daysAgo(60));
+  const [to, setTo] = useState("");
   const [codes, setCodes] = useState<string[]>([]);
   const [freeCode, setFreeCode] = useState("");
   const [kommune, setKommune] = useState("");
   const [requireWebsite, setRequireWebsite] = useState(true);
-  const [page, setPage] = useState(0);
+  const pageRef = useRef(0);
   const f = usePanelFetch(onChanged);
 
-  const fetchPage = (p: number) => {
-    setPage(p);
+  const buildParams = (p: number) => {
     const naering = [...codes, ...(freeCode.trim() ? [freeCode.trim()] : [])].join(",");
     const params = new URLSearchParams({
       source: "brreg",
@@ -112,9 +167,21 @@ function BrregPanel({ onScan, onChanged }: { onScan: (h: ScanHandoff) => void; o
       page: String(p),
       requireWebsite: requireWebsite ? "1" : "0",
     });
+    if (to) params.set("to", to);
     if (naering) params.set("naering", naering);
     if (kommune.trim()) params.set("kommune", kommune.trim());
-    void f.run(params);
+    return params;
+  };
+
+  const fetchFresh = () => {
+    pageRef.current = 0;
+    void f.run(buildParams(0));
+  };
+  const hasMore = !!f.pageInfo && pageRef.current < f.pageInfo.totalPages - 1;
+  const loadMore = () => {
+    if (f.busy || !hasMore) return;
+    pageRef.current += 1;
+    void f.run(buildParams(pageRef.current), true);
   };
 
   return (
@@ -124,6 +191,10 @@ function BrregPanel({ onScan, onChanged }: { onScan: (h: ScanHandoff) => void; o
         <label>
           Registrert etter
           <input className="ps-input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label>
+          Registrert før (valgfritt)
+          <input className="ps-input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
         <span className="ps-chips">
           {NAERING_PRESETS.map((p) => (
@@ -168,22 +239,25 @@ function BrregPanel({ onScan, onChanged }: { onScan: (h: ScanHandoff) => void; o
             må ha nettside
           </label>
         </span>
-        <button className="ps-btn ps-btn-primary" onClick={() => fetchPage(0)} disabled={f.busy}>
+        <button className="ps-btn ps-btn-primary" onClick={fetchFresh} disabled={f.busy}>
           {f.busy ? "Henter…" : "Hent selskaper"}
         </button>
       </div>
       {f.error && <div className="ps-error">{f.error}</div>}
       {f.leads && (
-        <LeadsTable
-          leads={f.leads}
-          setLeads={f.setLeads}
-          onScan={onScan}
-          onChanged={onChanged}
-          columns={["place", "niche", "registeredAt"]}
-        />
-      )}
-      {f.pageInfo && f.pageInfo.totalPages > 1 && (
-        <Pager page={page} totalPages={f.pageInfo.totalPages} busy={f.busy} go={fetchPage} />
+        <>
+          <LeadsTable
+            leads={f.leads}
+            setLeads={f.setLeads}
+            onScan={onScan}
+            onChanged={onChanged}
+            columns={["place", "niche", "registeredAt"]}
+          />
+          <div className="ps-comps">
+            {f.leads.length} rows{f.pageInfo ? ` · page ${pageRef.current + 1}/${f.pageInfo.totalPages}` : ""}
+          </div>
+          <ScrollSentinel onMore={loadMore} active={hasMore && !f.busy} />
+        </>
       )}
     </div>
   );
@@ -222,61 +296,40 @@ function ProductHuntPanel({ onScan, onChanged }: { onScan: (h: ScanHandoff) => v
 }
 
 function ShowHnPanel({ onScan, onChanged }: { onScan: (h: ScanHandoff) => void; onChanged: () => void }) {
-  const [page, setPage] = useState(0);
+  const pageRef = useRef(0);
   const f = usePanelFetch(onChanged);
-  const fetchPage = (p: number) => {
-    setPage(p);
-    void f.run(new URLSearchParams({ source: "shownh", page: String(p) }));
+
+  const fetchFresh = () => {
+    pageRef.current = 0;
+    void f.run(new URLSearchParams({ source: "shownh", page: "0" }));
   };
+  const hasMore = !!f.pageInfo && pageRef.current < f.pageInfo.totalPages - 1;
+  const loadMore = () => {
+    if (f.busy || !hasMore) return;
+    pageRef.current += 1;
+    void f.run(new URLSearchParams({ source: "shownh", page: String(pageRef.current) }), true);
+  };
+
   return (
     <div className="lp-card ps-panel">
       <h2>Show HN — latest launches</h2>
-      <button className="ps-btn ps-btn-primary" onClick={() => fetchPage(0)} disabled={f.busy}>
+      <button className="ps-btn ps-btn-primary" onClick={fetchFresh} disabled={f.busy}>
         {f.busy ? "Fetching…" : "Fetch posts"}
       </button>
       {f.error && <div className="ps-error">{f.error}</div>}
       {f.leads && (
-        <LeadsTable
-          leads={f.leads}
-          setLeads={f.setLeads}
-          onScan={onScan}
-          onChanged={onChanged}
-          columns={["points", "postedAt"]}
-        />
+        <>
+          <LeadsTable
+            leads={f.leads}
+            setLeads={f.setLeads}
+            onScan={onScan}
+            onChanged={onChanged}
+            columns={["points", "postedAt"]}
+          />
+          <div className="ps-comps">{f.leads.length} rows</div>
+          <ScrollSentinel onMore={loadMore} active={hasMore && !f.busy} />
+        </>
       )}
-      {f.pageInfo && f.pageInfo.totalPages > 1 && (
-        <Pager page={page} totalPages={f.pageInfo.totalPages} busy={f.busy} go={fetchPage} />
-      )}
-    </div>
-  );
-}
-
-function Pager({
-  page,
-  totalPages,
-  busy,
-  go,
-}: {
-  page: number;
-  totalPages: number;
-  busy: boolean;
-  go: (p: number) => void;
-}) {
-  return (
-    <div className="ps-pager">
-      <button className="ps-btn ps-btn-ghost" disabled={busy || page <= 0} onClick={() => go(page - 1)}>
-        ‹ Prev
-      </button>
-      <span className="ps-comps">
-        page {page + 1} / {totalPages}
-      </span>
-      <button
-        className="ps-btn ps-btn-ghost"
-        disabled={busy || page >= totalPages - 1}
-        onClick={() => go(page + 1)}
-      >
-        Next ›
-      </button>
     </div>
   );
 }
@@ -340,7 +393,11 @@ function LeadsTable({
             <td>{lead.name}</td>
             <td className="ps-comps">
               {lead.website ? (
-                <a href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`} target="_blank" rel="noreferrer">
+                <a
+                  href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   {lead.websiteKey ?? lead.website}
                 </a>
               ) : (

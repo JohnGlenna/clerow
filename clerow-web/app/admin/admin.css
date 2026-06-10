@@ -1,0 +1,29 @@
+/* Admin shell: dedicated sidebar + content column, reusing the ld-nav styles
+   and dark tokens from dashboard.css. */
+
+.adm-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.adm-nav {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  border-right: 1px solid var(--surface-2);
+}
+
+.adm-tag {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--xp);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-left: 4px;
+}
+
+.adm-main {
+  min-width: 0;
+}

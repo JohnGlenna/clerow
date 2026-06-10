@@ -5,6 +5,10 @@ import type { CompetitorCount, EmailCopy, Lang } from "./types";
 
 const SIGNATURE = "John";
 
+// Early-user launch offer, mentioned in every outreach mail.
+const DISCOUNT_NO = "PS: Akkurat nå får tidlige brukere Clerow for bare 30 kr den første måneden.";
+const DISCOUNT_EN = "PS: Right now early users get Clerow for just 30 NOK (~$3) for the first month.";
+
 export type EmailInput = {
   brand: string;
   language: Lang;
@@ -39,6 +43,7 @@ function standardEmail(i: EmailInput): EmailCopy {
       "Stadig flere kunder spør AI om anbefalinger i stedet for å google. Jeg har bygget Clerow (clerow.com) – det sporer synligheten deres på tvers av 5 AI-modeller og gir konkrete oppgaver for å tette gapet.",
       `Vil du se hele skanningen for ${i.brand}? Helt gratis og uforpliktende.`,
       SIGNATURE,
+      DISCOUNT_NO,
     ].join("\n\n");
     return { subject, body };
   }
@@ -53,6 +58,7 @@ function standardEmail(i: EmailInput): EmailCopy {
     "More and more buyers ask AI for recommendations instead of Googling. I built Clerow (clerow.com) — it tracks your visibility across 5 AI models and gives you concrete daily tasks to close the gap.",
     `Want the full scan for ${i.brand}? Free, no strings.`,
     SIGNATURE,
+    DISCOUNT_EN,
   ].join("\n\n");
   return { subject, body };
 }
@@ -73,6 +79,7 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
       "Den gode nyheten: dette er fiksbart på noen uker, ikke år. Jeg har bygget Clerow (clerow.com) – det sporer synligheten deres på tvers av 5 AI-modeller og gir konkrete daglige oppgaver for å komme inn i svarene.",
       `Vil du se hele skanningen for ${i.brand}? Helt gratis og uforpliktende.`,
       SIGNATURE,
+      DISCOUNT_NO,
     ].join("\n\n");
     return { subject, body };
   }
@@ -87,6 +94,7 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
     "The good news: this is fixable in weeks, not years. I built Clerow (clerow.com) — it tracks your visibility across 5 AI models and gives you concrete daily tasks to get into the answers.",
     `Want the full scan for ${i.brand}? Free, no strings.`,
     SIGNATURE,
+    DISCOUNT_EN,
   ].join("\n\n");
   return { subject, body };
 }

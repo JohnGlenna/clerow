@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 
 import type { Scan } from "./api";
+import { copyScanImage } from "./scanImage";
 
 export function ScanResult({
   scan,
@@ -20,7 +21,9 @@ export function ScanResult({
 }) {
   const [subject, setSubject] = useState(scan.email.subject);
   const [body, setBody] = useState(scan.email.body);
-  const [copied, setCopied] = useState<"subject" | "body" | "email" | null>(null);
+  const [copied, setCopied] = useState<"subject" | "body" | "email" | "image" | "image-dl" | null>(
+    null,
+  );
 
   useEffect(() => {
     setSubject(scan.email.subject);
@@ -31,6 +34,12 @@ export function ScanResult({
     await navigator.clipboard.writeText(text);
     setCopied(what);
     setTimeout(() => setCopied(null), 1500);
+  };
+
+  const copyImage = async () => {
+    const how = await copyScanImage(scan);
+    setCopied(how === "copied" ? "image" : "image-dl");
+    setTimeout(() => setCopied(null), 1800);
   };
 
   const mailto = `mailto:${prospectEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -119,7 +128,10 @@ export function ScanResult({
           <button className="ps-btn ps-btn-ghost" onClick={() => copy("subject", subject)}>
             {copied === "subject" ? "Copied!" : "Copy subject"}
           </button>
-          <a className="ps-btn ps-btn-ghost" href={mailto}>
+          <button className="ps-btn ps-btn-ghost" onClick={() => void copyImage()}>
+            {copied === "image" ? "Copied!" : copied === "image-dl" ? "Downloaded" : "Copy image"}
+          </button>
+          <a className="ps-btn ps-btn-ghost" href={mailto} title="Opens with the text — paste the copied image into the mail (Cmd+V)">
             Open in mail
           </a>
           {prospectEmail && (

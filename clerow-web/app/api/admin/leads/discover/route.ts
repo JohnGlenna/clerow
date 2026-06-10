@@ -38,6 +38,7 @@ export async function GET(req: Request) {
     if (source === "brreg") {
       fetched = await fetchBrreg({
         from: params.get("from") || daysAgoIso(60),
+        to: params.get("to") || undefined,
         naering: params.get("naering") || "",
         kommune: params.get("kommune") || undefined,
         page,

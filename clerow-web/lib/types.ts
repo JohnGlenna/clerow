@@ -188,6 +188,8 @@ export type ScanSynthesis = {
 
 export type DashboardData = {
   hasScan: boolean;
+  // Logged-in user is in ADMIN_EMAILS — shows the Admin item in the sidebar.
+  isAdmin?: boolean;
   hasFullScan?: boolean; // a tier='full' multi-model scan has completed
   brand: { company: string; url: string } | null;
   scannedAt?: string | null;

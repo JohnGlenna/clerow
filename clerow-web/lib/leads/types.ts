@@ -44,6 +44,8 @@ export type DiscoverResponse = {
 export type BrregParams = {
   /** YYYY-MM-DD — fraRegistreringsdatoEnhetsregisteret */
   from: string;
+  /** YYYY-MM-DD — tilRegistreringsdatoEnhetsregisteret (optional upper bound). */
+  to?: string;
   /** Comma list of SN 2025 codes, division level ok (e.g. "62,73"). */
   naering: string;
   kommune?: string;

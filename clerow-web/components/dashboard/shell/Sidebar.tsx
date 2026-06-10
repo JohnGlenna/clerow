@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useDashboard } from "@/lib/useDashboard";
 import { MascotClerow } from "../../Mascot";
 import { LDIcon } from "./LDIcon";
 
@@ -18,6 +19,7 @@ const NAV: { href: string; icon: string; label: string }[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { data } = useDashboard();
   return (
     <nav className="ld-nav">
       <Link href="/dashboard/tasks" className="ld-brand"><MascotClerow size={34} /><span>Clerow</span></Link>
@@ -29,6 +31,11 @@ export function Sidebar() {
           </Link>
         );
       })}
+      {data?.isAdmin && (
+        <Link href="/admin/prospect-scan" className="ld-navitem">
+          <span className="ic"><LDIcon name="settings" /></span><span>Admin</span>
+        </Link>
+      )}
       <div className="ld-nav-spacer" />
     </nav>
   );

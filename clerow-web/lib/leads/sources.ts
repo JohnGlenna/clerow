@@ -33,6 +33,7 @@ export async function fetchBrreg(
     size: String(PAGE_SIZE),
     page: String(params.page),
   });
+  if (params.to) qs.set("tilRegistreringsdatoEnhetsregisteret", params.to);
   if (params.naering) qs.set("naeringskode", params.naering);
   if (params.kommune) qs.set("kommunenummer", params.kommune);
 
