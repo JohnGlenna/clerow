@@ -1,0 +1,397 @@
+/* Prospect Scanner (founder-only admin tool). Leans on the .ld-root dark
+   tokens from dashboard.css; everything here is ps-* and function-first. */
+
+.ps-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+  color: var(--ink);
+}
+
+.ps-header h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 800;
+}
+.ps-sub {
+  margin: 0 0 18px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+/* Tabs */
+.ps-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.ps-tab {
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid var(--surface-2);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ps-tab.on {
+  color: var(--ink);
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+/* Cards stack */
+.ps-page .lp-card {
+  margin-bottom: 16px;
+}
+.ps-panel h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+/* Form */
+.ps-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin-bottom: 12px;
+}
+.ps-form-grid label,
+.ps-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  font-weight: 700;
+}
+.ps-input {
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 9px 11px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.ps-input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+.ps-input-sm {
+  width: 110px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+.ps-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ps-override {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.ps-override summary {
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.ps-override textarea {
+  width: 100%;
+}
+
+/* Buttons & chips */
+.ps-btn {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: none;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+.ps-btn-primary {
+  background: var(--blue);
+  color: #06222e;
+}
+.ps-btn-ghost {
+  background: transparent;
+  border: 1px solid var(--surface-2);
+  color: var(--ink-2);
+}
+.ps-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ps-chip {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ps-chip.on {
+  color: var(--ink);
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+.ps-chips,
+.ps-lang {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ps-toggle {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px !important;
+}
+
+/* Filters row */
+.ps-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+/* Tables */
+.ps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  margin-top: 12px;
+}
+.ps-table th {
+  text-align: left;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--surface-2);
+}
+.ps-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--surface-2);
+  vertical-align: top;
+}
+.ps-table a {
+  color: var(--blue);
+  text-decoration: none;
+}
+.ps-row-click {
+  cursor: pointer;
+}
+.ps-row-click:hover td {
+  background: var(--surface-2);
+}
+.ps-prompt {
+  max-width: 380px;
+}
+.ps-comps {
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+.ps-yes {
+  color: #58cc02;
+  font-weight: 900;
+}
+.ps-no {
+  color: var(--red);
+  font-weight: 900;
+}
+.ps-running {
+  color: var(--blue);
+}
+
+/* Result */
+.ps-headline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ps-stat {
+  font-size: 17px;
+}
+.ps-stat b {
+  color: var(--blue);
+}
+.ps-source {
+  background: var(--surface-2);
+  color: var(--ink-3);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.ps-cached {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--xp);
+  font-size: 12.5px;
+}
+.ps-leaderboard {
+  margin-top: 16px;
+}
+.ps-leaderboard h3,
+.ps-email h3 {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ps-lb-row {
+  display: grid;
+  grid-template-columns: 180px 1fr 50px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+.ps-lb-bar {
+  background: var(--surface-2);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+.ps-lb-fill {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+  border-radius: 999px;
+}
+.ps-lb-count {
+  color: var(--ink-3);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* Email box */
+.ps-email {
+  margin-top: 18px;
+}
+.ps-subject {
+  width: 100%;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.ps-body {
+  width: 100%;
+  line-height: 1.45;
+  resize: vertical;
+}
+.ps-email-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.ps-prospect-email {
+  background: transparent;
+  border: 1px dashed var(--surface-2);
+  color: var(--blue);
+  border-radius: 8px;
+  padding: 7px 11px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Batch */
+.ps-batch-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.ps-progress {
+  color: var(--ink-2);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+/* Discover */
+.ps-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ps-pipeline-title {
+  font-weight: 900;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  margin-right: 4px;
+}
+.ps-badge,
+.ps-badge-select {
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+.ps-badge-select {
+  cursor: pointer;
+  appearance: none;
+}
+.ps-badge-new {
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.ps-badge-scanned {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.ps-badge-emailed {
+  background: #3a2f10;
+  color: var(--xp);
+}
+.ps-badge-replied {
+  background: #16341a;
+  color: #58cc02;
+}
+.ps-badge-customer {
+  background: #2d1640;
+  color: #c77dff;
+}
+.ps-hint {
+  margin-top: 10px;
+  color: var(--ink-2);
+  font-size: 13px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.ps-hint code {
+  color: var(--xp);
+}
+.ps-error {
+  color: var(--red);
+  font-size: 13px;
+  margin-top: 8px;
+}
+.ps-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}

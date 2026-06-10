@@ -18,6 +18,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      prospect_scans: {
+        Row: {
+          answers: Json
+          brand: string
+          category: string
+          competitors: Json
+          created_at: string
+          email_copy: string | null
+          id: string
+          language: string
+          mentioned_count: number
+          total_prompts: number
+          website: string
+          website_key: string
+        }
+        Insert: {
+          answers?: Json
+          brand: string
+          category: string
+          competitors?: Json
+          created_at?: string
+          email_copy?: string | null
+          id?: string
+          language?: string
+          mentioned_count?: number
+          total_prompts?: number
+          website: string
+          website_key: string
+        }
+        Update: {
+          answers?: Json
+          brand?: string
+          category?: string
+          competitors?: Json
+          created_at?: string
+          email_copy?: string | null
+          id?: string
+          language?: string
+          mentioned_count?: number
+          total_prompts?: number
+          website?: string
+          website_key?: string
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          meta: Json
+          name: string
+          phone: string | null
+          source: string
+          status: string
+          updated_at: string
+          website: string
+          website_key: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          meta?: Json
+          name: string
+          phone?: string | null
+          source: string
+          status?: string
+          updated_at?: string
+          website: string
+          website_key: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          meta?: Json
+          name?: string
+          phone?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          website?: string
+          website_key?: string
+        }
+        Relationships: []
+      }
       cancellation_feedback: {
         Row: {
           created_at: string

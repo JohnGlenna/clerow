@@ -2,7 +2,11 @@
 // search) with buyer prompts and reports whether Clerow is mentioned, which
 // competitors are recommended, and which domains get cited — the core scan signal
 // without any Supabase writes. Run: npx tsx scripts/probe-clerow.ts
-import { readFileSync } from "node:fs";
+//
+// Every run is appended to data/clerow-visibility-history.jsonl (one line per
+// prompt × engine) and a date-by-date trend is printed — the before/after series
+// for the build-in-public "we got Clerow recommended by AI" story. Commit the file.
+import { readFileSync, appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -39,12 +43,44 @@ function domainsOf(citations: { url: string }[]): string[] {
   return [...out];
 }
 
+const HISTORY = join(here, "..", "data", "clerow-visibility-history.jsonl");
+
+type HistoryRow = { date: string; prompt: string; engine: string; clerow: boolean; competitors: string[] };
+
+function logRun(rows: HistoryRow[]) {
+  const dir = dirname(HISTORY);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  appendFileSync(HISTORY, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+}
+
+function printTrend() {
+  if (!existsSync(HISTORY)) return;
+  const rows: HistoryRow[] = readFileSync(HISTORY, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l));
+  const byDate = new Map<string, { hits: number; total: number }>();
+  for (const r of rows) {
+    const d = byDate.get(r.date) || { hits: 0, total: 0 };
+    d.hits += r.clerow ? 1 : 0;
+    d.total += 1;
+    byDate.set(r.date, d);
+  }
+  console.log("\nTREND — Clerow named across all prompts × engines:");
+  for (const [date, d] of [...byDate.entries()].sort()) {
+    const pct = Math.round((100 * d.hits) / d.total);
+    console.log(`  ${date}  ${String(d.hits).padStart(2)}/${d.total}  ${"█".repeat(Math.round(pct / 5)).padEnd(20)} ${pct}%`);
+  }
+}
+
 async function main() {
   const engines = Object.values(ENGINES).filter((e) => e.enabled);
   console.log("Engines:", engines.map((e) => e.label).join(", "), "\n");
 
   // matrix[prompt][engine] = clerow mentioned?
   const clerowHits: Record<string, number> = {};
+  const history: HistoryRow[] = [];
+  const today = new Date().toISOString().slice(0, 10);
 
   for (const prompt of PROMPTS) {
     console.log("=".repeat(72));
@@ -73,6 +109,7 @@ async function main() {
       clerowHits[r.engine.label] = (clerowHits[r.engine.label] || 0) + (hasClerow ? 1 : 0);
       const comps = COMPETITORS.filter((c) => mentioned(text, c));
       const doms = domainsOf(citations);
+      history.push({ date: today, prompt, engine: r.engine.label, clerow: hasClerow, competitors: comps });
       console.log(`  ${tag} Clerow: ${hasClerow ? "✅ NAMED" : "❌ not named"}`);
       console.log(`              competitors named: ${comps.length ? comps.join(", ") : "(none detected)"}`);
       console.log(`              cited domains (${doms.length}): ${doms.slice(0, 8).join(", ") || "(none)"}`);
@@ -85,6 +122,9 @@ async function main() {
   for (const engine of engines) {
     console.log(`  ${engine.label.padEnd(11)} ${clerowHits[engine.label] || 0}/${PROMPTS.length}`);
   }
+
+  logRun(history);
+  printTrend();
 }
 
 main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });

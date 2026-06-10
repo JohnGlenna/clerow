@@ -445,6 +445,29 @@
 .ld-root .lb-rank.r3 { background: linear-gradient(180deg,#F0B280,#C77B43); color: #fff; }
 .ld-root .lb-you { font-size: 9.5px; font-weight: 900; background: var(--blue); color: #fff; padding: 2px 7px; border-radius: 5px; margin-left: 8px; letter-spacing: .04em; }
 
+/* Top-of-page highlights: podium for the top 3 + the user's standing card. */
+.ld-root .lb-hero { display: flex; gap: 14px; align-items: stretch; margin-bottom: 16px; }
+.ld-root .lb-podium { flex: 1 1 auto; display: flex; gap: 12px; align-items: stretch; }
+.ld-root .lb-pod { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center; padding: 18px 14px; background: var(--surface); border: 2px solid var(--line); border-radius: 16px; }
+.ld-root .lb-pod--win { background: linear-gradient(180deg,#13242b,#0f1c22); border-color: var(--blue); margin-top: -10px; padding-top: 26px; box-shadow: 0 6px 22px rgba(0,0,0,.28); }
+.ld-root .lb-pod-place { width: 28px; height: 28px; flex: 0 0 28px; font-size: 13px; }
+.ld-root .lb-pod-logo { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; overflow: hidden; border: 1px solid var(--line-2); }
+.ld-root .lb-pod-logo img { width: 100%; height: 100%; object-fit: contain; }
+.ld-root .lb-pod-name { font-weight: 900; font-size: 15px; letter-spacing: -.01em; display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center; }
+.ld-root .lb-pod-vis { font-family: var(--mono); font-weight: 900; font-size: 24px; letter-spacing: -.02em; color: var(--ink); }
+.ld-root .lb-pod-vis span { font-size: 12px; font-weight: 700; color: var(--ink-3); margin-left: 1px; }
+.ld-root .lb-stand { flex: 0 0 268px; max-width: 268px; display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: 16px; background: linear-gradient(180deg,var(--blue-soft),#0f2330); border: 2px solid var(--blue); }
+.ld-root .lb-stand-eyebrow { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: var(--blue); }
+.ld-root .lb-stand-rank { font-family: var(--mono); font-weight: 900; font-size: 34px; line-height: 1; letter-spacing: -.02em; color: var(--ink); }
+.ld-root .lb-stand-rank span { font-size: 15px; font-weight: 700; color: var(--ink-3); }
+.ld-root .lb-stand-msg { font-size: 12.5px; font-weight: 600; line-height: 1.45; color: var(--ink-2); flex: 1; }
+.ld-root .lb-stand-btn { margin-top: 4px; height: 42px; border: none; border-radius: 12px; background: var(--blue); color: #fff; font-weight: 900; font-size: 13.5px; box-shadow: 0 3px 0 var(--blue-deep); cursor: pointer; }
+@media (max-width: 760px) {
+  .ld-root .lb-hero { flex-direction: column; }
+  .ld-root .lb-pod--win { margin-top: 0; padding-top: 18px; }
+  .ld-root .lb-stand { flex-basis: auto; max-width: none; }
+}
+
 /* Redesigned leaderboard row: rank · logo (or nothing) · name+meta+bar · % and gap. */
 .ld-root .lb-row { padding: 13px 16px; align-items: center; }
 .ld-root .lb-logo { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 30px; overflow: hidden; border: 1px solid var(--line-2); }
