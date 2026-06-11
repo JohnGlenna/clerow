@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         const subId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
         if (userId && subId) {
           const sub = await stripe.subscriptions.retrieve(subId);
-          await upsertSubscription(sub, userId);
+          await upsertSubscription(await resolveCurrentSubscription(stripe, sub), userId);
         }
         break;
       }
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
         const userId = sub.metadata?.user_id;
-        if (userId) await upsertSubscription(sub, userId);
+        if (userId) await upsertSubscription(await resolveCurrentSubscription(stripe, sub), userId);
         break;
       }
       default:
@@ -57,6 +57,23 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ received: true });
+}
+
+// Stripe webhooks can arrive out of order, and a double checkout briefly gives
+// a customer duplicate subscriptions. The event payload is therefore not the
+// customer's current state: a late `deleted` event for a stale subscription
+// would clobber the active row (the upsert keys on user_id). Re-list the
+// customer's subscriptions and keep the live one — newest active/trialing,
+// falling back to the newest of any status.
+async function resolveCurrentSubscription(
+  stripe: Stripe,
+  eventSub: Stripe.Subscription,
+): Promise<Stripe.Subscription> {
+  const customerId = typeof eventSub.customer === "string" ? eventSub.customer : eventSub.customer.id;
+  const { data } = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
+  const byNewest = [...data].sort((a, b) => b.created - a.created);
+  const live = byNewest.find((s) => s.status === "active" || s.status === "trialing");
+  return live ?? byNewest[0] ?? eventSub;
 }
 
 // Map a Stripe subscription onto the subscriptions row and upsert it (PK is
