@@ -2,7 +2,7 @@
 // these as ready-to-commit files so an agent can drop them straight into the
 // user's repo — no LLM call needed (and no hallucinated paths).
 
-import type { SiteAudit, SiteCrawl } from "../audit/site";
+import { evidenceForCheck, type SiteAudit, type SiteCrawl } from "../audit/site";
 import type { Database } from "../supabase/database.types";
 
 type BrandRow = Database["public"]["Tables"]["brands"]["Row"];
@@ -142,21 +142,34 @@ export function buildLlmsTxt(brand: BrandFile, crawl?: SiteCrawl | null): string
 //    robots.txt that returns a 500 has no artifact, so it correctly lands here.
 //  • everything else (real content tasks) -> null, so the caller falls back to
 //    a content brief / LLM draft.
+// The crawler's raw observation for a failing check — the status code and (on
+// error) what the server actually sent. Shipping this with the diagnostic steps
+// saves the agent the root-cause hunt the crawler already did. "" when the audit
+// predates evidence retention.
+function observedSection(checkId: string, audit: SiteAudit): string {
+  const e = evidenceForCheck(audit, checkId);
+  if (!e) return "";
+  const status = e.httpStatus == null ? "no response (timeout or blocked)" : `HTTP ${e.httpStatus}`;
+  const lines = [`## Observed (by Clerow's crawler, ${audit.fetchedAt})`, "", `- GET ${e.url} → ${status}`];
+  if (e.bodySnippet) lines.push(`- Response body began: "${e.bodySnippet}"`);
+  return lines.join("\n") + "\n\n";
+}
+
 export function deterministicTaskContent(
   key: string,
   brand: BrandFile,
   audit: SiteAudit | null,
 ): string | null {
   const crawl = audit?.crawl ?? null;
-  if (key.startsWith("audit-")) {
-    const check = audit?.checks.find((c) => `audit-${c.id}` === key);
+  if (audit && key.startsWith("audit-")) {
+    const check = audit.checks.find((c) => `audit-${c.id}` === key);
     if (check?.fix?.artifact === "robots") return buildRobotsTxt(brand, crawl);
     if (check?.fix?.artifact === "llms") return buildLlmsTxt(brand, crawl);
     if (check?.fix) {
       const steps = check.fix.steps.length
         ? "\n\n## Steps\n" + check.fix.steps.map((s) => `- ${s}`).join("\n")
         : "";
-      return `## ${check.fix.title}\n\n${check.fix.detail}${steps}`;
+      return `${observedSection(check.id, audit)}## ${check.fix.title}\n\n${check.fix.detail}${steps}`;
     }
   }
   // Fallback when the audit/check isn't in hand (e.g. the non-ladder task path):

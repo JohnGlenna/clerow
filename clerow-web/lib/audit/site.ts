@@ -37,7 +37,34 @@ export type SiteCheck = {
   status: CheckStatus;
   detail: string; // what we found, plain language
   fix: SiteCheckFix | null; // present when status is fail/warn
+  // Set on an "unknown" check that couldn't run because ANOTHER check failed
+  // (e.g. the on-page checks when the homepage fetch errored) — the id of the
+  // check to fix first. Lets agents sequence fixes instead of guessing.
+  blockedBy?: string;
 };
+
+// What the crawler actually observed for one fetched URL — the raw diagnosis
+// (status code + a snippet of the error body) that task content ships so an
+// agent doesn't redo the root-cause hunt the crawler already did.
+export type FetchEvidence = {
+  url: string;
+  httpStatus: number | null; // null = network error / timeout
+  ok: boolean;
+  bodySnippet?: string; // visible text of an ERROR response (bounded), absent on success
+};
+
+// Which audit fetch a check's evidence comes from (every other check reads the
+// homepage). Single lookup shared by task content, the MCP audit output, and
+// verify-on-complete. Undefined when the stored blob predates evidence retention.
+const EVIDENCE_SOURCE: Record<string, "robots" | "llms" | "sitemap"> = {
+  "robots-ai": "robots",
+  "llms-txt": "llms",
+  sitemap: "sitemap",
+};
+export function evidenceForCheck(audit: SiteAudit, checkId: string): FetchEvidence | undefined {
+  const ev = audit.crawl?.evidence;
+  return ev ? ev[EVIDENCE_SOURCE[checkId] ?? "home"] : undefined;
+}
 
 // A single crawled page, kept so content generation can be grounded in the
 // brand's REAL pages (titles, copy, voice) instead of guessing.
@@ -55,6 +82,9 @@ export type SiteCrawl = {
   sitemapUrls: string[]; // URLs parsed from sitemap.xml <loc>, capped
   home: CrawledPage | null;
   pages: CrawledPage[]; // a few key inner pages
+  // Per-fetch HTTP evidence (status + error-body snippet) for the four audit
+  // fetches. Optional: blobs crawled before this field existed lack it.
+  evidence?: { home: FetchEvidence; robots: FetchEvidence; llms: FetchEvidence; sitemap: FetchEvidence };
 };
 
 export type SiteAudit = {
@@ -72,9 +102,9 @@ const UA =
 // The AI answer-engine crawlers we want robots.txt to allow.
 const AI_CRAWLERS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "PerplexityBot", "Google-Extended"];
 
-type Fetched = { ok: boolean; status: number; text: string };
+export type Fetched = { ok: boolean; status: number; text: string };
 
-async function fetchText(u: string): Promise<Fetched | null> {
+export async function fetchText(u: string): Promise<Fetched | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
@@ -451,19 +481,40 @@ function visibleTextLen(html: string): number {
   return visibleText(html, Number.MAX_SAFE_INTEGER).length;
 }
 
-function checkSsr(home: Fetched | null): SiteCheck {
+// Loader/splash copy that signals the real content arrives via JS only.
+const LOADER_TEXT_RE = /\b(loading|please wait|enable javascript|you need to enable|just a moment)\b/i;
+// An empty SPA mount point (<div id="root"></div>, <div id="__next"></div>, …).
+const EMPTY_MOUNT_RE = /<div[^>]+id=["'](root|__next|app)["'][^>]*>\s*<\/div>/i;
+
+export function checkSsr(home: Fetched | null): SiteCheck {
   if (!home || !home.ok) {
     return { id: "ssr", label: "Server-rendered content", status: "unknown", detail: "Couldn't fetch your homepage HTML to check this.", fix: null };
   }
   const textLen = visibleTextLen(home.text);
   const scriptCount = (home.text.match(/<script[\s>]/gi) || []).length;
-  // A JS shell: almost no readable text in the raw HTML, but plenty of scripts.
+  const hasH1 = /<h1[\s>]/i.test(home.text);
+  // Three JS-shell signals, any of which warns (with the measured numbers so an
+  // agent can judge a borderline case):
+  //  1. almost no readable text at all;
+  //  2. no <h1> and little text — a splash/loader page whose boilerplate beats
+  //     the bare-text threshold but whose actual headline is JS-rendered;
+  //  3. explicit loader copy ("loading…", "please wait") or an empty SPA mount.
+  let why: string | null = null;
   if (textLen < 300 && scriptCount >= 1) {
+    why = `very little readable text (${textLen} chars)`;
+  } else if (!hasH1 && textLen < 800 && scriptCount >= 1) {
+    why = `no <h1> and only ${textLen} chars of readable text — the headline looks JS-rendered`;
+  } else if (textLen < 600 && LOADER_TEXT_RE.test(visibleText(home.text, 600))) {
+    why = `mostly loader text ("loading…"/"please wait", ${textLen} chars) — the real content arrives via JavaScript`;
+  } else if (textLen < 800 && EMPTY_MOUNT_RE.test(home.text)) {
+    why = `an empty SPA mount point (e.g. <div id="root"></div>) and only ${textLen} chars of readable text`;
+  }
+  if (why) {
     return {
       id: "ssr",
       label: "Server-rendered content",
       status: "warn",
-      detail: `Your homepage's raw HTML has very little readable text (${textLen} chars) — it looks rendered client-side by JavaScript.`,
+      detail: `Your homepage's raw HTML shows ${why} — it looks rendered client-side by JavaScript.`,
       fix: fix(
         "Make sure AI bots can see your page content",
         "Several AI crawlers (notably GPTBot) don't run JavaScript — they see only your raw HTML. Server-side render or pre-render your key content (or return static HTML to bot user-agents) so the facts you want cited are in the initial response. Test with View Source: if the facts aren't there, the bot never sees them.",
@@ -504,6 +555,78 @@ function checkSchema(html: string): SiteCheck {
     };
   }
   return { id: "schema", label: "Structured data (schema)", status: "pass", detail: `Structured data present: ${types.slice(0, 5).join(", ")}.`, fix: null };
+}
+
+// All ld+json block bodies concatenated, for inspecting schema VALUES (not just
+// @types like jsonLdTypes does).
+function jsonLdRaw(html: string): string {
+  const out: string[] = [];
+  const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) out.push(m[1]);
+  return out.join("\n");
+}
+
+// Visible-text signals that the page actually SHOWS reviews/ratings.
+const REVIEW_EVIDENCE_RE = /(\breview(s|ed)?\b|\brating(s)?\b|[★⭐]|\b\d(\.\d)?\s*(\/|out of)\s*5\b|testimonial)/i;
+// Linked third-party review platforms that could back an aggregate rating.
+const REVIEW_PLATFORM_RE = /(g2\.com|capterra\.com|trustpilot\.com|producthunt\.com|yelp\.com|google\.com\/maps)/i;
+
+// Review/rating schema with nothing visible to back it — the fabricated-trust
+// pattern AI engines increasingly discount (and Google penalizes as rich-result
+// spam). Conservative by design: warn-only, passes whenever the page shows ANY
+// review-ish content, and goes unknown (blocked by the SSR check) on thin raw
+// HTML where a JS widget could legitimately hold the reviews.
+export function checkSchemaHonesty(html: string): SiteCheck {
+  const id = "schema-honesty";
+  const label = "Review schema honesty";
+  const raw = jsonLdRaw(html);
+  const types = (raw.match(/"@type"\s*:\s*"(AggregateRating|Review)"/g) || []).length;
+  if (!types) {
+    return { id, label, status: "pass", detail: "No review/rating schema to verify.", fix: null };
+  }
+  if (visibleTextLen(html) < 800) {
+    return {
+      id,
+      label,
+      status: "unknown",
+      detail: "Your page declares review/rating schema, but the raw HTML is too thin to check whether reviews are actually shown (the content looks JS-rendered). Fix server-rendered content first, then re-check.",
+      fix: null,
+      blockedBy: "ssr",
+    };
+  }
+  if (REVIEW_EVIDENCE_RE.test(visibleText(html, Number.MAX_SAFE_INTEGER))) {
+    return { id, label, status: "pass", detail: "Your review/rating schema is backed by visible review content on the page.", fix: null };
+  }
+
+  const ratingValue = Number(raw.match(/"ratingValue"\s*:\s*"?([\d.]+)"?/)?.[1] ?? NaN);
+  const reviewCount = Number(raw.match(/"(?:reviewCount|ratingCount)"\s*:\s*"?(\d+)"?/)?.[1] ?? NaN);
+  const suspicious = ratingValue >= 4.8 && reviewCount >= 25 && !REVIEW_PLATFORM_RE.test(html);
+  const found = Number.isFinite(ratingValue)
+    ? ` (ratingValue ${ratingValue}${Number.isFinite(reviewCount) ? ` from ${reviewCount} reviews` : ""})`
+    : "";
+  return {
+    id,
+    label,
+    status: "warn",
+    detail:
+      `Your page declares AggregateRating/Review schema${found}, but its visible text shows no reviews, ratings, or testimonials to back it.` +
+      (suspicious
+        ? " A near-perfect rating from that many reviews with no linked review platform is exactly the pattern AI engines discount as fabricated."
+        : ""),
+    fix: fix(
+      "Back up your review schema — or remove it",
+      "Review markup with no corresponding visible content reads as a fabricated trust signal: Google treats it as rich-result spam, and AI engines increasingly discount sites whose structured data contradicts the page. Either surface the real reviews on the page or delete the markup.",
+      20,
+      "medium",
+      [
+        "If the reviews are real, show them: quote 2–3 on the page (name + source) next to the rating.",
+        "Link the platform the aggregate comes from (G2, Capterra, Trustpilot, Google) so the number is verifiable.",
+        "If you can't back the numbers, remove the AggregateRating/Review JSON-LD entirely — no schema beats fake schema.",
+        "Re-scan to confirm.",
+      ],
+    ),
+  };
 }
 
 // --- deeper crawl (retained for grounding content generation) ---------------
@@ -571,12 +694,23 @@ function looksLikeRobots(t: string): boolean {
   return /^\s*(user-agent|allow|disallow|sitemap|#)/im.test(t) && !/<html|<!doctype/i.test(t);
 }
 
-function toCrawledPage(url: string, f: Fetched | null): CrawledPage | null {
+export function toCrawledPage(url: string, f: Fetched | null): CrawledPage | null {
   if (!f || !f.ok || !f.text.trim()) return null;
   return { url, title: pageTitle(f.text), description: metaDescription(f.text), text: visibleText(f.text) };
 }
 
 // --- the audit -------------------------------------------------------------
+
+// The raw observation for one audit fetch — status + (on error only) a bounded
+// snippet of what the server actually sent, so old blobs stay small.
+function toEvidence(url: string, f: Fetched | null): FetchEvidence {
+  return {
+    url,
+    httpStatus: f ? f.status : null,
+    ok: !!f?.ok,
+    ...(f && !f.ok && f.text.trim() ? { bodySnippet: visibleText(f.text, 300) } : {}),
+  };
+}
 
 export async function auditSite(rawUrl: string): Promise<SiteAudit> {
   const fetchedAt = new Date().toISOString();
@@ -602,17 +736,28 @@ export async function auditSite(rawUrl: string): Promise<SiteAudit> {
 
   const html = home?.ok ? home.text : "";
   if (html) {
-    checks.push(checkTitle(html), checkH1(html), checkMetaDescription(html), checkSchema(html), checkSsr(home));
+    checks.push(checkTitle(html), checkH1(html), checkMetaDescription(html), checkSchema(html), checkSchemaHonesty(html), checkSsr(home));
   } else {
-    // Couldn't read the HTML — mark on-page checks unknown rather than failing.
+    // Couldn't read the HTML — mark on-page checks unknown rather than failing,
+    // and say exactly WHY (the observed homepage status) + what unblocks them,
+    // so an agent fixes crawlability first instead of treating these as dead ends.
+    const cause = home ? `your homepage returned HTTP ${home.status}` : "your homepage fetch timed out or was blocked";
     for (const [id, label] of [
       ["title", "Page title"],
       ["h1", "H1 heading"],
       ["meta-description", "Meta description"],
       ["schema", "Structured data (schema)"],
+      ["schema-honesty", "Review schema honesty"],
       ["ssr", "Server-rendered content"],
     ] as const) {
-      checks.push({ id, label, status: "unknown", detail: "Couldn't fetch your homepage HTML to check this.", fix: null });
+      checks.push({
+        id,
+        label,
+        status: "unknown",
+        detail: `Couldn't verify — ${cause}, so there was no HTML to check. Fix crawlability first (see the "Homepage reachable by crawlers" task), then re-check.`,
+        fix: null,
+        blockedBy: "crawlable",
+      });
     }
   }
 
@@ -632,6 +777,12 @@ export async function auditSite(rawUrl: string): Promise<SiteAudit> {
     sitemapUrls,
     home: toCrawledPage(norm.href, home),
     pages,
+    evidence: {
+      home: toEvidence(norm.href, home),
+      robots: toEvidence(`${norm.origin}/robots.txt`, robots),
+      llms: toEvidence(`${norm.origin}/llms.txt`, llms),
+      sitemap: toEvidence(`${norm.origin}/sitemap.xml`, sitemap),
+    },
   };
 
   return { url: norm.href, fetchedAt, ok: !!home?.ok, checks, crawl };

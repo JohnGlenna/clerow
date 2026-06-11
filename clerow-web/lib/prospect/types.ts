@@ -39,6 +39,24 @@ export type AnswerRecord = {
 
 export type EmailCopy = { subject: string; body: string };
 
+/** LLM-generated, grounded in the prospect's real homepage — proof we looked. */
+export type SiteTip = {
+  /** One short sentence about what the business concretely offers. */
+  observation: string;
+  /** One specific, actionable GEO improvement for this site. */
+  tip: string;
+};
+
+/** What we actually read from the prospect's homepage (null tip = generation failed). */
+export type SitePeek = {
+  url: string;
+  title: string | null;
+  description: string | null;
+  /** Visible homepage text, truncated. */
+  text: string;
+  tip: SiteTip | null;
+};
+
 export type ProspectScanResult = {
   brand: string;
   website: string;
@@ -51,6 +69,8 @@ export type ProspectScanResult = {
   topCompetitor: string | null;
   answers: AnswerRecord[];
   email: EmailCopy;
+  /** Homepage peek + generated tip; null when the site couldn't be read. */
+  sitePeek: SitePeek | null;
 };
 
 /** One row of the brreg lead-script CSV (navn,orgnr,website,email,phone,sted,niche,registrert). */

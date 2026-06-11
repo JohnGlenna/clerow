@@ -1,7 +1,7 @@
 // Client-side helpers for the Prospect Scanner UI: typed fetch wrappers around
 // the /api/admin endpoints.
 
-import type { AnswerRecord, CompetitorCount, Lang } from "@/lib/prospect/types";
+import type { AnswerRecord, CompetitorCount, Lang, SitePeek } from "@/lib/prospect/types";
 import type { DiscoverResponse, LeadStatus } from "@/lib/leads/types";
 
 export type Scan = {
@@ -16,6 +16,8 @@ export type Scan = {
   topCompetitor: string | null;
   answers: AnswerRecord[];
   email: { subject: string; body: string };
+  /** What the crawler read from their homepage; null for old scans / unreadable sites. */
+  sitePeek: SitePeek | null;
   cached: boolean;
   createdAt: string;
 };

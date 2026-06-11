@@ -7,6 +7,10 @@ import { MascotClerow } from "@/components/Mascot";
 import { LDIcon } from "@/components/dashboard/shell/LDIcon";
 
 const NAV: { href: string; icon: string; label: string }[] = [
+  { href: "/admin/metrics", icon: "board", label: "Metrics" },
+  { href: "/admin/activity", icon: "quest", label: "Activity" },
+  { href: "/admin/mcp", icon: "connect", label: "MCP Usage" },
+  { href: "/admin/investors", icon: "profile", label: "Investors" },
   { href: "/admin/prospect-scan", icon: "scan", label: "Prospect Scanner" },
 ];
 

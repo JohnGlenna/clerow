@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
 import { isAdminEmail } from "@/lib/adminGate";
 import { normalizeWebsite } from "@/lib/prospect/aggregate";
 import { runProspectScan } from "@/lib/prospect/scan";
-import type { AnswerRecord, CompetitorCount, Lang, ProspectScanResult } from "@/lib/prospect/types";
+import type { AnswerRecord, CompetitorCount, Lang, ProspectScanResult, SitePeek } from "@/lib/prospect/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,6 +30,7 @@ type ScanRow = {
   competitors: unknown;
   answers: unknown;
   email_copy: string | null;
+  site_peek: unknown;
   created_at: string;
 };
 
@@ -68,6 +69,8 @@ function rowToScan(row: ScanRow, cached: boolean) {
     topCompetitor: competitors[0]?.name ?? null,
     answers: (Array.isArray(row.answers) ? row.answers : []) as AnswerRecord[],
     email: unpackEmail(row.email_copy),
+    // Null for rows scanned before 0019 or when the site couldn't be read.
+    sitePeek: (row.site_peek ?? null) as SitePeek | null,
     cached,
     createdAt: row.created_at,
   };
@@ -161,6 +164,7 @@ export async function POST(req: Request) {
       competitors: result.competitors,
       answers: result.answers,
       email_copy: packEmail(result.email.subject, result.email.body),
+      site_peek: result.sitePeek,
     })
     .select("*")
     .single();

@@ -44,6 +44,13 @@ export function ScanResult({
 
   const mailto = `mailto:${prospectEmail || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
+  // mailto can't attach files, so "open with text AND image" = put the PNG on
+  // the clipboard first, then open the draft — one Cmd+V away from complete.
+  const openMailWithImage = async () => {
+    await copyImage();
+    window.location.href = mailto;
+  };
+
   return (
     <div className="ps-result">
       <div className="ps-headline">
@@ -106,6 +113,32 @@ export function ScanResult({
         </div>
       )}
 
+      <div className="ps-sitepeek">
+        <h3>Website signal</h3>
+        {scan.sitePeek ? (
+          <>
+            <p className="ps-peek-meta">
+              <b>{scan.sitePeek.title || "(no title)"}</b>
+              {scan.sitePeek.description && <> — {scan.sitePeek.description}</>}
+            </p>
+            {scan.sitePeek.tip ? (
+              <p className="ps-peek-tip">
+                {scan.sitePeek.tip.observation} <b>{scan.sitePeek.tip.tip}</b>
+              </p>
+            ) : (
+              <p className="ps-peek-warn">
+                Homepage was read, but no tip was generated — email has no site reference.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="ps-peek-warn">
+            Couldn&apos;t read their website — the email has no site reference. Check the domain or
+            force a rescan.
+          </p>
+        )}
+      </div>
+
       <div className="ps-email">
         <h3>Cold email ({scan.language === "no" ? "norsk" : "English"})</h3>
         <input
@@ -131,9 +164,17 @@ export function ScanResult({
           <button className="ps-btn ps-btn-ghost" onClick={() => void copyImage()}>
             {copied === "image" ? "Copied!" : copied === "image-dl" ? "Downloaded" : "Copy image"}
           </button>
-          <a className="ps-btn ps-btn-ghost" href={mailto} title="Opens with the text — paste the copied image into the mail (Cmd+V)">
-            Open in mail
-          </a>
+          <button
+            className="ps-btn ps-btn-ghost"
+            onClick={() => void openMailWithImage()}
+            title="Copies the scan image, then opens the draft with the text — Cmd+V to paste the image in"
+          >
+            {copied === "image"
+              ? "Image on clipboard — Cmd+V"
+              : copied === "image-dl"
+                ? "Image downloaded — attach it"
+                : "Open in mail (+ image)"}
+          </button>
           {prospectEmail && (
             <button
               className="ps-prospect-email"

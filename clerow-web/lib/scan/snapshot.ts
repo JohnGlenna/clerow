@@ -9,6 +9,7 @@ import type { DashboardCompetitor, ScanSynthesis } from "../types";
 import { ENGINES, ENGINE_META, PAID_ENGINES, type EngineId } from "../engines";
 import { overallScore } from "../score";
 import { domainsFrom, hostOf } from "./domains";
+import { norm } from "./detect";
 
 type DB = SupabaseClient<Database>;
 
@@ -40,6 +41,20 @@ export type BrandSnapshot = {
   // The multi-model "what all the AIs collectively think" verdict for the latest
   // scan. Only exists for multi-engine (paid) scans — null for free/single-engine.
   synthesis: ScanSynthesis | null;
+  // Each engine's PREVIOUS result for the primary prompt (second-latest row),
+  // so callers can narrate what changed since the last scan (lib/scan/delta.ts)
+  // and diff the market signal (lib/scan/diff.ts). Computed from rows the main
+  // query already fetched — costs nothing extra. Null until an engine has been
+  // scanned at least twice.
+  previous: {
+    engines: Partial<Record<EngineId, { visibility: number; position: number | null }>>;
+    score: { overall: number; visibility: number; position: number | null };
+    citedDomainEngines: Record<string, number>;
+    // prev scan_result id → engine, for lazily aggregating the previous
+    // competitor standings (result_brands) without re-deriving engines.
+    engineByResult: Record<string, EngineId>;
+    scannedAt: string | null;
+  } | null;
 };
 
 const SENTIMENT_RANK: BrandSentiment[] = ["neg", "warn", "neut", "pos"];
@@ -68,6 +83,7 @@ function emptySnapshot(): BrandSnapshot {
     primaryPromptId: null,
     primaryPromptText: null,
     synthesis: null,
+    previous: null,
   };
 }
 
@@ -100,8 +116,11 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
     .order("created_at", { ascending: false });
 
   const latestByEngine = new Map<string, NonNullable<typeof results>[number]>();
+  // Each engine's second-latest row — the "previous scan" for delta narration.
+  const prevByEngine = new Map<string, NonNullable<typeof results>[number]>();
   for (const r of results ?? []) {
     if (!latestByEngine.has(r.engine)) latestByEngine.set(r.engine, r);
+    else if (!prevByEngine.has(r.engine)) prevByEngine.set(r.engine, r);
   }
 
   const snap = emptySnapshot();
@@ -173,19 +192,93 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
   const sentiment = sentG.length ? Math.round(avg(sentG)) : null;
   snap.score = { overall: overallScore(visibility, sentiment, position), visibility, position, sentiment };
 
-  // Aggregate competitors across engines: visibility blended over every scanned
-  // model (absent = 0, so a single-model fluke can't outrank consensus brands),
-  // best (min) position, sentiment by strongest seen, and how many distinct
-  // engines actually named the brand. Rank strictly follows blended visibility,
-  // so the leaderboard can never look out of order against the displayed %.
   const engineByResult = new Map<string, string>();
   for (const [id, r] of latestByEngine) engineByResult.set(r.id, id);
-  type Agg = { name: string; domain: string | null; isYou: boolean; vis: number[]; positions: number[]; sentiment: BrandSentiment; engines: Set<string> };
-  const byName = new Map<string, Agg>();
-  for (const row of rb ?? []) {
-    const key = row.name.trim().toLowerCase();
-    const agg = byName.get(key) ?? {
-      name: row.name,
+  snap.competitors = aggregateCompetitors(rb ?? [], engineByResult, latestByEngine.size);
+
+  // The previous standings, from rows already in hand (each engine's second-
+  // latest result). Same aggregation rules as the current block so deltas
+  // compare like with like.
+  if (prevByEngine.size > 0) {
+    const pVis: number[] = [];
+    const pPos: number[] = [];
+    const pSent: number[] = [];
+    const pEngines: NonNullable<BrandSnapshot["previous"]>["engines"] = {};
+    const pEngineByResult: Record<string, EngineId> = {};
+    const pCited = new Map<string, Set<string>>();
+    let pScannedAt: string | null = null;
+    for (const [id, r] of prevByEngine) {
+      const visibility = Math.round(Number(r.your_visibility));
+      const position = r.your_position != null ? Number(r.your_position) : null;
+      const sentiment = r.your_sentiment != null ? Math.round(Number(r.your_sentiment)) : null;
+      pEngines[id as EngineId] = { visibility, position };
+      pEngineByResult[r.id] = id as EngineId;
+      pVis.push(visibility);
+      if (position != null) pPos.push(position);
+      if (sentiment != null) pSent.push(sentiment);
+      if (r.created_at && (!pScannedAt || r.created_at > pScannedAt)) pScannedAt = r.created_at;
+      for (const d of domainsFrom(r.citations as Citation[], ownHost)) {
+        let engines = pCited.get(d);
+        if (!engines) { engines = new Set<string>(); pCited.set(d, engines); }
+        engines.add(id);
+      }
+    }
+    const pV = Math.round(avg(pVis));
+    const pP = pPos.length ? Math.round(avg(pPos)) : null;
+    const pS = pSent.length ? Math.round(avg(pSent)) : null;
+    snap.previous = {
+      engines: pEngines,
+      score: { overall: overallScore(pV, pS, pP), visibility: pV, position: pP },
+      citedDomainEngines: Object.fromEntries([...pCited].map(([d, set]) => [d, set.size])),
+      engineByResult: pEngineByResult,
+      scannedAt: pScannedAt,
+    };
+  }
+
+  return snap;
+}
+
+// The fields the competitor aggregation reads off a result_brands row.
+export type CompetitorRow = {
+  scan_result_id: string;
+  name: string;
+  domain: string | null;
+  is_you: boolean;
+  visibility: number;
+  position: number | null;
+  sentiment: BrandSentiment;
+};
+
+// Aggregate ranked brands across engines: visibility blended over every scanned
+// model (absent = 0, so a single-model fluke can't outrank consensus brands),
+// best (min) position, sentiment by strongest seen, and how many distinct
+// engines actually named the brand. Rank strictly follows blended visibility,
+// so the leaderboard can never look out of order against the displayed %.
+//
+// Grouping: by resolved DOMAIN when an engine resolved one (the only signal that
+// reliably merges "Suno" with "Suno AI"), with name-normalized (norm) fallback —
+// and domain-less rows fold into a domain group whose name norm-matches. The
+// display name is the shortest variant seen ("Suno" beats "Suno AI").
+// Exported pure for tests.
+export function aggregateCompetitors(
+  rows: CompetitorRow[],
+  engineByResult: Map<string, string>,
+  scannedCount: number,
+): DashboardCompetitor[] {
+  type Agg = { names: string[]; domain: string | null; isYou: boolean; vis: number[]; positions: number[]; sentiment: BrandSentiment; engines: Set<string> };
+  const groups = new Map<string, Agg>();
+  // norm(name) → group key, so a domain-less "Suno" row joins suno.com's group.
+  const keyByName = new Map<string, string>();
+  const normDomain = (d: string | null) => (d ? d.trim().toLowerCase().replace(/^www\./, "") : null);
+
+  // Domain-bearing rows first, so their groups exist before name-only rows fold in.
+  const ordered = [...rows].sort((a, b) => Number(!a.domain) - Number(!b.domain));
+  for (const row of ordered) {
+    const dom = normDomain(row.domain);
+    const nameKey = norm(row.name);
+    const key = dom ? `d:${dom}` : (keyByName.get(nameKey) ?? `n:${nameKey}`);
+    const agg = groups.get(key) ?? {
+      names: [],
       domain: null,
       isYou: false,
       vis: [],
@@ -193,6 +286,8 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
       sentiment: "neut" as BrandSentiment,
       engines: new Set<string>(),
     };
+    if (!keyByName.has(nameKey)) keyByName.set(nameKey, key);
+    agg.names.push(row.name.trim());
     // First engine that resolved a real domain wins; others can't see it.
     agg.domain = agg.domain ?? row.domain;
     agg.isYou = agg.isYou || row.is_you;
@@ -206,19 +301,18 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
     const eng = engineByResult.get(row.scan_result_id);
     const mentioned = Number(row.visibility) > 0 || row.position != null;
     if (eng && mentioned) agg.engines.add(eng);
-    byName.set(key, agg);
+    groups.set(key, agg);
   }
 
-  const scannedCount = latestByEngine.size;
-  snap.competitors = [...byName.values()]
+  return [...groups.values()]
     .map((a) => ({
-      name: a.name,
+      name: a.names.reduce((best, n) => (n && n.length < best.length ? n : best), a.names[0] ?? ""),
       domain: a.domain,
       isYou: a.isYou,
       // Blend across ALL scanned models (absent = 0) — same denominator as the
       // user's own headline score, so rows are comparable. Single-model scans
       // divide by 1, so the free scan numbers are unchanged.
-      visibility: Math.round(a.vis.reduce((s, v) => s + v, 0) / scannedCount),
+      visibility: Math.round(a.vis.reduce((s, v) => s + v, 0) / Math.max(1, scannedCount)),
       position: a.positions.length ? Math.round(Math.min(...a.positions)) : null,
       sentiment: a.sentiment,
       enginesCount: a.engines.size,
@@ -228,8 +322,6 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
     // actually named the brand) as tie-break, then best position.
     .sort((x, y) => y.visibility - x.visibility || y.enginesCount - x.enginesCount || (x.position ?? 99) - (y.position ?? 99))
     .map((c, i) => ({ ...c, rank: i + 1 }));
-
-  return snap;
 }
 
 // Persist today's aggregated snapshot (idempotent per brand-local day; last write

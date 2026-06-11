@@ -6,7 +6,10 @@ import { registerTools } from "@/lib/mcp/tools";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// 300s (not 60): run_full_scan responds immediately but its background work —
+// registered via after() — still runs within this function's lifetime, and the
+// full multi-model scan takes ~1–2 minutes.
+export const maxDuration = 300;
 
 // The Clerow MCP server. File lives at app/api/[transport]/route.ts with
 // basePath "/api", so the streamable-HTTP endpoint resolves to /api/mcp.
@@ -25,7 +28,7 @@ const verifyToken = async (_req: Request, bearer?: string): Promise<AuthInfo | u
     token: bearer ?? "",
     clientId: resolved.userId,
     scopes: [],
-    extra: { userId: resolved.userId, brandId: resolved.brandId },
+    extra: { userId: resolved.userId, brandId: resolved.brandId, keyId: resolved.keyId },
   };
 };
 

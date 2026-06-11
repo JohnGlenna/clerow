@@ -54,6 +54,11 @@ export type LadderTask = {
   // Resolved = done OR skipped(archived) — counts toward level completion so a
   // skipped task still advances the path (it just earns no XP).
   resolved: boolean;
+  // The exact page/file this task is about (the user's /robots.txt, their best
+  // content page, the suggested slug for a page to create, the third-party
+  // domain to get cited on). Null when there's no single target (e.g. l3-reddit).
+  targetUrl: string | null;
+  targetIsNew: boolean; // targetUrl is a SUGGESTED new page, not an existing one
 };
 
 // "open" = a subscriber unlocked this level ahead of finishing the active one:
@@ -81,6 +86,7 @@ export type Ladder = {
 
 export type LadderContext = {
   company: string;
+  url: string; // the brand's site URL (origin source for target-page resolution)
   audit: SiteAudit | null;
   primaryPrompt: { text: string; intent: PromptIntent } | null;
   competitorsAhead: string[];
@@ -128,7 +134,7 @@ const spec = (key: string, title: string, detail: string, minutes: number, impac
 
 // Which audit checks belong to which level (by SiteCheck.id).
 const L1_AUDIT = new Set(["crawlable", "https", "robots-ai", "llms-txt", "title", "h1", "meta-description", "ssr"]);
-const L2_AUDIT = new Set(["schema", "sitemap"]);
+const L2_AUDIT = new Set(["schema", "schema-honesty", "sitemap"]);
 
 // Turn the audit's failing/warning checks (those carry a `fix`) into specs.
 function auditSpecs(audit: SiteAudit | null, ids: Set<string>): Spec[] {
@@ -141,7 +147,7 @@ function auditSpecs(audit: SiteAudit | null, ids: Set<string>): Spec[] {
 // Level-2 content criteria graded by the AI page-grader (lib/scan/pageGrade.ts),
 // keyed by the SAME spec keys as the generic fallbacks below so a full scan turns
 // them into page-specific tasks in place. Only failing criteria become tasks.
-const L2_CONTENT_IDS = ["l2-answer-first", "l2-h2-queries", "l2-comparison-table", "l2-eeat", "l2-freshness"];
+const L2_CONTENT_IDS = ["l2-answer-first", "l2-h2-queries", "l2-comparison-table", "l2-eeat", "l2-freshness", "l2-claim-consistency"];
 function gradedContentSpecs(audit: SiteAudit | null): Spec[] {
   if (!audit) return [];
   return audit.checks
@@ -357,7 +363,110 @@ function toTask(s: Spec, existing: Map<string, { id: string; done: boolean; reso
     id: e?.id ?? null,
     done: e?.done ?? false,
     resolved: e?.resolved ?? e?.done ?? false,
+    targetUrl: null, // attached in buildLadder (needs the context)
+    targetIsNew: false,
   };
+}
+
+// --- target-page resolution ---------------------------------------------------
+// Name the exact URL a task is about, so neither the user nor a calling agent
+// has to guess which page "your key page" means. Pure derivation from the key +
+// context; null when there's no single target.
+
+function originOf(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).origin;
+  } catch {
+    return null;
+  }
+}
+
+const COMPARE_PAGE_RE = /\/(vs|compare|alternativ)/i;
+
+// The crawled page most likely to be "the key page" for the primary prompt:
+// best keyword overlap with the prompt, else the first crawled key page (the
+// crawl already orders pricing/features/compare/faq first), else the homepage.
+function bestContentPage(ctx: LadderContext): string | null {
+  const crawl = ctx.audit?.crawl;
+  const home = crawl?.home?.url ?? ctx.audit?.url ?? null;
+  const pages = crawl?.pages ?? [];
+  const words = (ctx.primaryPrompt?.text ?? "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 3);
+  let best: string | null = null;
+  let bestScore = 0;
+  for (const p of pages) {
+    const hay = `${p.url} ${p.title ?? ""}`.toLowerCase();
+    const score = words.filter((w) => hay.includes(w)).length;
+    if (score > bestScore) {
+      best = p.url;
+      bestScore = score;
+    }
+  }
+  return best ?? pages[0]?.url ?? home;
+}
+
+// An existing comparison-style page, if the crawl/sitemap shows one.
+function existingComparePage(ctx: LadderContext): string | null {
+  const crawl = ctx.audit?.crawl;
+  return (
+    crawl?.pages.find((p) => COMPARE_PAGE_RE.test(p.url))?.url ??
+    crawl?.sitemapUrls.find((u) => COMPARE_PAGE_RE.test(u)) ??
+    null
+  );
+}
+
+function resolveTargetUrl(key: string, ctx: LadderContext): { url: string; create?: boolean } | null {
+  const origin = originOf(ctx.audit?.url ?? ctx.url);
+  const home = ctx.audit?.crawl?.home?.url ?? (origin ? `${origin}/` : null);
+
+  // Level-1/2 audit fixes: the exact file, else the homepage the check read.
+  if (key === "audit-robots-ai") return origin ? { url: `${origin}/robots.txt` } : null;
+  if (key === "audit-llms-txt") return origin ? { url: `${origin}/llms.txt` } : null;
+  if (key === "audit-sitemap") return origin ? { url: `${origin}/sitemap.xml` } : null;
+  if (key.startsWith("audit-") || key === "l2-freshness") return home ? { url: home } : null;
+
+  // Level-2 content work targets the brand's best page for the primary prompt.
+  if (key === "l2-comparison-table") {
+    const existing = existingComparePage(ctx);
+    if (existing) return { url: existing };
+    const comp = ctx.competitorsAhead[0];
+    return origin && comp ? { url: `${origin}/compare/${slug(ctx.company)}-vs-${slug(comp)}`, create: true } : null;
+  }
+  if (key.startsWith("l2-")) {
+    const best = bestContentPage(ctx);
+    return best ? { url: best } : null;
+  }
+
+  // Level-3 offsite: the third-party domain itself (matched back from the key's
+  // slug — the spec keys are `l3-source-${slug(domain)}`).
+  if (key.startsWith("l3-source-")) {
+    const suffix = key.slice("l3-source-".length);
+    const domain = ctx.sourceGaps.find((d) => slug(d) === suffix);
+    return domain ? { url: `https://${domain}` } : null;
+  }
+
+  // Level-4 cornerstones: an existing vs-page if there is one, else a suggested
+  // slug for the page to create.
+  if (key.startsWith("l4-compare-")) {
+    const existing = existingComparePage(ctx);
+    if (existing) return { url: existing };
+    const suffix = key.slice("l4-compare-".length);
+    const comp = ctx.competitorsAhead.find((c) => slug(c) === suffix);
+    return origin && comp ? { url: `${origin}/compare/${slug(ctx.company)}-vs-${slug(comp)}`, create: true } : null;
+  }
+  if (key.startsWith("l4-prompt-")) {
+    const suffix = key.slice("l4-prompt-".length);
+    const prompt = ctx.promptGaps.find((p) => slug(p) === suffix);
+    return origin && prompt ? { url: `${origin}/blog/${slug(prompt)}`, create: true } : null;
+  }
+  if (key === "l4-howto") {
+    return origin && ctx.primaryPrompt ? { url: `${origin}/blog/${slug(ctx.primaryPrompt.text)}`, create: true } : null;
+  }
+
+  return null; // no single target (l3-reddit, l3-directory, l3-entity, l5-rescan)
 }
 
 // A one-line "what we found" for a level, from the brand's real data. Reflects the
@@ -410,6 +519,14 @@ export function buildLadder(
     const tasks = meta.build(ctx).map((s, ti) => {
       const t = toTask(s, existing);
       t.locked = !subscribed && !isTaskFree(level, ti);
+      // Name the exact page/file the task is about, in the structured field and
+      // the human detail, so no surface has to guess "your key page".
+      const target = resolveTargetUrl(s.key, ctx);
+      if (target) {
+        t.targetUrl = target.url;
+        t.targetIsNew = target.create ?? false;
+        t.detail = `${t.detail} Target: ${target.url}${target.create ? " (create this page)" : ""}`;
+      }
       return t;
     });
     const total = tasks.length;

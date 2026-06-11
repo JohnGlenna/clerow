@@ -29,6 +29,7 @@ export type Database = {
           id: string
           language: string
           mentioned_count: number
+          site_peek: Json | null
           total_prompts: number
           website: string
           website_key: string
@@ -43,6 +44,7 @@ export type Database = {
           id?: string
           language?: string
           mentioned_count?: number
+          site_peek?: Json | null
           total_prompts?: number
           website: string
           website_key: string
@@ -57,6 +59,7 @@ export type Database = {
           id?: string
           language?: string
           mentioned_count?: number
+          site_peek?: Json | null
           total_prompts?: number
           website?: string
           website_key?: string
@@ -178,6 +181,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mcp_events: {
+        Row: {
+          brand_id: string | null
+          created_at: string
+          duration_ms: number | null
+          id: number
+          key_id: string | null
+          ok: boolean
+          tool: string
+          user_id: string
+        }
+        Insert: {
+          brand_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: never
+          key_id?: string | null
+          ok?: boolean
+          tool: string
+          user_id: string
+        }
+        Update: {
+          brand_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          id?: never
+          key_id?: string | null
+          ok?: boolean
+          tool?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_events_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_events_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      metrics_share_links: {
+        Row: {
+          created_at: string
+          id: string
+          revoked_at: string | null
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          revoked_at?: string | null
+          token: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          revoked_at?: string | null
+          token?: string
+        }
+        Relationships: []
       }
       oauth_refresh_tokens: {
         Row: {
@@ -399,6 +471,7 @@ export type Database = {
           id: string
           industry: string
           location: string
+          scan_claimed_at: string | null
           site_audit: Json | null
           site_audited_at: string | null
           size: string
@@ -422,6 +495,7 @@ export type Database = {
           id?: string
           industry?: string
           location?: string
+          scan_claimed_at?: string | null
           site_audit?: Json | null
           site_audited_at?: string | null
           size?: string
@@ -445,6 +519,7 @@ export type Database = {
           id?: string
           industry?: string
           location?: string
+          scan_claimed_at?: string | null
           site_audit?: Json | null
           site_audited_at?: string | null
           size?: string
@@ -679,6 +754,7 @@ export type Database = {
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean
+          canceled_at: string | null
           created_at: string
           current_period_end: string | null
           plan: string | null
@@ -691,6 +767,7 @@ export type Database = {
         }
         Insert: {
           cancel_at_period_end?: boolean
+          canceled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           plan?: string | null
@@ -703,6 +780,7 @@ export type Database = {
         }
         Update: {
           cancel_at_period_end?: boolean
+          canceled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           plan?: string | null

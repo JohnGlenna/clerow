@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { prewarmActiveLevel } from "@/lib/content/prewarm";
 import { ENGINES, type EngineId } from "@/lib/engines";
 import { loadBrandSnapshot, captureDailySnapshot, loadSnapshotHistory } from "@/lib/scan/snapshot";
+import { buildDeltaNarrative } from "@/lib/scan/delta";
 import { evaluateStreak, EMPTY_STREAK, dayKey, type StreakState } from "@/lib/streak";
 import { levelFromXp } from "@/lib/xp";
 import { ensureSiteAudit } from "@/lib/audit/ensure";
@@ -261,10 +262,13 @@ export async function GET(req: Request) {
   }
 
   // Score movement vs the previous daily snapshot, for the Overview score card.
+  // headline narrates the scan-over-scan story ("Gemini started citing you…") —
+  // computed from the snapshot already in hand, zero extra queries.
   const history = await loadSnapshotHistory(supabase, brand.id, 7);
   const trend = {
     delta: history.length >= 2 ? history[history.length - 1].overall - history[history.length - 2].overall : null,
     sparkline: history.map((h) => h.overall),
+    headline: buildDeltaNarrative(snapshot).headline,
   };
 
   // Active lists exclude archived quests; "Today's quests" first, then the rest.

@@ -27,6 +27,7 @@ export function buildLadderContext(
   const primaryPromptRow = prompts.find((p) => p.id === snapshot.primaryPromptId);
   return {
     company: brand.company,
+    url: brand.url,
     audit,
     primaryPrompt:
       snapshot.primaryPromptText && primaryPromptRow

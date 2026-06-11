@@ -54,7 +54,10 @@ function coerceSentiment(v: unknown): BrandSentiment {
     : "neut";
 }
 
-function norm(s: string): string {
+// Loose brand-name key ("Suno", "suno!" → "suno"). Shared with the snapshot's
+// competitor aggregation so the same brand spelled differently dedupes the
+// same way in detection and on the leaderboard.
+export function norm(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 

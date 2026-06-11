@@ -101,6 +101,10 @@ async function upsertSubscription(sub: Stripe.Subscription, userId: string) {
       price_id: priceId,
       current_period_end: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
       cancel_at_period_end: sub.cancel_at_period_end,
+      // Stripe's authoritative cancellation moment — the churn timeline for the
+      // admin metrics. Self-clears when a churner resubscribes (the live sub has
+      // canceled_at = null and the upsert overwrites the row).
+      canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },

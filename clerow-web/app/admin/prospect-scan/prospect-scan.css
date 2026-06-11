@@ -281,6 +281,37 @@
   text-align: right;
 }
 
+/* Website signal — what the crawler read on the prospect's homepage, so the
+   observation/tip in the email can be sanity-checked before sending. */
+.ps-sitepeek {
+  margin-top: 18px;
+}
+.ps-sitepeek h3 {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ps-peek-meta {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+.ps-peek-tip {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  border-left: 3px solid var(--blue);
+  padding-left: 10px;
+}
+.ps-peek-warn {
+  margin: 0;
+  font-size: 13px;
+  color: var(--xp);
+}
+
 /* Email box */
 .ps-email {
   margin-top: 18px;

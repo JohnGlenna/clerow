@@ -7,7 +7,7 @@
 // Mirrors the Anthropic Messages call in lib/scan/enrichFromUpload.ts.
 
 import type { BrandProfile } from "../types";
-import type { SiteCheck, SiteCheckFix } from "../audit/site";
+import type { SiteCheck, SiteCheckFix, CrawledPage } from "../audit/site";
 import { impactXp, type GeoStep } from "../geoSteps";
 import { parseJsonLoose } from "../perplexity/client";
 
@@ -17,12 +17,13 @@ const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 export type GradeImage = { mediaType: string; data: string };
 
 // id → human label. ids match the ladder's L2 content spec keys (lib/ladder.ts).
-const CRITERIA: Record<string, string> = {
+export const CRITERIA: Record<string, string> = {
   "l2-answer-first": "Answer-first opening",
   "l2-h2-queries": "Buyer-question headings",
   "l2-comparison-table": "Comparison table",
   "l2-eeat": "E-E-A-T signals",
   "l2-freshness": "Freshness signal",
+  "l2-claim-consistency": "Claim consistency across pages",
 };
 const IMPACTS = new Set<GeoStep["impact"]>(["low", "medium", "high", "very high"]);
 
@@ -34,6 +35,7 @@ const SYSTEM =
   "- l2-comparison-table: is there an honest comparison/feature table vs alternatives?\n" +
   "- l2-eeat: author credentials, first-hand proof (\"we tested…\"), named stats/sources, disclosures?\n" +
   "- l2-freshness: a visible \"last updated\" date or clearly recent content?\n" +
+  "- l2-claim-consistency: do the homepage and the inner pages contradict each other (pricing mismatches, \"free forever\" vs paid plans, conflicting feature/availability claims), state unverifiable superlatives as fact, or show fabricated-looking testimonials/ratings? ONLY fail on a contradiction you can quote from two specific pages, or a concrete fabricated-trust signal — the inner-page excerpts are TRUNCATED, so the absence of a claim is NOT a contradiction; when unsure, pass. A fail's fix detail must list each conflict as \"<page A URL> says '<quote>' but <page B URL> says '<quote>'\".\n" +
   "For each: status 'pass' (already good) or 'fail' (missing/weak). For every non-pass write a SPECIFIC fix that references what's actually on THIS page (quote/paraphrase the real H1, headings, copy), plus a `steps` array of 3–4 short, concrete, ordered actions the user can follow (reference the real page; wrap any file paths or code tokens in backticks; end with a 're-scan' step). " +
   'Return ONLY JSON, no prose: {"checks":[{"id":"l2-answer-first","status":"pass"|"fail","detail":"what you found on the page","fix":{"title":"…","detail":"…","minutes":20,"impact":"low|medium|high|very high","steps":["…","…","…"]}}]}. ' +
   "Omit fix when status is pass.";
@@ -55,8 +57,15 @@ function toFix(raw: RawCheck["fix"]): SiteCheckFix | null {
 }
 
 // Grade the page. Throws on API/key/parse failure (caller treats it best-effort).
-export async function gradeSite(input: { brand: BrandProfile; html: string; images: GradeImage[] }): Promise<SiteCheck[]> {
-  const { brand, html, images } = input;
+// `pages` (optional): crawled inner pages whose visible-text excerpts ground the
+// cross-page claim-consistency criterion — without them the model can only judge
+// the homepage against itself.
+export async function gradeSite(input: { brand: BrandProfile; html: string; images: GradeImage[]; pages?: CrawledPage[] }): Promise<SiteCheck[]> {
+  const { brand, html, images, pages } = input;
+  const innerPages = (pages ?? [])
+    .slice(0, 4)
+    .map((p) => `--- ${p.url}${p.title ? ` | ${p.title}` : ""}\n${p.text.slice(0, 1200)}`)
+    .join("\n");
   const text = [
     `BRAND: ${brand.company}`,
     `WEBSITE: ${brand.url}`,
@@ -65,6 +74,7 @@ export async function gradeSite(input: { brand: BrandProfile; html: string; imag
     html
       ? `HOMEPAGE RAW HTML (truncated):\n${html.slice(0, 12000)}`
       : "(The homepage couldn't be fetched — grade from the screenshots below.)",
+    innerPages ? `\nINNER PAGES (visible-text excerpts, truncated — what a non-JS crawler sees):\n${innerPages}` : "",
   ]
     .filter((l) => l !== "")
     .join("\n");
@@ -77,7 +87,7 @@ export async function gradeSite(input: { brand: BrandProfile; html: string; imag
   const res = await fetch(API_URL, {
     method: "POST",
     headers: { "x-api-key": apiKey(), "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, max_tokens: 2048, system: SYSTEM, messages: [{ role: "user", content }] }),
+    body: JSON.stringify({ model: MODEL, max_tokens: 3072, system: SYSTEM, messages: [{ role: "user", content }] }),
   });
   if (!res.ok) throw new Error(`Anthropic page-grade error ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
 

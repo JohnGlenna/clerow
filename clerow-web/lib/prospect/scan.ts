@@ -10,7 +10,8 @@ import { buildEmail } from "./email";
 import { extractMentions } from "./extract";
 import { chatCompletion } from "./openai";
 import { generateBuyerPrompts, parsePromptOverride, PROMPT_COUNT } from "./prompts";
-import type { ProspectInput, ProspectScanResult } from "./types";
+import { generateSiteTip, peekSite } from "./sitePeek";
+import type { ProspectInput, ProspectScanResult, SitePeek } from "./types";
 
 // Same consumer framing as lib/engines/openai.ts so answers name brands.
 const ANSWER_SYSTEM =
@@ -22,6 +23,9 @@ export async function runProspectScan(
   input: ProspectInput,
   signal?: AbortSignal,
 ): Promise<ProspectScanResult> {
+  // Homepage peek runs alongside the ChatGPT calls — its failure never fails the scan.
+  const peekPromise = peekSite(input.website);
+
   const override = input.promptOverride ? parsePromptOverride(input.promptOverride) : [];
   const prompts = override.length
     ? override.slice(0, PROMPT_COUNT)
@@ -32,11 +36,18 @@ export async function runProspectScan(
   );
   const answered = prompts.map((prompt, i) => ({ prompt, text: texts[i] }));
 
-  const perAnswer = await extractMentions(input.brand, input.website, answered, signal);
+  const [perAnswer, sitePeek] = await Promise.all([
+    extractMentions(input.brand, input.website, answered, signal),
+    peekPromise.then(async (page): Promise<SitePeek | null> => {
+      if (!page) return null;
+      return { ...page, tip: await generateSiteTip(page, input.category, input.language, signal) };
+    }),
+  ]);
   const agg = aggregateScan(perAnswer, { brand: input.brand, website: input.website });
 
+  const displayName = normalizeWebsite(input.website);
   const email = buildEmail({
-    brand: input.brand,
+    displayName,
     language: input.language,
     mentionedCount: agg.mentionedCount,
     totalPrompts: agg.totalPrompts,
@@ -44,12 +55,13 @@ export async function runProspectScan(
     topCompetitorMentions: agg.topCompetitorMentions,
     competitors: agg.competitors,
     samplePrompt: prompts[0],
+    siteTip: sitePeek?.tip ?? null,
   });
 
   return {
     brand: input.brand,
     website: input.website,
-    websiteKey: normalizeWebsite(input.website),
+    websiteKey: displayName,
     category: input.category,
     language: input.language,
     mentionedCount: agg.mentionedCount,
@@ -63,5 +75,6 @@ export async function runProspectScan(
       competitors: perAnswer[i].competitors,
     })),
     email,
+    sitePeek,
   };
 }

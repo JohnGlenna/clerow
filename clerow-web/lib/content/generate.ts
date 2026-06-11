@@ -54,6 +54,9 @@ export type FixContentInput = {
   detail: string;
   promptText?: string;
   intent?: PromptIntent;
+  // The exact page/file the fix is about (e.g. "https://x.com/pricing", or
+  // "https://x.com/compare/a-vs-b (create this new page)").
+  targetUrl?: string;
   competitorsAhead?: string[];
   // Real crawled-site context (see buildSiteContext) — real pages + voice.
   siteContext?: string;
@@ -65,6 +68,10 @@ export type FixContentInput = {
   // Set on a quality-gate revision pass: the specific problems the judge flagged
   // in the previous draft, so the rewrite is targeted (see lib/content/quality.ts).
   revisionNote?: string;
+  // A deterministic ~80%-ready draft (see lib/content/offsite.ts) the writer
+  // should polish rather than start from scratch — keep its structure and facts,
+  // fill the <find: …> slots it marks, match the brand voice.
+  offsiteSeed?: string;
 };
 
 // Distil the multi-model synthesis (what all the AI engines collectively think)
@@ -145,7 +152,7 @@ function xaiKey(): string {
 }
 
 function buildUserPrompt(input: FixContentInput): string {
-  const { brand, title, detail, promptText, intent, competitorsAhead, siteContext, citedSources, scanInsight, brandVoice, revisionNote } = input;
+  const { brand, title, detail, promptText, intent, targetUrl, competitorsAhead, siteContext, citedSources, scanInsight, brandVoice, revisionNote, offsiteSeed } = input;
   const lines = [
     `BRAND: ${brand.company}`,
     `WEBSITE: ${brand.url}`,
@@ -169,8 +176,12 @@ function buildUserPrompt(input: FixContentInput): string {
       : "",
     promptText ? `BUYER'S QUESTION TO AI: "${promptText}"` : "",
     intent ? `QUESTION INTENT: ${intent}` : "",
+    targetUrl ? `TARGET PAGE: ${targetUrl}` : "",
     `THE FIX TO WRITE: ${title}`,
     detail ? `FIX DETAILS: ${detail}` : "",
+    offsiteSeed
+      ? `\nSTART FROM THIS DRAFT (≈80% ready — keep its structure and facts, fill every <find: …> slot with the real value, and polish the voice; don't start over):\n${offsiteSeed}\n`
+      : "",
     revisionNote ? `\nREVISION REQUEST (a quality review of your previous draft):\n${revisionNote}` : "",
     "",
     "Write the finished content for this fix now.",
