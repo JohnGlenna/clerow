@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/prospect-pipeline",
-      "schedule": "0 6 * * *"
+      "schedule": "0 5,7,9,11,13,15 * * *"
     }
   ]
 }

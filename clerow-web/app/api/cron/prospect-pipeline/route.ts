@@ -5,7 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+// Pro plan + Fluid compute allows 800s — room for ~8 fresh scans per run.
+export const maxDuration = 800;
 
 // Daily prospect autopilot: discover new leads (brreg + Product Hunt), run the
 // quality gate, scan survivors, and fill the Outbox tab with ready-to-send
@@ -27,8 +28,8 @@ export async function GET(req: Request) {
   }
 
   const summary = await runProspectPipeline(admin, {
-    maxScans: Number(process.env.PROSPECT_PIPELINE_MAX_SCANS) || 5,
-    timeBudgetMs: 240_000,
+    maxScans: Number(process.env.PROSPECT_PIPELINE_MAX_SCANS) || 8,
+    timeBudgetMs: 720_000,
   });
   return NextResponse.json(summary);
 }

@@ -40,7 +40,7 @@ export type PipelineSummary = {
 const DEFAULT_MAX_SCANS = 5;
 const DEFAULT_TIME_BUDGET_MS = 240_000;
 // How many 'new' leads one run will even look at (cache checks + qualify).
-const PICKUP_LIMIT = 30;
+const PICKUP_LIMIT = 60;
 
 function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
