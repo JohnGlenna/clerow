@@ -82,6 +82,8 @@ export async function detectRanking(
           "'sentiment' (pos/neut/neg), and an approximate 'position' (1 = recommended first/most strongly; " +
           "null if only mentioned in passing). Set isYou=true ONLY for the user's brand. " +
           "If the user's brand is NOT recommended in the answer, do not invent it — just omit it. " +
+          "Only include brands the answer text explicitly names; never infer a brand from the " +
+          "question, the user's identity, or your own knowledge. " +
           "Also give 'domain' = the brand's primary website host, lowercase, no protocol or path " +
           "(e.g. 'salesforce.com'); use null if you are not confident which domain is theirs.",
       },
@@ -116,6 +118,24 @@ export async function detectRanking(
       sentiment: coerceSentiment(b.sentiment),
       position: b.position == null ? null : Number(b.position),
     }));
+
+  // Ground the judge's claim in the actual answer: it knows whose brand it's
+  // grading and sometimes invents a flattering mention the answer never makes
+  // (self-brand bias — observed: 55%/#1 for a brand absent from the text). A
+  // you-row keeps its score only if the brand is literally named in the answer;
+  // otherwise it's reset to the honest not-mentioned state.
+  const hay = answer.toLowerCase();
+  for (const b of brands) {
+    if (!b.isYou || (b.visibility <= 0 && b.position == null)) continue;
+    const candidates = [b.name, brand.company, cleanDomain(brand.url)]
+      .map((c) => (c ?? "").trim().toLowerCase())
+      .filter((c) => c.length > 2);
+    if (candidates.length && !candidates.some((c) => hay.includes(c))) {
+      b.visibility = 0;
+      b.position = null;
+      b.sentiment = "warn";
+    }
+  }
 
   // Sort by visibility desc (then by position asc) and assign ranks.
   brands.sort((a, b) => b.visibility - a.visibility || (a.position ?? 99) - (b.position ?? 99));
