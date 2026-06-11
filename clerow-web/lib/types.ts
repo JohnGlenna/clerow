@@ -88,10 +88,10 @@ export type DashboardCompetitor = {
   name: string;
   domain: string | null; // resolved website host, null if the scan couldn't determine one
   isYou: boolean;
-  visibility: number;
+  visibility: number; // blended across every scanned model (absent in a model = 0); rank follows this
   sentiment: BrandSentiment;
   position: number | null;
-  enginesCount: number; // distinct AI models that recommended the brand for the primary prompt
+  enginesCount: number; // distinct AI models that actually named the brand for the primary prompt
 };
 
 export type DashboardPrompt = {

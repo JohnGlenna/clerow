@@ -173,9 +173,11 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
   const sentiment = sentG.length ? Math.round(avg(sentG)) : null;
   snap.score = { overall: overallScore(visibility, sentiment, position), visibility, position, sentiment };
 
-  // Aggregate competitors across engines: average visibility, best (min)
-  // position, sentiment by strongest seen, and how many distinct engines
-  // recommended the brand. Rank by averaged visibility.
+  // Aggregate competitors across engines: visibility blended over every scanned
+  // model (absent = 0, so a single-model fluke can't outrank consensus brands),
+  // best (min) position, sentiment by strongest seen, and how many distinct
+  // engines actually named the brand. Rank strictly follows blended visibility,
+  // so the leaderboard can never look out of order against the displayed %.
   const engineByResult = new Map<string, string>();
   for (const [id, r] of latestByEngine) engineByResult.set(r.id, id);
   type Agg = { name: string; domain: string | null; isYou: boolean; vis: number[]; positions: number[]; sentiment: BrandSentiment; engines: Set<string> };
@@ -199,26 +201,32 @@ export async function loadBrandSnapshot(db: DB, brandId: string): Promise<BrandS
     if (SENTIMENT_RANK.indexOf(row.sentiment) > SENTIMENT_RANK.indexOf(agg.sentiment)) {
       agg.sentiment = row.sentiment;
     }
+    // Only a real mention counts toward "N AIs" — the user's own row is always
+    // persisted (even at 0%) and must not read as "recommended by 5 AIs".
     const eng = engineByResult.get(row.scan_result_id);
-    if (eng) agg.engines.add(eng);
+    const mentioned = Number(row.visibility) > 0 || row.position != null;
+    if (eng && mentioned) agg.engines.add(eng);
     byName.set(key, agg);
   }
 
+  const scannedCount = latestByEngine.size;
   snap.competitors = [...byName.values()]
     .map((a) => ({
       name: a.name,
       domain: a.domain,
       isYou: a.isYou,
-      visibility: Math.round(avg(a.vis)),
+      // Blend across ALL scanned models (absent = 0) — same denominator as the
+      // user's own headline score, so rows are comparable. Single-model scans
+      // divide by 1, so the free scan numbers are unchanged.
+      visibility: Math.round(a.vis.reduce((s, v) => s + v, 0) / scannedCount),
       position: a.positions.length ? Math.round(Math.min(...a.positions)) : null,
       sentiment: a.sentiment,
       enginesCount: a.engines.size,
       rank: 0,
     }))
-    // Consensus first: a brand more models recommend is the more confident target,
-    // then averaged visibility, then best position. (Single-model scans: enginesCount
-    // is 1 for all, so this is a no-op and the free scan ordering is unchanged.)
-    .sort((x, y) => y.enginesCount - x.enginesCount || y.visibility - x.visibility || (x.position ?? 99) - (y.position ?? 99))
+    // Rank follows the displayed % — visibility first, consensus (engines that
+    // actually named the brand) as tie-break, then best position.
+    .sort((x, y) => y.visibility - x.visibility || y.enginesCount - x.enginesCount || (x.position ?? 99) - (y.position ?? 99))
     .map((c, i) => ({ ...c, rank: i + 1 }));
 
   return snap;

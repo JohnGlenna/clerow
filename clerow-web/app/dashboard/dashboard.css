@@ -618,7 +618,13 @@
 .jy-celebrate-ic { font-size: 18px; }
 .jy-celebrate-x { margin-left: auto; background: transparent; border: 0; color: var(--ink-2); font-family: inherit; font-size: 13px; cursor: pointer; }
 .jy-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.jy-eyebrow { font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--blue); }
+.jy-eyebrow { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--blue); }
+.jy-info-btn { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--blue-mid); background: transparent; color: var(--blue); font-family: Georgia, serif; font-style: italic; font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer; padding: 0; }
+.jy-info-btn:hover, .jy-info-btn[aria-expanded="true"] { background: var(--blue-soft); }
+.jy-info { margin: -4px 0 16px; padding: 12px 15px; border: 1px solid var(--blue-mid); border-radius: 13px; background: var(--blue-soft); }
+.jy-info p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+.jy-info p + p { margin-top: 8px; }
+.jy-info b { color: var(--ink); }
 .jy-day { font-size: 14px; font-weight: 900; color: var(--ink); }
 .jy-day-left { color: var(--ink-2); font-weight: 700; }
 .jy-track { position: relative; height: 8px; border-radius: 999px; background: var(--surface-2); margin: 26px 4px 30px; }
