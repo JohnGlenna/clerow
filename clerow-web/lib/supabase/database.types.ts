@@ -70,10 +70,12 @@ export type Database = {
         Row: {
           created_at: string
           email: string | null
+          emailed_at: string | null
           id: string
           meta: Json
           name: string
           phone: string | null
+          reject_reason: string | null
           source: string
           status: string
           updated_at: string
@@ -83,10 +85,12 @@ export type Database = {
         Insert: {
           created_at?: string
           email?: string | null
+          emailed_at?: string | null
           id?: string
           meta?: Json
           name: string
           phone?: string | null
+          reject_reason?: string | null
           source: string
           status?: string
           updated_at?: string
@@ -96,10 +100,12 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string | null
+          emailed_at?: string | null
           id?: string
           meta?: Json
           name?: string
           phone?: string | null
+          reject_reason?: string | null
           source?: string
           status?: string
           updated_at?: string

@@ -404,6 +404,37 @@
   background: #2d1640;
   color: #c77dff;
 }
+.ps-badge-rejected {
+  background: #3a1414;
+  color: var(--red);
+}
+
+/* Outbox */
+.ps-ob-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.ps-ob-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.ps-outbox .ps-pipeline .ps-btn {
+  margin-left: auto;
+}
+.ps-outbox .ps-pipeline .ps-btn + .ps-btn {
+  margin-left: 0;
+}
+/* "Open in mail" is an <a> in the outbox — make it sit like its sibling buttons. */
+.ps-email-actions a.ps-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
 .ps-hint {
   margin-top: 10px;
   color: var(--ink-2);

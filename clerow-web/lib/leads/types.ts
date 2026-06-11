@@ -2,9 +2,9 @@
 
 export type LeadSource = "brreg" | "producthunt" | "shownh";
 
-export type LeadStatus = "new" | "scanned" | "emailed" | "replied" | "customer";
+export type LeadStatus = "new" | "scanned" | "emailed" | "replied" | "customer" | "rejected";
 
-export const LEAD_STATUSES: LeadStatus[] = ["new", "scanned", "emailed", "replied", "customer"];
+export const LEAD_STATUSES: LeadStatus[] = ["new", "scanned", "emailed", "replied", "customer", "rejected"];
 
 /** A company as fetched from an external source, before persistence. */
 export type CandidateLead = {

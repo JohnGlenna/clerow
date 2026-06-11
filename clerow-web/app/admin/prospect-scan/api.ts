@@ -72,3 +72,68 @@ export async function patchLeadStatus(id: string, status: LeadStatus): Promise<v
   });
   if (!res.ok) throw await asError(res);
 }
+
+// --- Outbox ----------------------------------------------------------------
+
+export type OutboxRow = {
+  leadId: string;
+  name: string;
+  website: string;
+  websiteKey: string;
+  email: string | null;
+  source: string;
+  scanId: string;
+  mentionedCount: number;
+  totalPrompts: number;
+  topCompetitor: string | null;
+  language: string;
+  subject: string;
+  body: string;
+  scanCreatedAt: string;
+};
+
+export type OutboxResponse = {
+  rows: OutboxRow[];
+  sentToday: number;
+  cap: number;
+  queued: number;
+  sendConfigured: boolean;
+};
+
+export async function fetchOutbox(): Promise<OutboxResponse> {
+  const res = await fetch("/api/admin/outbox");
+  if (!res.ok) throw await asError(res);
+  return (await res.json()) as OutboxResponse;
+}
+
+export type PipelineSummary = {
+  discovered: number;
+  scanned: { name: string; websiteKey: string; mentionedCount: number; totalPrompts: number; cached: boolean }[];
+  rejected: { name: string; websiteKey: string; reason: string }[];
+  errors: { name: string; websiteKey: string; error: string }[];
+  queued: number;
+  ranOutOfTime: boolean;
+};
+
+export async function runPipeline(maxScans = 3): Promise<PipelineSummary> {
+  const res = await fetch("/api/admin/outbox/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ maxScans }),
+  });
+  if (!res.ok) throw await asError(res);
+  return (await res.json()) as PipelineSummary;
+}
+
+export async function sendLeadEmail(
+  id: string,
+  payload: { to: string; subject: string; body: string },
+): Promise<{ ok: true; sentToday: number; cap: number }> {
+  const res = await fetch(`/api/admin/leads/${encodeURIComponent(id)}/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw await asError(res);
+  return (await res.json()) as { ok: true; sentToday: number; cap: number };
+}

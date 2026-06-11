@@ -93,6 +93,7 @@ export async function getLeadCounts(
     emailed: 0,
     replied: 0,
     customer: 0,
+    rejected: 0,
     total: 0,
   };
   for (const row of data ?? []) {

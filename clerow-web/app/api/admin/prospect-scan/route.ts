@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 
 import { isAdminEmail } from "@/lib/adminGate";
 import { normalizeWebsite } from "@/lib/prospect/aggregate";
+import { findRecentScan, insertProspectScan, promoteLeadScanned, unpackEmail } from "@/lib/prospect/persist";
 import { runProspectScan } from "@/lib/prospect/scan";
 import type { AnswerRecord, CompetitorCount, Lang, ProspectScanResult, SitePeek } from "@/lib/prospect/types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -15,8 +16,6 @@ import { createClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-const CACHE_DAYS = 14;
 
 type ScanRow = {
   id: string;
@@ -42,17 +41,6 @@ async function requireAdmin(): Promise<NextResponse | null> {
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   if (!isAdminEmail(user.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   return null;
-}
-
-// email_copy is stored as "Subject: <s>\n\n<body>".
-function packEmail(subject: string, body: string): string {
-  return `Subject: ${subject}\n\n${body}`;
-}
-
-function unpackEmail(copy: string | null): { subject: string; body: string } {
-  if (!copy) return { subject: "", body: "" };
-  const m = copy.match(/^Subject: (.*)\n\n([\s\S]*)$/);
-  return m ? { subject: m[1], body: m[2] } : { subject: "", body: copy };
 }
 
 function rowToScan(row: ScanRow, cached: boolean) {
@@ -124,17 +112,13 @@ export async function POST(req: Request) {
   const admin = createAdminClient();
 
   if (!body.force) {
-    const since = new Date(Date.now() - CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    const { data: hit, error } = await admin
-      .from("prospect_scans")
-      .select("*")
-      .eq("website_key", websiteKey)
-      .gte("created_at", since)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (hit) return NextResponse.json({ scan: rowToScan(hit as ScanRow, true) });
+    let hit;
+    try {
+      hit = await findRecentScan(admin, websiteKey);
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "lookup failed" }, { status: 500 });
+    }
+    if (hit) return NextResponse.json({ scan: rowToScan(hit as unknown as ScanRow, true) });
   }
 
   let result: ProspectScanResult;
@@ -151,31 +135,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
-  const { data: inserted, error: insertError } = await admin
-    .from("prospect_scans")
-    .insert({
-      brand: result.brand,
-      website: result.website,
-      website_key: result.websiteKey,
-      category: result.category,
-      language: result.language,
-      mentioned_count: result.mentionedCount,
-      total_prompts: result.totalPrompts,
-      competitors: result.competitors,
-      answers: result.answers,
-      email_copy: packEmail(result.email.subject, result.email.body),
-      site_peek: result.sitePeek,
-    })
-    .select("*")
-    .single();
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  let inserted;
+  try {
+    inserted = await insertProspectScan(admin, result);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "insert failed" }, { status: 500 });
+  }
 
-  // Promote a matching lead new → scanned; never downgrade later stages.
-  await admin
-    .from("leads")
-    .update({ status: "scanned", updated_at: new Date().toISOString() })
-    .eq("website_key", result.websiteKey)
-    .eq("status", "new");
+  await promoteLeadScanned(admin, result.websiteKey);
 
-  return NextResponse.json({ scan: rowToScan(inserted as ScanRow, false) });
+  return NextResponse.json({ scan: rowToScan(inserted as unknown as ScanRow, false) });
 }
