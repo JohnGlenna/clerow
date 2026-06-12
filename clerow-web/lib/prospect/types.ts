@@ -16,7 +16,10 @@ export type PerAnswerExtraction = {
   /** 0-based answer index. */
   index: number;
   mentioned: boolean;
+  /** True substitutes a buyer could pick instead of the prospect. */
   competitors: string[];
+  /** Non-substitute brands the answer named (tools, platforms, directories) — never counted as competitors. */
+  otherMentions: string[];
 };
 
 export type CompetitorCount = { name: string; mentions: number };
@@ -35,6 +38,8 @@ export type AnswerRecord = {
   answer: string;
   mentioned: boolean;
   competitors: string[];
+  /** Tools/platforms named in the answer; optional — scans persisted before this field lack it. */
+  otherMentions?: string[];
 };
 
 export type EmailCopy = { subject: string; body: string };

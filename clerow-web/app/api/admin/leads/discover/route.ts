@@ -4,9 +4,18 @@
 import { NextResponse } from "next/server";
 
 import { isAdminEmail } from "@/lib/adminGate";
-import { fetchBrreg, fetchProductHunt, fetchShowHn, productHuntConfigured } from "@/lib/leads/sources";
+import { directoryUrls, fetchDirectory } from "@/lib/leads/directory";
+import {
+  fetchBetaList,
+  fetchBrreg,
+  fetchProductHunt,
+  fetchShowHn,
+  fetchTheHub,
+  fetchYCombinator,
+  productHuntConfigured,
+} from "@/lib/leads/sources";
 import { persistAndAnnotate } from "@/lib/leads/store";
-import type { DiscoverResponse, LeadSource } from "@/lib/leads/types";
+import { LEAD_SOURCES, type DiscoverResponse, type LeadSource, type TheHubCountry } from "@/lib/leads/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,8 +36,8 @@ export async function GET(req: Request) {
 
   const params = new URL(req.url).searchParams;
   const source = params.get("source") as LeadSource | null;
-  if (!source || !["brreg", "producthunt", "shownh"].includes(source)) {
-    return NextResponse.json({ error: "source must be brreg|producthunt|shownh" }, { status: 400 });
+  if (!source || !LEAD_SOURCES.includes(source)) {
+    return NextResponse.json({ error: `source must be one of ${LEAD_SOURCES.join("|")}` }, { status: 400 });
   }
 
   const page = Math.max(0, Number(params.get("page")) || 0);
@@ -52,6 +61,23 @@ export async function GET(req: Request) {
         return NextResponse.json(empty);
       }
       fetched = await fetchProductHunt();
+    } else if (source === "thehub") {
+      const country = params.get("country");
+      const cc: TheHubCountry = country === "SE" || country === "DK" ? country : "NO";
+      fetched = await fetchTheHub(cc, Math.max(1, page + 1)); // UI pages are 0-based, The Hub is 1-based
+    } else if (source === "ycombinator") {
+      fetched = await fetchYCombinator();
+    } else if (source === "betalist") {
+      fetched = await fetchBetaList();
+    } else if (source === "directory") {
+      const url = params.get("url")?.trim() || "";
+      if (!/^https?:\/\//i.test(url)) {
+        return NextResponse.json(
+          { error: `url must be an http(s) directory page (configured: ${directoryUrls().join(", ")})` },
+          { status: 400 },
+        );
+      }
+      fetched = { ...(await fetchDirectory(url)), page: null };
     } else {
       fetched = await fetchShowHn(page);
     }

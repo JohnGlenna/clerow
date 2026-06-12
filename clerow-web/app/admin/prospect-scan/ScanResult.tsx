@@ -87,7 +87,12 @@ export function ScanResult({
                 “{a.prompt}”
               </td>
               <td className={a.mentioned ? "ps-yes" : "ps-no"}>{a.mentioned ? "✓" : "✗"}</td>
-              <td className="ps-comps">{a.competitors.join(", ") || "—"}</td>
+              <td className="ps-comps">
+                {a.competitors.join(", ") || "—"}
+                {a.otherMentions && a.otherMentions.length > 0 && (
+                  <span className="ps-comps-tools"> · tools: {a.otherMentions.join(", ")}</span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

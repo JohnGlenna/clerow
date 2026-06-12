@@ -1,13 +1,20 @@
 "use client";
 
-// Discover tab: find prospects from Brønnøysund / Product Hunt / Show HN —
-// one source sub-tab at a time, infinite scroll instead of paging — persist
-// them as leads with a 5-stage status (the entire CRM), and hand any row off
-// to the scanner in one click.
+// Discover tab: find prospects from Brønnøysund / Product Hunt / Show HN /
+// The Hub / Y Combinator / BetaList / startup-hub directories — one source
+// sub-tab at a time, infinite scroll instead of paging — persist them as
+// leads with a 5-stage status (the entire CRM), and hand any row off to the
+// scanner in one click.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { LEAD_STATUSES, type LeadRow, type LeadStatus, type PageInfo } from "@/lib/leads/types";
+import {
+  LEAD_STATUSES,
+  type LeadRow,
+  type LeadStatus,
+  type PageInfo,
+  type TheHubCountry,
+} from "@/lib/leads/types";
 
 import { discover, fetchCounts, patchLeadStatus } from "./api";
 
@@ -28,12 +35,25 @@ const NAERING_PRESETS = [
 
 const KRISTIANSAND = "4204";
 
-type Source = "brreg" | "producthunt" | "shownh";
+type Source = "brreg" | "producthunt" | "shownh" | "thehub" | "ycombinator" | "betalist" | "directory";
 
 const SOURCE_TABS: { id: Source; label: string }[] = [
   { id: "brreg", label: "Brønnøysund" },
   { id: "producthunt", label: "Product Hunt" },
   { id: "shownh", label: "Show HN" },
+  { id: "thehub", label: "The Hub" },
+  { id: "ycombinator", label: "Y Combinator" },
+  { id: "betalist", label: "BetaList" },
+  { id: "directory", label: "Directories" },
+];
+
+// Mirrors DEFAULT_DIRECTORY_URLS in lib/leads/directory.ts (server-only module).
+const DIRECTORY_PRESETS = [
+  "https://alliance.vc/portfolio",
+  "https://www.investinor.no/portefolje",
+  "https://www.antler.co/portfolio",
+  "https://skyfall.vc",
+  "https://nordicmakers.vc",
 ];
 
 function daysAgo(days: number): string {
@@ -44,6 +64,9 @@ function suggestCategory(lead: LeadRow): string {
   const m = lead.meta as { niche?: string; place?: string; tagline?: string; topics?: string[] };
   if (lead.source === "brreg" && m.niche) return m.place ? `${m.niche} i ${m.place}` : m.niche;
   if (lead.source === "producthunt") return m.topics?.length ? m.topics.join(", ") : m.tagline || "";
+  if (lead.source === "thehub" || lead.source === "ycombinator" || lead.source === "betalist") {
+    return m.tagline || "";
+  }
   return "";
 }
 
@@ -89,6 +112,32 @@ export function DiscoverTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
       </div>
       <div style={{ display: source === "shownh" ? "block" : "none" }}>
         <ShowHnPanel onScan={onScan} onChanged={refreshCounts} />
+      </div>
+      <div style={{ display: source === "thehub" ? "block" : "none" }}>
+        <TheHubPanel onScan={onScan} onChanged={refreshCounts} />
+      </div>
+      <div style={{ display: source === "ycombinator" ? "block" : "none" }}>
+        <SimpleSourcePanel
+          source="ycombinator"
+          title="Y Combinator — two most recent batches"
+          button="Fetch companies"
+          columns={["tagline", "batch"]}
+          onScan={onScan}
+          onChanged={refreshCounts}
+        />
+      </div>
+      <div style={{ display: source === "betalist" ? "block" : "none" }}>
+        <SimpleSourcePanel
+          source="betalist"
+          title="BetaList — latest launches"
+          button="Fetch startups"
+          columns={["tagline"]}
+          onScan={onScan}
+          onChanged={refreshCounts}
+        />
+      </div>
+      <div style={{ display: source === "directory" ? "block" : "none" }}>
+        <DirectoryPanel onScan={onScan} onChanged={refreshCounts} />
       </div>
     </div>
   );
@@ -329,6 +378,159 @@ function ShowHnPanel({ onScan, onChanged }: { onScan: (h: ScanHandoff) => void; 
           <div className="ps-comps">{f.leads.length} rows</div>
           <ScrollSentinel onMore={loadMore} active={hasMore && !f.busy} />
         </>
+      )}
+    </div>
+  );
+}
+
+function TheHubPanel({ onScan, onChanged }: { onScan: (h: ScanHandoff) => void; onChanged: () => void }) {
+  const [country, setCountry] = useState<TheHubCountry>("NO");
+  const pageRef = useRef(0);
+  const f = usePanelFetch(onChanged);
+
+  const buildParams = (p: number) =>
+    new URLSearchParams({ source: "thehub", country, page: String(p) });
+
+  const fetchFresh = () => {
+    pageRef.current = 0;
+    void f.run(buildParams(0));
+  };
+  const hasMore = !!f.pageInfo && pageRef.current < f.pageInfo.totalPages - 1;
+  const loadMore = () => {
+    if (f.busy || !hasMore) return;
+    pageRef.current += 1;
+    void f.run(buildParams(pageRef.current), true);
+  };
+
+  return (
+    <div className="lp-card ps-panel">
+      <h2>The Hub — Nordic startups</h2>
+      <div className="ps-filters">
+        <span className="ps-chips">
+          {(["NO", "SE", "DK"] as TheHubCountry[]).map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`ps-chip ${country === c ? "on" : ""}`}
+              onClick={() => setCountry(c)}
+            >
+              {c}
+            </button>
+          ))}
+        </span>
+        <button className="ps-btn ps-btn-primary" onClick={fetchFresh} disabled={f.busy}>
+          {f.busy ? "Fetching…" : "Fetch startups"}
+        </button>
+      </div>
+      {f.error && <div className="ps-error">{f.error}</div>}
+      {f.leads && (
+        <>
+          <LeadsTable
+            leads={f.leads}
+            setLeads={f.setLeads}
+            onScan={onScan}
+            onChanged={onChanged}
+            columns={["tagline", "countries", "fundingStage"]}
+          />
+          <div className="ps-comps">
+            {f.leads.length} rows{f.pageInfo ? ` · page ${pageRef.current + 1}/${f.pageInfo.totalPages}` : ""}
+          </div>
+          <ScrollSentinel onMore={loadMore} active={hasMore && !f.busy} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** One-button source panel (Y Combinator, BetaList): no filters, no paging. */
+function SimpleSourcePanel({
+  source,
+  title,
+  button,
+  columns,
+  onScan,
+  onChanged,
+}: {
+  source: Source;
+  title: string;
+  button: string;
+  columns: string[];
+  onScan: (h: ScanHandoff) => void;
+  onChanged: () => void;
+}) {
+  const f = usePanelFetch(onChanged);
+  return (
+    <div className="lp-card ps-panel">
+      <h2>{title}</h2>
+      <button
+        className="ps-btn ps-btn-primary"
+        onClick={() => void f.run(new URLSearchParams({ source }))}
+        disabled={f.busy}
+      >
+        {f.busy ? "Fetching…" : button}
+      </button>
+      {f.error && <div className="ps-error">{f.error}</div>}
+      {f.leads && (
+        <LeadsTable
+          leads={f.leads}
+          setLeads={f.setLeads}
+          onScan={onScan}
+          onChanged={onChanged}
+          columns={columns}
+        />
+      )}
+    </div>
+  );
+}
+
+function DirectoryPanel({ onScan, onChanged }: { onScan: (h: ScanHandoff) => void; onChanged: () => void }) {
+  const [url, setUrl] = useState(DIRECTORY_PRESETS[0]);
+  const f = usePanelFetch(onChanged);
+
+  const fetchUrl = (u: string) => {
+    if (!/^https?:\/\//i.test(u)) return;
+    void f.run(new URLSearchParams({ source: "directory", url: u }));
+  };
+
+  return (
+    <div className="lp-card ps-panel">
+      <h2>Startup hubs &amp; coworking directories</h2>
+      <div className="ps-filters">
+        <span className="ps-chips">
+          {DIRECTORY_PRESETS.map((u) => (
+            <button
+              key={u}
+              type="button"
+              className={`ps-chip ${url === u ? "on" : ""}`}
+              onClick={() => setUrl(u)}
+            >
+              {new URL(u).hostname.replace(/^www\./, "")}
+            </button>
+          ))}
+        </span>
+        <input
+          className="ps-input"
+          placeholder="https://hub.example/portfolio"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+        />
+        <button className="ps-btn ps-btn-primary" onClick={() => fetchUrl(url)} disabled={f.busy}>
+          {f.busy ? "Scraping…" : "Scrape page"}
+        </button>
+      </div>
+      <div className="ps-hint">
+        Any member/portfolio page works — the model extracts the companies. The cron rotates
+        through these plus <code>PROSPECT_DIRECTORY_URLS</code> automatically.
+      </div>
+      {f.error && <div className="ps-error">{f.error}</div>}
+      {f.leads && (
+        <LeadsTable
+          leads={f.leads}
+          setLeads={f.setLeads}
+          onScan={onScan}
+          onChanged={onChanged}
+          columns={["directoryHost"]}
+        />
       )}
     </div>
   );

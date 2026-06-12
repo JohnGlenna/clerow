@@ -56,8 +56,13 @@ describe("parseExtraction", () => {
       3,
     );
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toEqual({ index: 0, mentioned: false, competitors: [] });
-    expect(rows[1]).toEqual({ index: 1, mentioned: true, competitors: ["Acme", "Beta"] });
+    expect(rows[0]).toEqual({ index: 0, mentioned: false, competitors: [], otherMentions: [] });
+    expect(rows[1]).toEqual({
+      index: 1,
+      mentioned: true,
+      competitors: ["Acme", "Beta"],
+      otherMentions: [],
+    });
     expect(rows[2].mentioned).toBe(false);
   });
 
@@ -73,8 +78,28 @@ describe("parseExtraction", () => {
       },
       2,
     );
-    expect(rows[0]).toEqual({ index: 0, mentioned: false, competitors: ["Acme"] });
-    expect(rows[1]).toEqual({ index: 1, mentioned: false, competitors: [] });
+    expect(rows[0]).toEqual({ index: 0, mentioned: false, competitors: ["Acme"], otherMentions: [] });
+    expect(rows[1]).toEqual({ index: 1, mentioned: false, competitors: [], otherMentions: [] });
+  });
+
+  it("separates other_mentions from competitors and coerces malformed values", () => {
+    const rows = parseExtraction(
+      {
+        answers: [
+          {
+            index: 1,
+            prospect_mentioned: false,
+            competitors: ["Apriil"],
+            other_mentions: [" Google Analytics 4 ", "HubSpot", 7, ""],
+          },
+          { index: 2, prospect_mentioned: false, competitors: [], other_mentions: "not-a-list" },
+        ],
+      },
+      2,
+    );
+    expect(rows[0].competitors).toEqual(["Apriil"]);
+    expect(rows[0].otherMentions).toEqual(["Google Analytics 4", "HubSpot"]);
+    expect(rows[1].otherMentions).toEqual([]);
   });
 
   it("handles totally invalid payloads", () => {

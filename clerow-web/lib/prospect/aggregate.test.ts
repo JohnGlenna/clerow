@@ -7,6 +7,7 @@ const answer = (index: number, mentioned: boolean, competitors: string[]): PerAn
   index,
   mentioned,
   competitors,
+  otherMentions: [],
 });
 
 describe("aggregateScan", () => {

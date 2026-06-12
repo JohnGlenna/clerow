@@ -204,6 +204,9 @@
   color: var(--ink-2);
   font-size: 12.5px;
 }
+.ps-comps-tools {
+  color: var(--ink-3);
+}
 .ps-yes {
   color: #58cc02;
   font-weight: 900;

@@ -1,6 +1,26 @@
-// Types for the Discover tab's lead sourcing (brreg / Product Hunt / Show HN).
+// Types for the Discover tab's lead sourcing (brreg / Product Hunt / Show HN /
+// The Hub / Y Combinator / BetaList / startup-hub directories).
 
-export type LeadSource = "brreg" | "producthunt" | "shownh";
+export type LeadSource =
+  | "brreg"
+  | "producthunt"
+  | "shownh"
+  | "thehub"
+  | "ycombinator"
+  | "betalist"
+  | "directory";
+
+export const LEAD_SOURCES: LeadSource[] = [
+  "brreg",
+  "producthunt",
+  "shownh",
+  "thehub",
+  "ycombinator",
+  "betalist",
+  "directory",
+];
+
+export type TheHubCountry = "NO" | "SE" | "DK";
 
 export type LeadStatus = "new" | "scanned" | "emailed" | "replied" | "customer" | "rejected";
 

@@ -7,8 +7,17 @@
 // transient errors leave the lead 'new' for the next run, quality-gate
 // failures park it as 'rejected' permanently.
 
-import { fetchBrreg, fetchProductHunt, productHuntConfigured } from "@/lib/leads/sources";
+import { directoryUrls, fetchDirectory } from "@/lib/leads/directory";
+import {
+  fetchBetaList,
+  fetchBrreg,
+  fetchProductHunt,
+  fetchTheHub,
+  fetchYCombinator,
+  productHuntConfigured,
+} from "@/lib/leads/sources";
 import { persistAndAnnotate } from "@/lib/leads/store";
+import type { CandidateLead, LeadSource, TheHubCountry } from "@/lib/leads/types";
 import type { createAdminClient } from "@/lib/supabase/admin";
 
 import { findRecentScan, insertProspectScan, promoteLeadScanned } from "./persist";
@@ -57,25 +66,82 @@ function brregParams() {
   };
 }
 
+// Which sources the cron discovers from — env-toggleable without a deploy.
+const DEFAULT_PIPELINE_SOURCES = "brreg,producthunt,thehub,ycombinator,betalist,directory";
+function enabledSources(): Set<string> {
+  return new Set(
+    (process.env.PROSPECT_PIPELINE_SOURCES || DEFAULT_PIPELINE_SOURCES)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+}
+
+// Stateless rotation cursor: advances every hour, so sources without date
+// filters or sort control (The Hub pages, directory URLs) get swept fully
+// over successive cron runs instead of refetching the same slice.
+function hourIndex(): number {
+  return Math.floor(Date.now() / 3_600_000);
+}
+
+const THEHUB_COUNTRIES: TheHubCountry[] = ["NO", "SE", "DK"];
+
+// The Hub has no "newest first": fetch page 1 to learn the page count, then a
+// rotating page so the whole directory is covered over time.
+async function theHubCandidates(): Promise<CandidateLead[]> {
+  const out: CandidateLead[] = [];
+  for (const country of THEHUB_COUNTRIES) {
+    const first = await fetchTheHub(country, 1);
+    out.push(...first.candidates);
+    const totalPages = first.page?.totalPages ?? 1;
+    if (totalPages > 1) {
+      const rotating = 2 + (hourIndex() % (totalPages - 1));
+      out.push(...(await fetchTheHub(country, rotating)).candidates);
+    }
+  }
+  return out;
+}
+
+// Two directory pages per run, rotating through the configured list.
+async function directoryCandidates(): Promise<CandidateLead[]> {
+  const urls = directoryUrls();
+  if (!urls.length) return [];
+  const start = hourIndex() % urls.length;
+  const targets = [...new Set([urls[start], urls[(start + 1) % urls.length]])];
+  const out: CandidateLead[] = [];
+  for (const url of targets) {
+    out.push(...(await fetchDirectory(url)).candidates);
+  }
+  return out;
+}
+
 async function discoverLeads(admin: Admin): Promise<{ count: number; errors: string[] }> {
   let count = 0;
   const errors: string[] = [];
+  const enabled = enabledSources();
 
-  try {
-    const { candidates } = await fetchBrreg(brregParams());
+  const persist = async (source: LeadSource, candidates: CandidateLead[]) => {
     const withSite = candidates.filter((c) => c.website);
-    count += (await persistAndAnnotate(admin, "brreg", withSite)).length;
-  } catch (e) {
-    errors.push(`brreg discovery failed: ${e instanceof Error ? e.message : "unknown"}`);
-  }
+    count += (await persistAndAnnotate(admin, source, withSite)).length;
+  };
 
-  if (productHuntConfigured()) {
+  // Every source is independent: one failing never blocks the others.
+  const runs: [LeadSource, () => Promise<CandidateLead[]>][] = [
+    ["brreg", async () => (await fetchBrreg(brregParams())).candidates],
+    ["producthunt", async () => (await fetchProductHunt()).candidates],
+    ["thehub", theHubCandidates],
+    ["ycombinator", async () => (await fetchYCombinator()).candidates],
+    ["betalist", async () => (await fetchBetaList()).candidates],
+    ["directory", directoryCandidates],
+  ];
+
+  for (const [source, fetcher] of runs) {
+    if (!enabled.has(source)) continue;
+    if (source === "producthunt" && !productHuntConfigured()) continue;
     try {
-      const { candidates } = await fetchProductHunt();
-      const withSite = candidates.filter((c) => c.website);
-      count += (await persistAndAnnotate(admin, "producthunt", withSite)).length;
+      await persist(source, await fetcher());
     } catch (e) {
-      errors.push(`producthunt discovery failed: ${e instanceof Error ? e.message : "unknown"}`);
+      errors.push(`${source} discovery failed: ${e instanceof Error ? e.message : "unknown"}`);
     }
   }
 

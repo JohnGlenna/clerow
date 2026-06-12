@@ -1,0 +1,161 @@
+// LLM-written outreach email: one call turns the full scan context (crawled
+// homepage, per-question results, competitor leaderboard) into a personalized
+// subject + body. Never throws — any failure returns null and the caller falls
+// back to the fixed template in email.ts, so the pipeline can't lose a scan to
+// a flaky writer call.
+
+import { chatCompletion } from "./openai";
+import type { CompetitorCount, EmailCopy, Lang } from "./types";
+
+const EXCERPT_CHARS = 500;
+const TOP_COMPETITORS = 5;
+
+export type EmailWriterInput = {
+  /** What the email calls the prospect — the bare domain, never the registry org name. */
+  displayName: string;
+  category: string;
+  language: Lang;
+  mentionedCount: number;
+  totalPrompts: number;
+  /** Filtered competitor leaderboard (true substitutes only). */
+  competitors: CompetitorCount[];
+  answers: { prompt: string; text: string; mentioned: boolean; competitors: string[] }[];
+  /** Crawled homepage; null when the site couldn't be read. */
+  site: { url: string; title: string | null; description: string | null; text: string } | null;
+};
+
+const EMAIL_SCHEMA = {
+  name: "outreach_email",
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["subject", "body"],
+    properties: {
+      subject: { type: "string" },
+      body: { type: "string" },
+    },
+  },
+} as const;
+
+const WRITER_SYSTEM =
+  "You write a cold outreach email from John, the founder of Clerow, to a small-business owner. " +
+  "You are given REAL data: the content of the prospect's homepage, and the results of a scan where " +
+  "ChatGPT was asked real buyer questions in the prospect's category.\n\n" +
+  "VOICE: Plain, direct, founder-to-founder. No flattery, no 'I hope this finds you well', no hype " +
+  "words, no exclamation marks, no emoji. Write like a busy person who did real homework on this " +
+  "specific company.\n\n" +
+  "LANGUAGE: Write the entire email (subject and body) in the language given in the data " +
+  "('no' = Norwegian bokmål, 'en' = English).\n\n" +
+  "GROUNDING — the email must prove we actually looked:\n" +
+  "- Refer to the prospect ONLY by their domain or by what their own website calls them. NEVER use a " +
+  "registry or legal company name.\n" +
+  "- Early in the email, reference something concrete the business actually does or sells, taken " +
+  "strictly from the homepage content provided — what they offer and who they serve. Never invent " +
+  "services, claims, or pages you cannot see.\n" +
+  "- Tell the competitor story with the REAL scan numbers provided: the prospect appeared in X of N " +
+  "answers; name the top 2-3 competitors and how many of the N answers each appeared in. Use only " +
+  "names and counts from the data. If the prospect appeared in 0 answers, the angle is: buyers who " +
+  "ask AI for recommendations never hear about them, while the named competitors own those answers " +
+  "today. If the data contains no competitors, skip naming any — never invent one.\n\n" +
+  "PITCH — must appear, woven in naturally in your own words:\n" +
+  "- More and more buyers ask AI for recommendations instead of Googling.\n" +
+  "- Clerow tracks their visibility across 5 AI models — ChatGPT, Claude, Perplexity, Gemini and " +
+  "Grok — and turns the gaps into concrete daily tasks to get recommended more often.\n" +
+  "- Include the link https://clerow.com/ exactly once, written as the full URL including https:// " +
+  "so mail clients auto-link it.\n\n" +
+  "CALL TO ACTION: Offer to send the full scan for their domain — free, no strings attached.\n\n" +
+  "FORMAT:\n" +
+  "- subject: maximum 55 characters, concrete and specific to this scan's findings (a real " +
+  "competitor name or the real mention count beats anything generic). No clickbait, no ALL CAPS.\n" +
+  "- body: plain text only — no markdown, no bullet points, no placeholders like [name]. 4 to 6 " +
+  "short paragraphs separated by blank lines, 110-170 words total. Start with a plain greeting " +
+  "('Hei,' / 'Hi,').\n" +
+  "- Sign off with just 'John' as its own paragraph.\n" +
+  "- After the signature, end with one PS paragraph: early users get Clerow for just 30 kr the " +
+  "first month (in English: '30 NOK (~$3) for the first month').\n\n" +
+  "HONESTY: Every number and name must come from the data provided. Never exaggerate or invent " +
+  "statistics, competitors, or site details.";
+
+function buildUserMessage(i: EmailWriterInput): string {
+  const parts = [
+    `Language: ${i.language}`,
+    `Prospect domain: ${i.displayName}`,
+    `Category/market: ${i.category}`,
+  ];
+
+  if (i.site) {
+    parts.push(
+      "HOMEPAGE (real, crawled):\n" +
+        `URL: ${i.site.url}\n` +
+        `Title: ${i.site.title ?? "(none)"}\n` +
+        `Meta description: ${i.site.description ?? "(none)"}\n` +
+        `Visible text:\n${i.site.text}`,
+    );
+  }
+
+  const leaderboard = i.competitors
+    .slice(0, TOP_COMPETITORS)
+    .map((c) => `${c.name} (${c.mentions})`)
+    .join(", ");
+  parts.push(
+    `SCAN RESULT: asked ChatGPT ${i.totalPrompts} buyer questions; prospect appeared in ` +
+      `${i.mentionedCount} of ${i.totalPrompts} answers.\n` +
+      `Competitor leaderboard (appearances out of ${i.totalPrompts}): ${leaderboard || "(none found)"}`,
+  );
+
+  parts.push(
+    "PER-QUESTION DETAIL:\n" +
+      i.answers
+        .map(
+          (a, idx) =>
+            `${idx + 1}. Q: "${a.prompt}" | prospect mentioned: ${a.mentioned ? "yes" : "no"} | ` +
+            `competitors named: ${a.competitors.join(", ") || "(none)"}\n` +
+            `   Answer excerpt: ${a.text.slice(0, EXCERPT_CHARS)}`,
+        )
+        .join("\n"),
+  );
+
+  return parts.join("\n\n");
+}
+
+/**
+ * Validate and clean the writer's raw JSON reply. Null (→ template fallback)
+ * when the JSON is invalid, a field is empty, or the body lost the Clerow link
+ * — the template guarantees the link, so a non-compliant draft is rejected
+ * rather than patched.
+ */
+export function parseEmailReply(raw: string): EmailCopy | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const o = parsed as { subject?: unknown; body?: unknown };
+  const subject = typeof o.subject === "string" ? o.subject.trim() : "";
+  const body =
+    typeof o.body === "string" ? o.body.trim().replace(/\n{3,}/g, "\n\n") : "";
+  if (!subject || !body) return null;
+  if (!body.includes("https://clerow.com/")) return null;
+  return { subject, body };
+}
+
+/** One writer call → personalized {subject, body}. Null on any failure. */
+export async function writeEmail(
+  input: EmailWriterInput,
+  signal?: AbortSignal,
+): Promise<EmailCopy | null> {
+  try {
+    const reply = await chatCompletion({
+      system: WRITER_SYSTEM,
+      user: buildUserMessage(input),
+      jsonSchema: EMAIL_SCHEMA,
+      maxTokens: 3000,
+      signal,
+    });
+    return parseEmailReply(reply);
+  } catch {
+    return null;
+  }
+}

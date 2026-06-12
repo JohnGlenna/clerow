@@ -7,6 +7,7 @@
 
 import { aggregateScan, normalizeWebsite } from "./aggregate";
 import { buildEmail } from "./email";
+import { writeEmail } from "./emailWriter";
 import { extractMentions } from "./extract";
 import { chatCompletion } from "./openai";
 import { generateBuyerPrompts, parsePromptOverride, PROMPT_COUNT } from "./prompts";
@@ -37,7 +38,7 @@ export async function runProspectScan(
   const answered = prompts.map((prompt, i) => ({ prompt, text: texts[i] }));
 
   const [perAnswer, sitePeek] = await Promise.all([
-    extractMentions(input.brand, input.website, answered, signal),
+    extractMentions(input.brand, input.website, input.category, answered, signal),
     peekPromise.then(async (page): Promise<SitePeek | null> => {
       if (!page) return null;
       return { ...page, tip: await generateSiteTip(page, input.category, input.language, signal) };
@@ -46,17 +47,46 @@ export async function runProspectScan(
   const agg = aggregateScan(perAnswer, { brand: input.brand, website: input.website });
 
   const displayName = normalizeWebsite(input.website);
-  const email = buildEmail({
-    displayName,
-    language: input.language,
-    mentionedCount: agg.mentionedCount,
-    totalPrompts: agg.totalPrompts,
-    topCompetitor: agg.topCompetitor,
-    topCompetitorMentions: agg.topCompetitorMentions,
-    competitors: agg.competitors,
-    samplePrompt: prompts[0],
-    siteTip: sitePeek?.tip ?? null,
-  });
+  // LLM-written email grounded in the crawled site + scan answers; the fixed
+  // template is the never-fail fallback when the writer call misbehaves.
+  const written = await writeEmail(
+    {
+      displayName,
+      category: input.category,
+      language: input.language,
+      mentionedCount: agg.mentionedCount,
+      totalPrompts: agg.totalPrompts,
+      competitors: agg.competitors,
+      answers: answered.map((a, i) => ({
+        prompt: a.prompt,
+        text: a.text,
+        mentioned: perAnswer[i].mentioned,
+        competitors: perAnswer[i].competitors,
+      })),
+      site: sitePeek
+        ? {
+            url: sitePeek.url,
+            title: sitePeek.title,
+            description: sitePeek.description,
+            text: sitePeek.text,
+          }
+        : null,
+    },
+    signal,
+  );
+  const email =
+    written ??
+    buildEmail({
+      displayName,
+      language: input.language,
+      mentionedCount: agg.mentionedCount,
+      totalPrompts: agg.totalPrompts,
+      topCompetitor: agg.topCompetitor,
+      topCompetitorMentions: agg.topCompetitorMentions,
+      competitors: agg.competitors,
+      samplePrompt: prompts[0],
+      siteTip: sitePeek?.tip ?? null,
+    });
 
   return {
     brand: input.brand,
@@ -73,6 +103,7 @@ export async function runProspectScan(
       answer: a.text,
       mentioned: perAnswer[i].mentioned,
       competitors: perAnswer[i].competitors,
+      otherMentions: perAnswer[i].otherMentions,
     })),
     email,
     sitePeek,
