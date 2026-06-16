@@ -65,8 +65,18 @@ const WRITER_SYSTEM =
   "so mail clients auto-link it.\n\n" +
   "CALL TO ACTION: Offer to send the full scan for their domain — free, no strings attached.\n\n" +
   "FORMAT:\n" +
-  "- subject: maximum 55 characters, concrete and specific to this scan's findings (a real " +
-  "competitor name or the real mention count beats anything generic). No clickbait, no ALL CAPS.\n" +
+  "- subject: max 55 characters, concrete and curiosity-driven — it must earn the open by creating " +
+  "tension, NOT just restate a statistic. Never use the flat '<name> in X of N answers' / '<name> in " +
+  "X of N AI answers' pattern; that reads like a report, not a reason to open. Pick the angle from the " +
+  "real data:\n" +
+  "    - A competitor clearly leads the scan: name them as the one AI recommends instead — e.g. " +
+  '"ChatGPT recommends <competitor>, not you" / "ChatGPT anbefaler <competitor>, ikke <domain>".\n' +
+  "    - The prospect appeared in 0 answers: use the 'AI doesn't know you exist yet' angle — e.g. " +
+  '"ChatGPT doesn\'t know <domain> exists yet" / "ChatGPT vet ikke at <domain> finnes ennå".\n' +
+  "    - Otherwise: lead with what they're missing — buyers asking AI in their category don't hear " +
+  "about them — in your own words.\n" +
+  "  Use only real names from the data, in the target language, sentence case (not Title Case, no " +
+  "ALL CAPS), no clickbait, no emoji.\n" +
   "- body: plain text only — no markdown, no bullet points, no placeholders like [name]. 4 to 6 " +
   "short paragraphs separated by blank lines, 110-170 words total. Start with a plain greeting " +
   "('Hei,' / 'Hi,').\n" +
