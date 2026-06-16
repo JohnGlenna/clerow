@@ -6,6 +6,7 @@ import { loadBrandSnapshot, captureDailySnapshot } from "@/lib/scan/snapshot";
 import { dayKey } from "@/lib/streak";
 import { isPlanKey } from "@/lib/billing/plans";
 import { enginesForPlan } from "@/lib/billing/limits";
+import { getAutoScansEnabled } from "@/lib/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,12 @@ export async function GET(req: Request) {
     admin = createAdminClient();
   } catch {
     return NextResponse.json({ error: "Service role key not configured" }, { status: 500 });
+  }
+
+  // Founder kill switch (Admin → Prospect Scanner). When off, the cron still
+  // fires on schedule but no-ops cheaply — no scans, no snapshots, no spend.
+  if (!(await getAutoScansEnabled(admin))) {
+    return NextResponse.json({ skipped: true, reason: "auto-scans disabled" });
   }
 
   // Only scan brands owned by an active subscriber — never spend paid API calls

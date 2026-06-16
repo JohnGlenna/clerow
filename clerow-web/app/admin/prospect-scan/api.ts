@@ -125,6 +125,24 @@ export async function runPipeline(maxScans = 3): Promise<PipelineSummary> {
   return (await res.json()) as PipelineSummary;
 }
 
+// --- Autopilot kill switch -------------------------------------------------
+
+export async function fetchAutopilot(): Promise<{ enabled: boolean }> {
+  const res = await fetch("/api/admin/autopilot");
+  if (!res.ok) throw await asError(res);
+  return (await res.json()) as { enabled: boolean };
+}
+
+export async function setAutopilot(enabled: boolean): Promise<{ enabled: boolean }> {
+  const res = await fetch("/api/admin/autopilot", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) throw await asError(res);
+  return (await res.json()) as { enabled: boolean };
+}
+
 export async function sendLeadEmail(
   id: string,
   payload: { to: string; subject: string; body: string },

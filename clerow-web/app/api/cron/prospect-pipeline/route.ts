@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { runProspectPipeline } from "@/lib/prospect/pipeline";
+import { getAutoScansEnabled } from "@/lib/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -25,6 +26,12 @@ export async function GET(req: Request) {
     admin = createAdminClient();
   } catch {
     return NextResponse.json({ error: "Service role key not configured" }, { status: 500 });
+  }
+
+  // Founder kill switch (Admin → Prospect Scanner). When off, the cron still
+  // fires on schedule but no-ops cheaply — no discovery, no scans, no spend.
+  if (!(await getAutoScansEnabled(admin))) {
+    return NextResponse.json({ skipped: true, reason: "auto-scans disabled" });
   }
 
   const summary = await runProspectPipeline(admin, {

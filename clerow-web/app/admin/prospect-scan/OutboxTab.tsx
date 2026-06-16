@@ -10,10 +10,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { ScanHandoff } from "./DiscoverTab";
 import {
+  fetchAutopilot,
   fetchOutbox,
   patchLeadStatus,
   runPipeline,
   sendLeadEmail,
+  setAutopilot,
   type OutboxResponse,
   type OutboxRow,
   type PipelineSummary,
@@ -25,6 +27,9 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
   const [busy, setBusy] = useState(false);
   const [pipelineBusy, setPipelineBusy] = useState(false);
   const [pipelineMsg, setPipelineMsg] = useState<string | null>(null);
+  // null = unknown (still loading); the kill switch that gates both scan crons.
+  const [autopilot, setAutopilotState] = useState<boolean | null>(null);
+  const [autopilotBusy, setAutopilotBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -40,7 +45,22 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
 
   useEffect(() => {
     void refresh();
+    void fetchAutopilot()
+      .then((a) => setAutopilotState(a.enabled))
+      .catch(() => setAutopilotState(null));
   }, [refresh]);
+
+  const toggleAutopilot = async () => {
+    setAutopilotBusy(true);
+    try {
+      const next = await setAutopilot(!(autopilot ?? false));
+      setAutopilotState(next.enabled);
+    } catch (e) {
+      setPipelineMsg(e instanceof Error ? e.message : "Could not change automated scanning");
+    } finally {
+      setAutopilotBusy(false);
+    }
+  };
 
   const runNow = async () => {
     setPipelineBusy(true);
@@ -89,7 +109,24 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
         <button className="ps-btn ps-btn-ghost" onClick={() => void refresh()} disabled={busy}>
           {busy ? "Refreshing…" : "Refresh"}
         </button>
+        <button
+          className={`ps-btn ${autopilot ? "ps-btn-primary" : "ps-btn-ghost"}`}
+          onClick={() => void toggleAutopilot()}
+          disabled={autopilot === null || autopilotBusy}
+          title="Pauses both the daily subscriber re-scan and the prospect autopilot cron"
+        >
+          {autopilot === null
+            ? "Automated scanning…"
+            : `Automated scanning: ${autopilot ? "ON" : "OFF"}`}
+        </button>
       </div>
+
+      {autopilot === false && (
+        <div className="ps-hint">
+          Automated scanning is <b>OFF</b> — the daily subscriber re-scan and the prospect cron are
+          paused, so they spend nothing. Use “Run pipeline now” to scan on demand.
+        </div>
+      )}
 
       {pipelineMsg && <div className="ps-hint">{pipelineMsg}</div>}
       {error && <div className="ps-error">{error}</div>}
