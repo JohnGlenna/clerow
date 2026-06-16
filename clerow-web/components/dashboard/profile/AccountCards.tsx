@@ -6,6 +6,7 @@ import { Icon } from "../../Icon";
 import { GameIcon } from "../../GameIcon";
 import { createClient } from "@/lib/supabase/client";
 import { useSubscription, startCheckout, openBillingPortal, submitCancelFeedback } from "@/lib/useSubscription";
+import { ProfileScanButton } from "./ProfileScanButton";
 import { PLANS } from "@/lib/billing/plans";
 import { LAUNCH_PROMO, promoFirstMonth } from "@/lib/billing/promo";
 
@@ -206,6 +207,7 @@ function BillingCard() {
           <div className="settings-actions">
             {subscribed ? (
               <>
+                <ProfileScanButton />
                 <button className="btn btn--ghost btn--sm" onClick={() => openBillingPortal()}><Icon name="external" size={14} /> Manage billing</button>
                 {!cancelling && (
                   <button className="btn btn--ghost btn--sm" onClick={() => setCancelOpen(true)}>Cancel subscription</button>
