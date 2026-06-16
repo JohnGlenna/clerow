@@ -190,9 +190,56 @@ export async function runProspectPipeline(
     }
 
     try {
-      // A recent scan (manual or from a previous run) is free — promote it
-      // straight into the Outbox without re-qualifying or re-scanning.
+      const meta = lead.meta as { niche?: string; tagline?: string } | null;
       const cached = await findRecentScan(admin, lead.website_key);
+
+      // A lead can only reach the Outbox if we have an address to send to.
+      // Resolve one up front: use the registry's email, else qualify the site
+      // to discover one. Reuse this gate for the fresh scan below so we never
+      // qualify the same lead twice.
+      let gate: Awaited<ReturnType<typeof qualifyLead>> | null = null;
+      let email = lead.email;
+      if (!email) {
+        gate = await qualifyLead({
+          name: lead.name,
+          website: lead.website,
+          nicheHint: meta?.niche ?? meta?.tagline ?? null,
+        });
+        if (!gate.ok) {
+          await admin
+            .from("leads")
+            .update({ status: "rejected", reject_reason: gate.reason, updated_at: new Date().toISOString() })
+            .eq("id", lead.id)
+            .eq("status", "new");
+          summary.rejected.push({ name: lead.name, websiteKey: lead.website_key, reason: gate.reason });
+          continue;
+        }
+        // The gate often finds a contact address the registry didn't have.
+        email = gate.contactEmail;
+        if (email) {
+          await admin
+            .from("leads")
+            .update({ email, updated_at: new Date().toISOString() })
+            .eq("id", lead.id)
+            .is("email", null);
+        }
+      }
+
+      // No address found anywhere — nothing to send, so never scan or promote
+      // it. Reject permanently rather than parking it in the Outbox empty.
+      if (!email) {
+        const reason = "no contact email found";
+        await admin
+          .from("leads")
+          .update({ status: "rejected", reject_reason: reason, updated_at: new Date().toISOString() })
+          .eq("id", lead.id)
+          .eq("status", "new");
+        summary.rejected.push({ name: lead.name, websiteKey: lead.website_key, reason });
+        continue;
+      }
+
+      // A recent scan (manual or from a previous run) is free — promote it
+      // straight into the Outbox without re-scanning.
       if (cached) {
         await promoteLeadScanned(admin, lead.website_key);
         summary.scanned.push({
@@ -207,30 +254,22 @@ export async function runProspectPipeline(
 
       if (freshScans >= maxScans) continue; // keep sweeping for cached hits only
 
-      const meta = lead.meta as { niche?: string; tagline?: string } | null;
-      const gate = await qualifyLead({
-        name: lead.name,
-        website: lead.website,
-        nicheHint: meta?.niche ?? meta?.tagline ?? null,
-      });
-
-      if (!gate.ok) {
-        await admin
-          .from("leads")
-          .update({ status: "rejected", reject_reason: gate.reason, updated_at: new Date().toISOString() })
-          .eq("id", lead.id)
-          .eq("status", "new");
-        summary.rejected.push({ name: lead.name, websiteKey: lead.website_key, reason: gate.reason });
-        continue;
-      }
-
-      // The gate often finds a contact address the registry didn't have.
-      if (!lead.email && gate.contactEmail) {
-        await admin
-          .from("leads")
-          .update({ email: gate.contactEmail, updated_at: new Date().toISOString() })
-          .eq("id", lead.id)
-          .is("email", null);
+      // Need category/language for the fresh scan — qualify if we haven't yet.
+      if (!gate) {
+        gate = await qualifyLead({
+          name: lead.name,
+          website: lead.website,
+          nicheHint: meta?.niche ?? meta?.tagline ?? null,
+        });
+        if (!gate.ok) {
+          await admin
+            .from("leads")
+            .update({ status: "rejected", reject_reason: gate.reason, updated_at: new Date().toISOString() })
+            .eq("id", lead.id)
+            .eq("status", "new");
+          summary.rejected.push({ name: lead.name, websiteKey: lead.website_key, reason: gate.reason });
+          continue;
+        }
       }
 
       const result = await runProspectScan({

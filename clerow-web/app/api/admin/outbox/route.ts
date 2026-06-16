@@ -44,6 +44,7 @@ export async function GET() {
     .from("leads")
     .select("id, name, website, website_key, email, source")
     .eq("status", "scanned")
+    .not("email", "is", null) // no address means nothing to send — hide it
     .order("updated_at", { ascending: false })
     .limit(100);
   if (leadsError) return NextResponse.json({ error: leadsError.message }, { status: 500 });
