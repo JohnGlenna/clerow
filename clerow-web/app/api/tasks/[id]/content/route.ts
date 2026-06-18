@@ -21,6 +21,7 @@ async function resolveBrand(supabase: SupabaseClient<Database>, userId: string) 
     .from("brands")
     .select("*")
     .eq("user_id", userId)
+    .eq("is_prospect", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

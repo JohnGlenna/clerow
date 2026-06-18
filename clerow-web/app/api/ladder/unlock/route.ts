@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     .from("brands")
     .select("*")
     .eq("user_id", user.id)
+    .eq("is_prospect", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

@@ -143,6 +143,40 @@ export async function setAutopilot(enabled: boolean): Promise<{ enabled: boolean
   return (await res.json()) as { enabled: boolean };
 }
 
+// --- Full report (multi-model prospect report + shareable link) ------------
+
+export type ProspectReportRow = {
+  token: string;
+  url: string;
+  company: string;
+  website: string;
+  createdAt: string;
+  revoked: boolean;
+};
+
+export async function generateReport(input: { url: string; company?: string }): Promise<{ url: string; token: string }> {
+  const res = await fetch("/api/admin/prospect-report", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw await asError(res);
+  return (await res.json()) as { url: string; token: string };
+}
+
+export async function fetchReports(): Promise<ProspectReportRow[]> {
+  const res = await fetch("/api/admin/prospect-report");
+  if (!res.ok) throw await asError(res);
+  return (await res.json()).reports as ProspectReportRow[];
+}
+
+export async function revokeReport(token: string): Promise<void> {
+  const res = await fetch(`/api/admin/prospect-report?token=${encodeURIComponent(token)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw await asError(res);
+}
+
 export async function sendLeadEmail(
   id: string,
   payload: { to: string; subject: string; body: string },

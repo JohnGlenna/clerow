@@ -278,6 +278,10 @@ export async function runPromptScan(
   promptId: string,
   engineIds: EngineId[] = PAID_ENGINES,
   onEvent?: (e: ScanEvent) => void,
+  // `skipBudget` runs the scan without the per-plan budget guard — used only by
+  // the admin prospect-report tool, whose synthetic brands are founder-funded and
+  // not tied to a subscribed user. Always off for real user scans.
+  opts: { skipBudget?: boolean } = {},
 ): Promise<PromptScanResult> {
   const engines = enabledEngines(engineIds);
   if (engines.length === 0) {
@@ -289,8 +293,10 @@ export async function runPromptScan(
 
   // Per-plan monthly cost guard — refuse the scan if it would exceed the budget.
   // Throws BudgetExceededError (callers map it to an "out of scans" response).
-  const plan = planFromSub(await getSubscription(db, brand.user_id));
-  await assertBudget(db, brand.user_id, plan, costForEngines(engines), new Date());
+  if (!opts.skipBudget) {
+    const plan = planFromSub(await getSubscription(db, brand.user_id));
+    await assertBudget(db, brand.user_id, plan, costForEngines(engines), new Date());
+  }
 
   const { data: prompt, error: pe } = await db
     .from("prompts")
@@ -369,9 +375,9 @@ export async function scanTopPrompts(
   db: DB,
   brandId: string,
   engineIds: EngineId[],
-  opts: { maxPrompts?: number; onEvent?: (e: ScanEvent) => void } = {},
+  opts: { maxPrompts?: number; onEvent?: (e: ScanEvent) => void; skipBudget?: boolean } = {},
 ): Promise<string[]> {
-  const { maxPrompts = MAX_SCAN_PROMPTS, onEvent } = opts;
+  const { maxPrompts = MAX_SCAN_PROMPTS, onEvent, skipBudget } = opts;
   const { data: prompts } = await db
     .from("prompts")
     .select("id, text")
@@ -389,7 +395,7 @@ export async function scanTopPrompts(
     // engine ticks. Engine events carry promptId for grouping.
     onEvent?.({ type: "prompt", promptId: p.id, text: p.text, index: i, total });
     try {
-      const result = await runPromptScan(db, brandId, p.id, engineIds, onEvent);
+      const result = await runPromptScan(db, brandId, p.id, engineIds, onEvent, { skipBudget });
       scanIds.push(result.scanId);
     } catch {
       // One prompt failing (e.g. all engines down for it) shouldn't abort the

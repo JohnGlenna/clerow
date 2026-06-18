@@ -187,7 +187,7 @@ async function loadAll(admin: Db) {
   const [users, brands, subs, feedback, tasks, scans, scanResultCount, taskTotal, streaks, mcpEvents, apiKeys] =
     await Promise.all([
       listAllUsers(admin),
-      admin.from("brands").select("id, user_id, company, created_at").then((r) => r.data ?? []),
+      admin.from("brands").select("id, user_id, company, created_at").eq("is_prospect", false).then((r) => r.data ?? []),
       admin
         .from("subscriptions")
         .select("user_id, status, plan, price_id, created_at, canceled_at, cancel_at_period_end")

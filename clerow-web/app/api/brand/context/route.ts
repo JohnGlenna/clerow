@@ -16,6 +16,7 @@ async function resolveBrand(userId: string) {
     .from("brands")
     .select("id, about, screenshots")
     .eq("user_id", userId)
+    .eq("is_prospect", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

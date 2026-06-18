@@ -17,6 +17,7 @@ async function currentBrand() {
     .from("brands")
     .select("id, url, site_audit, site_audited_at")
     .eq("user_id", user.id)
+    .eq("is_prospect", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

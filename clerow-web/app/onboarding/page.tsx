@@ -20,8 +20,9 @@ export default async function OnboardingPage({
     if (user) {
       const { data: scan } = await supabase
         .from("scans")
-        .select("id, brands!inner(user_id)")
+        .select("id, brands!inner(user_id, is_prospect)")
         .eq("brands.user_id", user.id)
+        .eq("brands.is_prospect", false)
         .eq("status", "done")
         .limit(1)
         .maybeSingle();

@@ -62,6 +62,7 @@ export async function GET(req: Request) {
     .from("brands")
     .select("id, timezone, user_id")
     .in("user_id", [...planByUser.keys()])
+    .eq("is_prospect", false) // never auto-scan founder prospect-report brands
     .order("created_at", { ascending: true })
     .limit(MAX_BRANDS);
 

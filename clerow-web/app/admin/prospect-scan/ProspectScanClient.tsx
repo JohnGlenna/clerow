@@ -8,13 +8,15 @@ import { useState } from "react";
 
 import { BatchTable } from "./BatchTable";
 import { DiscoverTab, type ScanHandoff } from "./DiscoverTab";
+import { FullReportPanel } from "./FullReportPanel";
 import { OutboxTab } from "./OutboxTab";
 import { SingleScanPanel, type ScanPrefill } from "./SingleScanPanel";
 
-type Tab = "single" | "outbox" | "csv" | "discover";
+type Tab = "single" | "report" | "outbox" | "csv" | "discover";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "single", label: "Scan" },
+  { id: "report", label: "Full report" },
   { id: "outbox", label: "Outbox" },
   { id: "csv", label: "CSV batch" },
   { id: "discover", label: "Discover" },
@@ -60,6 +62,9 @@ export function ProspectScanClient() {
 
       <div style={{ display: tab === "single" ? "block" : "none" }}>
         <SingleScanPanel prefill={prefill} />
+      </div>
+      <div style={{ display: tab === "report" ? "block" : "none" }}>
+        <FullReportPanel />
       </div>
       <div style={{ display: tab === "outbox" ? "block" : "none" }}>
         <OutboxTab onScan={handoff} />

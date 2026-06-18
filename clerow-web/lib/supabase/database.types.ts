@@ -494,6 +494,7 @@ export type Database = {
           geos: string[]
           id: string
           industry: string
+          is_prospect: boolean
           location: string
           scan_claimed_at: string | null
           site_audit: Json | null
@@ -518,6 +519,7 @@ export type Database = {
           geos?: string[]
           id?: string
           industry?: string
+          is_prospect?: boolean
           location?: string
           scan_claimed_at?: string | null
           site_audit?: Json | null
@@ -542,6 +544,7 @@ export type Database = {
           geos?: string[]
           id?: string
           industry?: string
+          is_prospect?: boolean
           location?: string
           scan_claimed_at?: string | null
           site_audit?: Json | null
@@ -736,6 +739,38 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "scans_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospect_report_links: {
+        Row: {
+          brand_id: string
+          created_at: string
+          id: string
+          revoked_at: string | null
+          token: string
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          id?: string
+          revoked_at?: string | null
+          token: string
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          id?: string
+          revoked_at?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospect_report_links_brand_id_fkey"
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"

@@ -18,6 +18,7 @@ export async function GET() {
     .from("brands")
     .select("company, url, industry, description, competitors")
     .eq("user_id", user.id)
+    .eq("is_prospect", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
     .from("brands")
     .select("id")
     .eq("user_id", user.id)
+    .eq("is_prospect", false)
     .limit(1)
     .maybeSingle();
 
@@ -114,6 +116,7 @@ export async function PATCH(req: Request) {
     .from("brands")
     .select("id")
     .eq("user_id", user.id)
+    .eq("is_prospect", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
