@@ -58,7 +58,7 @@ describe("buildEmail hook and CTA", () => {
   it("opens with the bad-news hook grounded in the scan data (zero-mention, no)", () => {
     const { body } = buildEmail(base);
     const paragraphs = body.split("\n\n");
-    expect(paragraphs[1]).toMatch(/^Dårlige nyheter: jeg spurte ChatGPT/);
+    expect(paragraphs[1]).toMatch(/^Beklager å måtte si det: jeg spurte ChatGPT/);
     expect(paragraphs[1]).toContain("«Hvilke dataprogrammeringstjenester i Oslo er best?»");
     expect(paragraphs[1]).toContain("Bouvet, Knowit, Bekk");
   });
@@ -66,7 +66,7 @@ describe("buildEmail hook and CTA", () => {
   it("opens with the heads-up hook and real numbers (standard, en)", () => {
     const { body } = buildEmail({ ...base, language: "en", mentionedCount: 2 });
     const paragraphs = body.split("\n\n");
-    expect(paragraphs[1]).toMatch(/^Quick heads-up: I asked ChatGPT/);
+    expect(paragraphs[1]).toMatch(/^Sorry to be the one to tell you: I asked ChatGPT/);
     expect(paragraphs[1]).toContain("came up in only 2 of 6 answers");
     expect(paragraphs[1]).toContain("Bouvet was recommended in 4.");
   });

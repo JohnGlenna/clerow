@@ -60,7 +60,7 @@ function standardEmail(i: EmailInput): EmailCopy {
       : `ChatGPT nevner ${i.displayName} i bare ${x} av ${i.totalPrompts} svar`;
     const body = [
       "Hei,",
-      `Litt dårlige nyheter: jeg spurte ChatGPT «${i.samplePrompt}» og ${others} andre spørsmål ekte kjøpere stiller i markedet deres – ${i.displayName} dukket opp i bare ${x} av ${i.totalPrompts} svar.` +
+      `Beklager å måtte si det: jeg spurte ChatGPT «${i.samplePrompt}» og ${others} andre spørsmål ekte kjøpere stiller i markedet deres – ${i.displayName} dukket opp i bare ${x} av ${i.totalPrompts} svar.` +
         (top ? ` ${top} ble anbefalt i ${y}.` : ""),
       ...siteTipParagraph(i),
       `Stadig flere kunder spør AI i stedet for å google. Clerow sporer synligheten deres på tvers av 5 AI-modeller – ChatGPT, Claude, Perplexity, Gemini og Grok – og gir konkrete daglige oppgaver som gjør de svarene om til gratis, organiske besøkende.`,
@@ -76,7 +76,7 @@ function standardEmail(i: EmailInput): EmailCopy {
     : `ChatGPT mentions ${i.displayName} in only ${x} of ${i.totalPrompts} answers`;
   const body = [
     "Hi,",
-    `Quick heads-up: I asked ChatGPT "${i.samplePrompt}" and ${others} more questions real buyers ask in your market — ${i.displayName} came up in only ${x} of ${i.totalPrompts} answers.` +
+    `Sorry to be the one to tell you: I asked ChatGPT "${i.samplePrompt}" and ${others} more questions real buyers ask in your market — ${i.displayName} came up in only ${x} of ${i.totalPrompts} answers.` +
       (top ? ` ${top} was recommended in ${y}.` : ""),
     ...siteTipParagraph(i),
     `More and more buyers ask AI instead of Google. Clerow tracks your visibility across 5 AI models — ChatGPT, Claude, Perplexity, Gemini and Grok — and gives you concrete daily tasks that turn those answers into free, organic visitors.`,
@@ -96,7 +96,7 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
     const subject = `ChatGPT vet ikke at ${i.displayName} finnes ennå`;
     const body = [
       "Hei,",
-      `Dårlige nyheter: jeg spurte ChatGPT «${i.samplePrompt}» og ${others} andre spørsmål ekte kjøpere stiller i markedet deres – ${i.displayName} dukket ikke opp i et eneste svar.` +
+      `Beklager å måtte si det: jeg spurte ChatGPT «${i.samplePrompt}» og ${others} andre spørsmål ekte kjøpere stiller i markedet deres – ${i.displayName} dukket ikke opp i et eneste svar.` +
         (owners.length
           ? ` Akkurat nå er det ${ownerList} som eier de svarene, og kundene som spør hører aldri om dere.`
           : " Akkurat nå er det andre aktører som eier de svarene, og kundene som spør hører aldri om dere."),
@@ -112,7 +112,7 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
   const subject = `ChatGPT doesn't know ${i.displayName} exists yet`;
   const body = [
     "Hi,",
-    `Bad news: I asked ChatGPT "${i.samplePrompt}" and ${others} more questions real buyers ask in your market — ${i.displayName} didn't come up in a single answer.` +
+    `Sorry to be the one to tell you: I asked ChatGPT "${i.samplePrompt}" and ${others} more questions real buyers ask in your market — ${i.displayName} didn't come up in a single answer.` +
       (owners.length
         ? ` Right now ${ownerList} own those answers, and the buyers asking never hear about you.`
         : " Right now other players own those answers, and the buyers asking never hear about you."),

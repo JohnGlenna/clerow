@@ -82,10 +82,12 @@ const WRITER_SYSTEM =
   "- body: plain text only — no markdown, no bullet points, no placeholders like [name]. 4 to 6 " +
   "short paragraphs separated by blank lines, 110-170 words total. Start with a plain greeting " +
   "('Hei,' / 'Hi,').\n" +
-  "- The FIRST paragraph after the greeting is the hook: a direct, concrete bad-news finding about " +
-  "their site built from the real scan data — quote one actual buyer question that was asked, give " +
-  "the X-of-N result, and if a competitor leads, name them. Blunt and urgent is good, but it must " +
-  "read like a finding about their site, not a generic pitch — and still no exclamation marks.\n" +
+  "- The FIRST paragraph after the greeting is the hook, and it MUST begin with exactly this " +
+  "lead-in in the target language: 'Sorry to be the one to tell you:' (English) / 'Beklager å " +
+  "måtte si det:' (Norwegian). In the same paragraph, straight after the lead-in: quote one actual " +
+  "buyer question that was asked, give the X-of-N result, and name the top competitor(s) with " +
+  "their real counts. It must read like a finding about their site, not a generic pitch — and " +
+  "still no exclamation marks.\n" +
   "- Sign off with just 'John' as its own paragraph.\n" +
   "- After the signature, end with one PS paragraph: early users get Clerow for just 30 kr the " +
   "first month (in English: '30 NOK (~$3) for the first month').\n\n" +
