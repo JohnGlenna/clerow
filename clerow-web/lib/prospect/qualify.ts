@@ -18,12 +18,12 @@ export type QualifyInput = {
   /** Company name as discovered (registry org name, PH product name…). */
   name: string;
   website: string;
-  /** Source hint for the category (brreg niche, PH tagline) — fallback only. */
+  /** What the source says the business does (brreg niche, PH tagline) — context for the mismatch check. */
   nicheHint?: string | null;
 };
 
 export type QualifyResult =
-  | { ok: true; category: string; language: Lang; contactEmail: string | null }
+  | { ok: true; language: Lang; contactEmail: string | null }
   | { ok: false; reason: string };
 
 // Hosts that are never the prospect's own site — social profiles, directories,
@@ -71,11 +71,10 @@ const JUDGE_SCHEMA = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: ["verdict", "reason", "category", "language"],
+    required: ["verdict", "reason", "language"],
     properties: {
       verdict: { type: "string", enum: ["ok", "parked", "mismatch", "thin"] },
       reason: { type: "string" },
-      category: { type: "string" },
       language: { type: "string", enum: ["no", "en"] },
     },
   },
@@ -89,7 +88,6 @@ const JUDGE_SYSTEM =
   "'mismatch' = the site clearly belongs to a DIFFERENT business than the named company. " +
   "'thin' = no real content about what the business offers (bare contact page, empty shell). " +
   "REASON: one short sentence. " +
-  "CATEGORY: what a buyer would type when searching for this kind of business, in the site's own language — short, specific, include the city only for local services (e.g. 'regnskapsfører i Kristiansand', 'project management software'). Empty string if not 'ok'. " +
   "LANGUAGE: 'no' if the site is mainly Norwegian, else 'en'.";
 
 /** Gate one lead. Rejections are permanent; transient model errors throw. */
@@ -127,15 +125,12 @@ export async function qualifyLead(input: QualifyInput): Promise<QualifyResult> {
   const parsed = JSON.parse(reply) as {
     verdict: "ok" | "parked" | "mismatch" | "thin";
     reason: string;
-    category: string;
     language: Lang;
   };
 
   if (parsed.verdict !== "ok") {
     return { ok: false, reason: `${parsed.verdict}: ${parsed.reason}`.slice(0, 300) };
   }
-  const category = parsed.category.trim() || input.nicheHint?.trim() || "";
-  if (!category) return { ok: false, reason: "could not determine a buyer category" };
 
-  return { ok: true, category, language: parsed.language === "en" ? "en" : "no", contactEmail };
+  return { ok: true, language: parsed.language === "en" ? "en" : "no", contactEmail };
 }

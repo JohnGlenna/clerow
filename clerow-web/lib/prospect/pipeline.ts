@@ -254,7 +254,7 @@ export async function runProspectPipeline(
 
       if (freshScans >= maxScans) continue; // keep sweeping for cached hits only
 
-      // Need category/language for the fresh scan — qualify if we haven't yet.
+      // Need the language for the fresh scan — qualify if we haven't yet.
       if (!gate) {
         gate = await qualifyLead({
           name: lead.name,
@@ -275,7 +275,6 @@ export async function runProspectPipeline(
       const result = await runProspectScan({
         brand: lead.name,
         website: lead.website,
-        category: gate.category,
         language: gate.language,
       });
       await insertProspectScan(admin, result);

@@ -21,7 +21,6 @@ import { discover, fetchCounts, patchLeadStatus } from "./api";
 export type ScanHandoff = {
   brand: string;
   website: string;
-  category?: string;
   email?: string | null;
   scanId?: string | null;
 };
@@ -60,15 +59,6 @@ function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-function suggestCategory(lead: LeadRow): string {
-  const m = lead.meta as { niche?: string; place?: string; tagline?: string; topics?: string[] };
-  if (lead.source === "brreg" && m.niche) return m.place ? `${m.niche} i ${m.place}` : m.niche;
-  if (lead.source === "producthunt") return m.topics?.length ? m.topics.join(", ") : m.tagline || "";
-  if (lead.source === "thehub" || lead.source === "ycombinator" || lead.source === "betalist") {
-    return m.tagline || "";
-  }
-  return "";
-}
 
 export function DiscoverTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
@@ -637,7 +627,6 @@ function LeadsTable({
                   onScan({
                     brand: lead.name,
                     website: lead.website!,
-                    category: suggestCategory(lead),
                     email: lead.email,
                     scanId: lead.scanId,
                   })

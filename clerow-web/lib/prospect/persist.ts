@@ -49,7 +49,6 @@ export async function insertProspectScan(admin: Admin, result: ProspectScanResul
       brand: result.brand,
       website: result.website,
       website_key: result.websiteKey,
-      category: result.category,
       language: result.language,
       mentioned_count: result.mentionedCount,
       total_prompts: result.totalPrompts,

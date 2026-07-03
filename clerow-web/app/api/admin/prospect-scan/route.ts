@@ -22,7 +22,6 @@ type ScanRow = {
   brand: string;
   website: string;
   website_key: string;
-  category: string;
   language: string;
   mentioned_count: number;
   total_prompts: number;
@@ -49,7 +48,6 @@ function rowToScan(row: ScanRow, cached: boolean) {
     id: row.id,
     brand: row.brand,
     website: row.website,
-    category: row.category,
     language: row.language as Lang,
     mentionedCount: row.mentioned_count,
     totalPrompts: row.total_prompts,
@@ -85,7 +83,6 @@ export async function POST(req: Request) {
   let body: {
     brand?: string;
     website?: string;
-    category?: string;
     language?: string;
     promptOverride?: string;
     force?: boolean;
@@ -98,12 +95,11 @@ export async function POST(req: Request) {
 
   const brand = (body.brand || "").trim();
   const website = (body.website || "").trim();
-  const category = (body.category || "").trim();
   const language: Lang = body.language === "en" ? "en" : "no";
   const websiteKey = normalizeWebsite(website);
 
-  if (!brand || !category) {
-    return NextResponse.json({ error: "brand and category are required" }, { status: 400 });
+  if (!brand) {
+    return NextResponse.json({ error: "brand is required" }, { status: 400 });
   }
   if (!websiteKey || !websiteKey.includes(".")) {
     return NextResponse.json({ error: "website must be a valid domain or URL" }, { status: 400 });
@@ -126,7 +122,6 @@ export async function POST(req: Request) {
     result = await runProspectScan({
       brand,
       website,
-      category,
       language,
       promptOverride: body.promptOverride,
     });

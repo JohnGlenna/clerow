@@ -54,7 +54,6 @@ export function BatchTable() {
         const scan = await runScan({
           brand: rows[i].row.navn,
           website: rows[i].row.website,
-          category: rows[i].row.niche || rows[i].row.sted || "",
           language,
         });
         setRows((rs) => rs.map((r, j) => (j === i ? { ...r, status: "done", scan } : r)));

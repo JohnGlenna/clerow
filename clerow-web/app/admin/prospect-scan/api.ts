@@ -8,7 +8,6 @@ export type Scan = {
   id: string;
   brand: string;
   website: string;
-  category: string;
   language: Lang;
   mentionedCount: number;
   totalPrompts: number;
@@ -25,7 +24,6 @@ export type Scan = {
 export type ScanRequest = {
   brand: string;
   website: string;
-  category: string;
   language: Lang;
   promptOverride?: string;
   force?: boolean;

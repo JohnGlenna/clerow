@@ -7,7 +7,6 @@ async function main() {
   const result = await runProspectScan({
     brand: "Breel Social",
     website: "https://breelsocial.no",
-    category: "sosiale medier-byrå i Stavanger",
     language: "no",
   });
 

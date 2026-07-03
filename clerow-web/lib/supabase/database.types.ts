@@ -40,7 +40,7 @@ export type Database = {
         Row: {
           answers: Json
           brand: string
-          category: string
+          category: string | null
           competitors: Json
           created_at: string
           email_copy: string | null
@@ -55,7 +55,7 @@ export type Database = {
         Insert: {
           answers?: Json
           brand: string
-          category: string
+          category?: string | null
           competitors?: Json
           created_at?: string
           email_copy?: string | null

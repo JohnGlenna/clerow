@@ -5,7 +5,6 @@ export type Lang = "no" | "en";
 export type ProspectInput = {
   brand: string;
   website: string;
-  category: string;
   language: Lang;
   /** Newline-separated prompts; when set, skips the prompt-generation call. */
   promptOverride?: string;
@@ -66,7 +65,6 @@ export type ProspectScanResult = {
   brand: string;
   website: string;
   websiteKey: string;
-  category: string;
   language: Lang;
   mentionedCount: number;
   totalPrompts: number;

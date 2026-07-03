@@ -15,7 +15,6 @@ export type ScanPrefill = {
   nonce: number;
   brand: string;
   website: string;
-  category?: string;
   email?: string | null;
   scanId?: string | null;
 };
@@ -23,7 +22,6 @@ export type ScanPrefill = {
 export function SingleScanPanel({ prefill }: { prefill: ScanPrefill | null }) {
   const [brand, setBrand] = useState("");
   const [website, setWebsite] = useState("");
-  const [category, setCategory] = useState("");
   const [language, setLanguage] = useState<Lang>("no");
   const [promptOverride, setPromptOverride] = useState("");
   const [prospectEmail, setProspectEmail] = useState<string | null>(null);
@@ -33,7 +31,7 @@ export function SingleScanPanel({ prefill }: { prefill: ScanPrefill | null }) {
   const [error, setError] = useState<string | null>(null);
   const seenNonce = useRef(0);
 
-  const run = async (input: { brand: string; website: string; category: string; force?: boolean }) => {
+  const run = async (input: { brand: string; website: string; force?: boolean }) => {
     setBusy(true);
     setError(null);
     try {
@@ -55,7 +53,6 @@ export function SingleScanPanel({ prefill }: { prefill: ScanPrefill | null }) {
     seenNonce.current = prefill.nonce;
     setBrand(prefill.brand);
     setWebsite(prefill.website);
-    setCategory(prefill.category || "");
     setProspectEmail(prefill.email || null);
     setScan(null);
     setError(null);
@@ -65,16 +62,16 @@ export function SingleScanPanel({ prefill }: { prefill: ScanPrefill | null }) {
         .then(setScan)
         .catch((e) => setError(e instanceof Error ? e.message : "Could not load scan"))
         .finally(() => setBusy(false));
-    } else if (prefill.brand && prefill.website && prefill.category) {
-      void run({ brand: prefill.brand, website: prefill.website, category: prefill.category });
+    } else if (prefill.brand && prefill.website) {
+      void run({ brand: prefill.brand, website: prefill.website });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!brand.trim() || !website.trim() || !category.trim() || busy) return;
-    void run({ brand: brand.trim(), website: website.trim(), category: category.trim() });
+    if (!brand.trim() || !website.trim() || busy) return;
+    void run({ brand: brand.trim(), website: website.trim() });
   };
 
   return (
@@ -98,16 +95,6 @@ export function SingleScanPanel({ prefill }: { prefill: ScanPrefill | null }) {
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
               placeholder="regnskapshuset.no"
-              required
-            />
-          </label>
-          <label>
-            Category / niche
-            <input
-              className="ps-input"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="regnskapsbyrå i Kristiansand"
               required
             />
           </label>
@@ -156,7 +143,7 @@ export function SingleScanPanel({ prefill }: { prefill: ScanPrefill | null }) {
             prospectEmail={prospectEmail}
             busy={busy}
             onForceRescan={() =>
-              void run({ brand: scan.brand, website: scan.website, category: scan.category, force: true })
+              void run({ brand: scan.brand, website: scan.website, force: true })
             }
           />
         </div>

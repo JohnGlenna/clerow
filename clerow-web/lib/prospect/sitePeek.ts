@@ -52,13 +52,11 @@ const TIP_SYSTEM =
 /** One mini-model call → grounded {observation, tip} in the scan language. Null on any failure. */
 export async function generateSiteTip(
   page: Omit<SitePeek, "tip">,
-  category: string,
   language: Lang,
   signal?: AbortSignal,
 ): Promise<SiteTip | null> {
   const user = [
     `Language for both sentences: ${language === "no" ? "Norwegian (bokmål)" : "English"}.`,
-    `Business category: ${category}`,
     `Homepage URL: ${page.url}`,
     `Page title: ${page.title ?? "(none)"}`,
     `Meta description: ${page.description ?? "(none)"}`,

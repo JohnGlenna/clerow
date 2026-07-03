@@ -1,6 +1,8 @@
-// Orchestrates one prospect scan: prompts → 6 ChatGPT answers (parallel) →
-// one extraction call → aggregate → email copy. No DB access here — the API
-// route owns caching and persistence.
+// Orchestrates one prospect scan: homepage peek → prompts grounded in the real
+// site → 6 ChatGPT answers (parallel) → one extraction call → aggregate →
+// email copy. No DB access here — the API route owns caching and persistence.
+// There is no category label anywhere: the market comes from the crawled site
+// and the competitors from what the answers actually name.
 //
 // Honesty note carried into the UI: these are gpt-5.4-mini API answers without
 // browsing, an approximation of chatgpt.com — label the source "ChatGPT (API)".
@@ -24,13 +26,19 @@ export async function runProspectScan(
   input: ProspectInput,
   signal?: AbortSignal,
 ): Promise<ProspectScanResult> {
-  // Homepage peek runs alongside the ChatGPT calls — its failure never fails the scan.
-  const peekPromise = peekSite(input.website);
+  // Homepage peek runs first — the prompt set and the competitor judgment are
+  // grounded in the real site. Its failure still never fails the scan: prompts
+  // fall back to brand + domain inference.
+  const page = await peekSite(input.website);
 
   const override = input.promptOverride ? parsePromptOverride(input.promptOverride) : [];
   const prompts = override.length
     ? override.slice(0, PROMPT_COUNT)
-    : await generateBuyerPrompts(input.category, input.language, signal);
+    : await generateBuyerPrompts(
+        { brand: input.brand, website: input.website, site: page },
+        input.language,
+        signal,
+      );
 
   const texts = await Promise.all(
     prompts.map((prompt) => chatCompletion({ system: ANSWER_SYSTEM, user: prompt, signal })),
@@ -38,11 +46,11 @@ export async function runProspectScan(
   const answered = prompts.map((prompt, i) => ({ prompt, text: texts[i] }));
 
   const [perAnswer, sitePeek] = await Promise.all([
-    extractMentions(input.brand, input.website, input.category, answered, signal),
-    peekPromise.then(async (page): Promise<SitePeek | null> => {
+    extractMentions(input.brand, input.website, page, answered, signal),
+    (async (): Promise<SitePeek | null> => {
       if (!page) return null;
-      return { ...page, tip: await generateSiteTip(page, input.category, input.language, signal) };
-    }),
+      return { ...page, tip: await generateSiteTip(page, input.language, signal) };
+    })(),
   ]);
   const agg = aggregateScan(perAnswer, { brand: input.brand, website: input.website });
 
@@ -52,7 +60,6 @@ export async function runProspectScan(
   const written = await writeEmail(
     {
       displayName,
-      category: input.category,
       language: input.language,
       mentionedCount: agg.mentionedCount,
       totalPrompts: agg.totalPrompts,
@@ -92,7 +99,6 @@ export async function runProspectScan(
     brand: input.brand,
     website: input.website,
     websiteKey: displayName,
-    category: input.category,
     language: input.language,
     mentionedCount: agg.mentionedCount,
     totalPrompts: agg.totalPrompts,

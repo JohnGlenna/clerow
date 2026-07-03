@@ -13,7 +13,6 @@ const TOP_COMPETITORS = 5;
 export type EmailWriterInput = {
   /** What the email calls the prospect — the bare domain, never the registry org name. */
   displayName: string;
-  category: string;
   language: Lang;
   mentionedCount: number;
   totalPrompts: number;
@@ -40,7 +39,7 @@ const EMAIL_SCHEMA = {
 const WRITER_SYSTEM =
   "You write a cold outreach email from John, the founder of Clerow, to a small-business owner. " +
   "You are given REAL data: the content of the prospect's homepage, and the results of a scan where " +
-  "ChatGPT was asked real buyer questions in the prospect's category.\n\n" +
+  "ChatGPT was asked real buyer questions in the prospect's market.\n\n" +
   "VOICE: Plain, direct, founder-to-founder. No flattery, no 'I hope this finds you well', no hype " +
   "words, no exclamation marks, no emoji. Write like a busy person who did real homework on this " +
   "specific company.\n\n" +
@@ -76,7 +75,7 @@ const WRITER_SYSTEM =
   '"ChatGPT recommends <competitor>, not you" / "ChatGPT anbefaler <competitor>, ikke <domain>".\n' +
   "    - The prospect appeared in 0 answers: use the 'AI doesn't know you exist yet' angle — e.g. " +
   '"ChatGPT doesn\'t know <domain> exists yet" / "ChatGPT vet ikke at <domain> finnes ennå".\n' +
-  "    - Otherwise: lead with what they're missing — buyers asking AI in their category don't hear " +
+  "    - Otherwise: lead with what they're missing — buyers asking AI in their market don't hear " +
   "about them — in your own words.\n" +
   "  Use only real names from the data, in the target language, sentence case (not Title Case, no " +
   "ALL CAPS), no clickbait, no emoji.\n" +
@@ -97,7 +96,6 @@ function buildUserMessage(i: EmailWriterInput): string {
   const parts = [
     `Language: ${i.language}`,
     `Prospect domain: ${i.displayName}`,
-    `Category/market: ${i.category}`,
   ];
 
   if (i.site) {

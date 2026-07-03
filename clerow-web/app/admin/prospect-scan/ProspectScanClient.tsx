@@ -31,7 +31,6 @@ export function ProspectScanClient() {
       nonce: (prefill?.nonce ?? 0) + 1,
       brand: h.brand,
       website: h.website,
-      category: h.category,
       email: h.email,
       scanId: h.scanId,
     });
