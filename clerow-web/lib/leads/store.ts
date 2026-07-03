@@ -27,12 +27,29 @@ export async function persistAndAnnotate(
   for (const c of keyed) {
     if (c.websiteKey && !byKey.has(c.websiteKey)) byKey.set(c.websiteKey, c);
   }
+
+  // An email already on the row wins over the source's (often null) one — the
+  // qualify gate finds addresses on homepages, and a re-fetch from a source
+  // without an address must never wipe them (a wiped email hides the lead
+  // from the Outbox even though it has a ready draft).
+  const knownEmail = new Map<string, string>();
+  const keyList = [...byKey.keys()];
+  if (keyList.length) {
+    const { data, error } = await db
+      .from("leads")
+      .select("website_key, email")
+      .in("website_key", keyList)
+      .not("email", "is", null);
+    if (error) throw new Error(`leads email lookup failed: ${error.message}`);
+    for (const row of data ?? []) knownEmail.set(row.website_key, row.email as string);
+  }
+
   const upsertRows = [...byKey.values()].map((c) => ({
     source,
     name: c.name,
     website: c.website as string,
     website_key: c.websiteKey as string,
-    email: c.email,
+    email: knownEmail.get(c.websiteKey as string) ?? c.email,
     phone: c.phone,
     meta: c.meta as Json,
     updated_at: new Date().toISOString(),
