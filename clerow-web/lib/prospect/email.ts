@@ -60,11 +60,11 @@ function standardEmail(i: EmailInput): EmailCopy {
       : `ChatGPT nevner ${i.displayName} i bare ${x} av ${i.totalPrompts} svar`;
     const body = [
       "Hei,",
-      `Jeg spurte ChatGPT «${i.samplePrompt}» og ${others} lignende kjøperspørsmål – ${i.displayName} dukket opp i ${x} av ${i.totalPrompts} svar.` +
-        (top ? ` ${top} var med i ${y}.` : ""),
+      `Litt dårlige nyheter: jeg spurte ChatGPT «${i.samplePrompt}» og ${others} andre spørsmål ekte kjøpere stiller i markedet deres – ${i.displayName} dukket opp i bare ${x} av ${i.totalPrompts} svar.` +
+        (top ? ` ${top} ble anbefalt i ${y}.` : ""),
       ...siteTipParagraph(i),
-      `Stadig flere kunder spør AI om anbefalinger i stedet for å google. Jeg har bygget Clerow (${CLEROW_URL}) – det sporer synligheten deres på tvers av 5 AI-modeller og gir konkrete oppgaver for å tette gapet.`,
-      `Vil du se hele skanningen for ${i.displayName}? Helt gratis og uforpliktende.`,
+      `Stadig flere kunder spør AI i stedet for å google. Clerow sporer synligheten deres på tvers av 5 AI-modeller – ChatGPT, Claude, Perplexity, Gemini og Grok – og gir konkrete daglige oppgaver som gjør de svarene om til gratis, organiske besøkende.`,
+      `Skann nettsiden deres nå på ${CLEROW_URL} – på et par minutter ser du nøyaktig hvor ${i.displayName} mangler og hva dere bør fikse først.`,
       SIGNATURE,
       DISCOUNT_NO,
     ].join("\n\n");
@@ -76,11 +76,11 @@ function standardEmail(i: EmailInput): EmailCopy {
     : `ChatGPT mentions ${i.displayName} in only ${x} of ${i.totalPrompts} answers`;
   const body = [
     "Hi,",
-    `I asked ChatGPT "${i.samplePrompt}" and ${others} similar buyer questions — ${i.displayName} showed up in ${x} of ${i.totalPrompts} answers.` +
-      (top ? ` ${top} showed up in ${y}.` : ""),
+    `Quick heads-up: I asked ChatGPT "${i.samplePrompt}" and ${others} more questions real buyers ask in your market — ${i.displayName} came up in only ${x} of ${i.totalPrompts} answers.` +
+      (top ? ` ${top} was recommended in ${y}.` : ""),
     ...siteTipParagraph(i),
-    `More and more buyers ask AI for recommendations instead of Googling. I built Clerow (${CLEROW_URL}) — it tracks your visibility across 5 AI models and gives you concrete daily tasks to close the gap.`,
-    `Want the full scan for ${i.displayName}? Free, no strings.`,
+    `More and more buyers ask AI instead of Google. Clerow tracks your visibility across 5 AI models — ChatGPT, Claude, Perplexity, Gemini and Grok — and gives you concrete daily tasks that turn those answers into free, organic visitors.`,
+    `Scan your website now at ${CLEROW_URL} — in a couple of minutes you'll see exactly where ${i.displayName} is missing and what to fix first.`,
     SIGNATURE,
     DISCOUNT_EN,
   ].join("\n\n");
@@ -96,13 +96,13 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
     const subject = `ChatGPT vet ikke at ${i.displayName} finnes ennå`;
     const body = [
       "Hei,",
-      `Jeg spurte ChatGPT «${i.samplePrompt}» og ${others} lignende kjøperspørsmål – ${i.displayName} dukket ikke opp i et eneste svar. Det er helt normalt for nyere selskaper, men det betyr at kunder som spør AI om anbefalinger aldri hører om dere.`,
+      `Dårlige nyheter: jeg spurte ChatGPT «${i.samplePrompt}» og ${others} andre spørsmål ekte kjøpere stiller i markedet deres – ${i.displayName} dukket ikke opp i et eneste svar.` +
+        (owners.length
+          ? ` Akkurat nå er det ${ownerList} som eier de svarene, og kundene som spør hører aldri om dere.`
+          : " Akkurat nå er det andre aktører som eier de svarene, og kundene som spør hører aldri om dere."),
       ...siteTipParagraph(i),
-      owners.length
-        ? `Akkurat nå er det ${ownerList} som eier svarene i kategorien deres.`
-        : "Akkurat nå er det andre aktører som eier svarene i kategorien deres.",
-      `Den gode nyheten: dette er fiksbart på noen uker, ikke år. Jeg har bygget Clerow (${CLEROW_URL}) – det sporer synligheten deres på tvers av 5 AI-modeller og gir konkrete daglige oppgaver for å komme inn i svarene.`,
-      `Vil du se hele skanningen for ${i.displayName}? Helt gratis og uforpliktende.`,
+      `Den gode nyheten: dette er fiksbart på noen uker, ikke år. Clerow sporer synligheten deres på tvers av 5 AI-modeller – ChatGPT, Claude, Perplexity, Gemini og Grok – og gir konkrete daglige oppgaver som gjør de svarene om til gratis, organiske besøkende.`,
+      `Skann nettsiden deres nå på ${CLEROW_URL} – på et par minutter ser du nøyaktig hvor ${i.displayName} mangler og hva dere bør fikse først.`,
       SIGNATURE,
       DISCOUNT_NO,
     ].join("\n\n");
@@ -112,13 +112,13 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
   const subject = `ChatGPT doesn't know ${i.displayName} exists yet`;
   const body = [
     "Hi,",
-    `I asked ChatGPT "${i.samplePrompt}" and ${others} similar buyer questions — ${i.displayName} didn't show up in a single answer. That's completely normal for newer companies, but it means buyers who ask AI for recommendations never hear about you.`,
+    `Bad news: I asked ChatGPT "${i.samplePrompt}" and ${others} more questions real buyers ask in your market — ${i.displayName} didn't come up in a single answer.` +
+      (owners.length
+        ? ` Right now ${ownerList} own those answers, and the buyers asking never hear about you.`
+        : " Right now other players own those answers, and the buyers asking never hear about you."),
     ...siteTipParagraph(i),
-    owners.length
-      ? `Right now ${ownerList} own the answers in your category.`
-      : "Right now other players own the answers in your category.",
-    `The good news: this is fixable in weeks, not years. I built Clerow (${CLEROW_URL}) — it tracks your visibility across 5 AI models and gives you concrete daily tasks to get into the answers.`,
-    `Want the full scan for ${i.displayName}? Free, no strings.`,
+    `The good news: this is fixable in weeks, not years. Clerow tracks your visibility across 5 AI models — ChatGPT, Claude, Perplexity, Gemini and Grok — and gives you concrete daily tasks that turn those answers into free, organic visitors.`,
+    `Scan your website now at ${CLEROW_URL} — in a couple of minutes you'll see exactly where ${i.displayName} is missing and what to fix first.`,
     SIGNATURE,
     DISCOUNT_EN,
   ].join("\n\n");

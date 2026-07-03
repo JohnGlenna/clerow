@@ -60,10 +60,13 @@ const WRITER_SYSTEM =
   "PITCH — must appear, woven in naturally in your own words:\n" +
   "- More and more buyers ask AI for recommendations instead of Googling.\n" +
   "- Clerow tracks their visibility across 5 AI models — ChatGPT, Claude, Perplexity, Gemini and " +
-  "Grok — and turns the gaps into concrete daily tasks to get recommended more often.\n" +
+  "Grok — and turns the gaps into concrete daily tasks that win them free, organic visitors from " +
+  "AI answers.\n" +
   "- Include the link https://clerow.com/ exactly once, written as the full URL including https:// " +
   "so mail clients auto-link it.\n\n" +
-  "CALL TO ACTION: Offer to send the full scan for their domain — free, no strings attached.\n\n" +
+  "CALL TO ACTION: Tell them to scan their website now at https://clerow.com/ — in a couple of " +
+  "minutes they'll see exactly where they're missing and what to fix first. (This is where the one " +
+  "link belongs.)\n\n" +
   "FORMAT:\n" +
   "- subject: max 55 characters, concrete and curiosity-driven — it must earn the open by creating " +
   "tension, NOT just restate a statistic. Never use the flat '<name> in X of N answers' / '<name> in " +
@@ -80,6 +83,10 @@ const WRITER_SYSTEM =
   "- body: plain text only — no markdown, no bullet points, no placeholders like [name]. 4 to 6 " +
   "short paragraphs separated by blank lines, 110-170 words total. Start with a plain greeting " +
   "('Hei,' / 'Hi,').\n" +
+  "- The FIRST paragraph after the greeting is the hook: a direct, concrete bad-news finding about " +
+  "their site built from the real scan data — quote one actual buyer question that was asked, give " +
+  "the X-of-N result, and if a competitor leads, name them. Blunt and urgent is good, but it must " +
+  "read like a finding about their site, not a generic pitch — and still no exclamation marks.\n" +
   "- Sign off with just 'John' as its own paragraph.\n" +
   "- After the signature, end with one PS paragraph: early users get Clerow for just 30 kr the " +
   "first month (in English: '30 NOK (~$3) for the first month').\n\n" +
