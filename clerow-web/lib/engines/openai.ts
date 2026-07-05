@@ -72,10 +72,14 @@ export const OpenAIEngine: AIEngine = {
         model: MODEL,
         instructions: SYSTEM,
         input: prompt,
-        tools: [{ type: "web_search_preview" }],
+        tools: [{ type: "web_search" }],
         // Force a browse so the answer reflects ChatGPT-with-search (what a real
         // user sees), not a stale training-data guess.
-        tool_choice: { type: "web_search_preview" },
+        tool_choice: { type: "web_search" },
+        // Cost guards: naming the leading options needs no deep reasoning, and
+        // reasoning tokens bill as output. Cap includes reasoning tokens.
+        reasoning: { effort: "low" },
+        max_output_tokens: 1200,
       }),
       signal,
     });
