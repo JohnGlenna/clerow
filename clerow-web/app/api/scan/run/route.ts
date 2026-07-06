@@ -7,8 +7,10 @@ import { synthesizeAndStore } from "@/lib/scan/synthesize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// One prompt × one engine + detection — a few seconds. Give it headroom.
-export const maxDuration = 60;
+// One prompt × one engine (medium reasoning + web search can take a minute+)
+// plus the concurrent competitor-expansion call and two detection passes.
+// 60s killed real scans mid-run; match the other scan routes.
+export const maxDuration = 300;
 
 // Step 2: run the free scan on the primary prompt and return the ranked table.
 export async function POST(req: Request) {

@@ -154,6 +154,11 @@ export async function runFreeScan(
     // instead of just the one brand the answer happened to name. Best-effort:
     // discoverCompetitors swallows its own errors and returns [] on failure.
     // Adds one extra engine + detection call to the once-per-brand free scan.
+    // It only needs the prompt text, so it runs concurrently with the primary
+    // query — the free scan's wall-clock is max(query, discover), not the sum,
+    // which matters inside the route's maxDuration.
+    const engine = getEngine(engineId);
+    const discovering = discoverCompetitors(primary.text, profile, (p, s) => engine.query(p, s));
     const { detection, label, citations } = await persistEngineResult(
       db,
       scan.id,
@@ -162,11 +167,7 @@ export async function runFreeScan(
       engineId,
       undefined,
       onEvent,
-      async (brands) => {
-        const engine = getEngine(engineId);
-        const discovered = await discoverCompetitors(primary.text, profile, (p, s) => engine.query(p, s));
-        return mergeDiscoveredBrands(brands, discovered);
-      },
+      async (brands) => mergeDiscoveredBrands(brands, await discovering),
     );
 
     await seedTeaserTasks(db, brandId, profile, primary.text, detection.you.mentioned, detection.brands, citations);
