@@ -171,6 +171,16 @@ function ConfirmProfileStep({
   const [industry, setIndustry] = React.useState(derived.industry);
   const submit = () => onConfirm({ company: company.trim(), industry: industry.trim() });
 
+  // "You make" can be a long phrase; a single-line input clips it, so it's a
+  // textarea that grows to fit its content.
+  const industryRef = React.useRef<HTMLTextAreaElement>(null);
+  React.useLayoutEffect(() => {
+    const el = industryRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [industry]);
+
   return (
     <div className="onboard-card">
       <div className="onboard-mascot">
@@ -197,13 +207,18 @@ function ConfirmProfileStep({
         </div>
         <div className="input-with-prefix">
           <span className="px">You make</span>
-          <input
+          <textarea
+            ref={industryRef}
+            rows={1}
             spellCheck={false}
             value={industry}
             onChange={(e) => setIndustry(e.target.value)}
             placeholder="e.g. AI music generator"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && company.trim()) submit();
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (company.trim()) submit();
+              }
             }}
           />
         </div>

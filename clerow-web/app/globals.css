@@ -1548,7 +1548,8 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   border-right: 2px solid var(--border);
   font-weight: 600;
 }
-.input-with-prefix input {
+.input-with-prefix input,
+.input-with-prefix textarea {
   flex: 1; min-width: 0;
   border: 0; outline: 0;
   background: transparent;
@@ -1558,7 +1559,13 @@ textarea.input { resize: vertical; min-height: 96px; font-family: inherit; }
   padding: 14px 16px;
   color: var(--ink);
 }
-.input-with-prefix input::placeholder { color: var(--ink-3); }
+.input-with-prefix textarea {
+  resize: none;
+  overflow: hidden;
+  line-height: 1.45;
+}
+.input-with-prefix input::placeholder,
+.input-with-prefix textarea::placeholder { color: var(--ink-3); }
 
 /* The two stacked fields in the onboarding "confirm your profile" step. */
 .confirm-fields { display: flex; flex-direction: column; gap: 12px; text-align: left; }
