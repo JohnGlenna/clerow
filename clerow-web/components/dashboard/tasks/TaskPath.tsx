@@ -33,15 +33,17 @@ function taskIcon(key: string | undefined, channel: Channel | undefined): GameIc
   return channel === "offsite" ? "world" : "gears";
 }
 
-function PathNode({ kind, icon, cap, xp, start, mascot, onClick }: {
-  kind: string; icon: React.ReactNode; cap: string; xp?: number | null; start?: boolean; mascot?: boolean; onClick?: () => void;
+function PathNode({ kind, icon, cap, xp, start, mascot, blurCap, onClick }: {
+  kind: string; icon: React.ReactNode; cap: string; xp?: number | null; start?: boolean; mascot?: boolean; blurCap?: boolean; onClick?: () => void;
 }) {
   return (
     <div className="node-row">
       <div className={`node ${kind}`}>
         {start && <span className="start-bubble">Start</span>}
         <button className="node-btn" onClick={onClick} disabled={!onClick}>{icon}</button>
-        {cap && <span className="node-cap">{cap}</span>}
+        {/* Paywalled captions are redacted placeholders; blur them and make the
+            blur itself open the upgrade sheet — it's what curious users click. */}
+        {cap && <span className={`node-cap${blurCap ? " node-cap--locked" : ""}`} aria-hidden={blurCap || undefined} onClick={blurCap ? onClick : undefined}>{cap}</span>}
         {xp != null && <span className="node-xp">{kind === "done" ? "✓ earned" : `+${xp} XP`}</span>}
         {mascot && <span className="node-mascot"><MascotClerow size={56} float /></span>}
       </div>
@@ -150,6 +152,7 @@ export function TaskPath({ data, subscribed, onOpen, onUpgrade, onUnlock, unlock
               xp={t.xp}
               start={kind === "current" && ti === firstCurrent}
               mascot={kind === "current" && ti === firstCurrent}
+              blurCap={paywalled && !t.resolved}
               onClick={!clickable ? undefined : paywalled ? onUpgrade : () => onOpen({ kind: "task", id: t.id, channel: t.channel, title: t.title, why: t.detail, xp: t.xp, minutes: t.minutes, steps: t.steps, ladderKey: t.key, crumb: lvl.title })}
             />
           );

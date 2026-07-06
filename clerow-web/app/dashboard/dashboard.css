@@ -195,6 +195,8 @@
 .node.scanbtn .node-xp { color: var(--ink-3); }
 .node-cap { font-size: 12px; font-weight: 800; color: var(--ink-2); text-align: center; max-width: 160px; line-height: 1.25; }
 .node.locked .node-cap { color: var(--ink-4); }
+/* Paywalled caption: a blurred placeholder that opens the upgrade sheet on click. */
+.node-cap--locked { filter: blur(4px); opacity: .55; user-select: none; cursor: pointer; }
 .node-xp { font-family: var(--mono); font-size: 10px; font-weight: 800; color: var(--xp); }
 .node.done .node-xp { color: var(--green); }
 .start-bubble { position: absolute; top: -30px; background: var(--surface); border: 2px solid var(--blue); color: var(--blue); font-weight: 900; font-size: 11px; padding: 6px 12px; border-radius: 12px; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; z-index: 3; animation: ldbob 1.4s ease-in-out infinite; }
@@ -601,6 +603,7 @@
 .nm-card:hover { border-color: var(--blue-mid); transform: translateY(-2px); }
 .nm-body { position: relative; padding: 22px 24px 20px; border-left: 5px solid var(--blue); }
 .nm-step { font-size: 11.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.nm-free-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--blue-soft); color: var(--blue); font-weight: 900; font-size: 11px; }
 .nm-title { font-size: 27px; font-weight: 900; letter-spacing: -.02em; line-height: 1.15; margin: 7px 0 10px; color: var(--ink); }
 .nm-why { font-size: 14px; line-height: 1.6; color: var(--ink-2); max-width: 62ch; margin: 0; }
 .nm-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }

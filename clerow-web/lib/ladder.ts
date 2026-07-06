@@ -34,6 +34,18 @@ export function isTaskFree(level: number, indexInLevel: number): boolean {
   return false;
 }
 
+// Paywalled tasks are redacted server-side in buildLadder: the specific insight
+// (which source to get cited on, which comparison page to publish) is the paid
+// product, so the real title/detail/steps/target must never reach a free
+// client — the UI blurs these placeholders on top.
+const LOCKED_TITLE: Record<number, string> = {
+  2: "Locked on-page improvement task",
+  3: "Locked citation opportunity",
+  4: "Locked competitive content play",
+  5: "Locked milestone task",
+};
+const LOCKED_DETAIL = "Upgrade to Clerow Premium to reveal and complete this task.";
+
 export type LadderTask = {
   key: string; // stable ladder_key (idempotency)
   title: string;
@@ -527,6 +539,19 @@ export function buildLadder(
         t.targetIsNew = target.create ?? false;
         t.detail = `${t.detail} Target: ${target.url}${target.create ? " (create this page)" : ""}`;
       }
+      // Redact paywalled tasks (resolved ones keep their real title — the user
+      // already did that work). The done/resolved match above ran on the real
+      // key, and ensureLadderTasks never seeds locked tasks, so the placeholder
+      // key never reaches the DB. Even the key is swapped: slugs like
+      // "l3-source-ahrefs-com" leak the insight on their own.
+      if (t.locked && !t.resolved) {
+        t.key = `locked-l${level}-${ti + 1}`;
+        t.title = LOCKED_TITLE[level] ?? "Locked task";
+        t.detail = LOCKED_DETAIL;
+        t.steps = [];
+        t.targetUrl = null;
+        t.targetIsNew = false;
+      }
       return t;
     });
     const total = tasks.length;
@@ -622,7 +647,10 @@ export async function refreshLadderTaskContent(
   const changed = rows.filter((r) => {
     if (!r.ladder_key) return false;
     const t = specByKey.get(r.ladder_key);
-    return !!t && (t.title !== r.title || t.meta !== r.meta || t.impact !== r.impact);
+    // Never write a locked spec back: a churned subscriber's seeded rows would
+    // otherwise get their real titles overwritten with redaction placeholders.
+    if (!t || t.locked) return false;
+    return t.title !== r.title || t.meta !== r.meta || t.impact !== r.impact;
   });
   await Promise.all(
     changed.map((r) => {

@@ -11,10 +11,15 @@ export function NextMoveHero() {
   const { openTask } = useOverlay();
 
   const lvl = data?.ladder?.levels.find((l) => l.state === "active");
-  const lt = lvl?.tasks.find((t) => t.id && !t.resolved);
+  // Never surface a paywalled task (a churned subscriber can have seeded-but-
+  // locked tasks with ids — those are redacted placeholders, not next moves).
+  const lt = lvl?.tasks.find((t) => t.id && !t.resolved && !t.locked);
   if (!lvl || !lt) return null;
 
   const step = lvl.tasks.filter((t) => t.resolved).length + 1;
+  // A free user working the taster: the level's remaining tasks are paywalled,
+  // so "step 1 of 5" would oversell — frame it as the free preview it is.
+  const freePreview = !data?.subscribed && lvl.tasks.some((t) => t.locked);
   const canMcp = lt.channel !== "offsite";
   const effort = lt.minutes ? `~${lt.minutes} min` : (lt.meta.split("·")[0] ?? "").replace(/≈/g, "").trim() || "~5 min";
 
@@ -26,7 +31,7 @@ export function NextMoveHero() {
       <div className="nm-eyebrow"><span className="nm-pulse" /> Your next move</div>
       <div className="nm-card" onClick={open} role="button" tabIndex={0}>
         <div className="nm-body">
-          <div className="nm-step">Level {lvl.level} · {lvl.title} · step {step} of {lvl.total}</div>
+          <div className="nm-step">Level {lvl.level} · {lvl.title} · {freePreview ? <span className="nm-free-chip">Free preview</span> : `step ${step} of ${lvl.total}`}</div>
           <h2 className="nm-title">{lt.title}</h2>
           <p className="nm-why">{lt.detail}</p>
           <div className="nm-actions">

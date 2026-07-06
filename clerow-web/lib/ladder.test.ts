@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildLadder, type LadderContext } from "./ladder";
+import { buildLadder, refreshLadderTaskContent, type LadderContext } from "./ladder";
 import type { SiteAudit, SiteCheck, SiteCheckFix } from "./audit/site";
 
 const aFix = (title: string): SiteCheckFix => ({ title, detail: "d", minutes: 20, impact: "medium", xp: 35, steps: [] });
@@ -43,5 +43,77 @@ describe("buildLadder wiring for the new checks", () => {
   it("resolves the exact file URL for audit fixes", () => {
     const tasks = levelTasks(ctx([check("robots-ai", "fail", "Let AI crawlers read your site")]), 1);
     expect(tasks.find((t) => t.key === "audit-robots-ai")?.targetUrl).toBe("https://acme.com/robots.txt");
+  });
+});
+
+describe("paywalled-task redaction for free users", () => {
+  // A ctx rich enough to build insight-bearing tasks at every paid level.
+  const richCtx = (): LadderContext => ({
+    ...ctx([]),
+    primaryPrompt: { text: "best geo tools 2026", intent: "solution" },
+    competitorsAhead: ["Ahrefs Brand Radar"],
+    sourceGaps: ["ahrefs.com", "semrush.com"],
+    promptGaps: ["geo vs seo"],
+  });
+
+  const allTasks = (subscribed: boolean, existing = new Map<string, { id: string; done: boolean; resolved: boolean }>()) =>
+    buildLadder(richCtx(), existing, 0, subscribed).levels.flatMap((l) => l.tasks.map((t) => ({ ...t, level: l.level })));
+
+  it("replaces every unresolved locked task's insight fields with placeholders", () => {
+    const locked = allTasks(false).filter((t) => t.locked && !t.resolved);
+    expect(locked.length).toBeGreaterThan(0);
+    for (const t of locked) {
+      expect(t.key).toMatch(/^locked-l\d+-\d+$/);
+      expect(t.title).toMatch(/^Locked /);
+      expect(t.detail).not.toContain("Target:");
+      expect(t.steps).toEqual([]);
+      expect(t.targetUrl).toBeNull();
+    }
+    const serialized = JSON.stringify(locked);
+    expect(serialized).not.toContain("ahrefs");
+    expect(serialized).not.toContain("semrush");
+  });
+
+  it("keeps the Level 2 taster's real spec", () => {
+    const taster = buildLadder(richCtx(), new Map(), 0, false).levels.find((l) => l.level === 2)!.tasks[0];
+    expect(taster.locked).toBe(false);
+    expect(taster.title).not.toMatch(/^Locked /);
+  });
+
+  it("redacts nothing for a subscriber", () => {
+    const tasks = allTasks(true);
+    expect(tasks.some((t) => t.locked)).toBe(false);
+    expect(tasks.some((t) => t.title.startsWith("Locked "))).toBe(false);
+  });
+
+  it("keeps the level-banner teasers (findings) intact for free users", () => {
+    const freeLevels = buildLadder(richCtx(), new Map(), 0, false).levels;
+    const paidLevels = buildLadder(richCtx(), new Map(), 0, true).levels;
+    expect(freeLevels.map((l) => l.findings)).toEqual(paidLevels.map((l) => l.findings));
+  });
+
+  it("keeps a churned user's resolved locked tasks readable (real key + title)", () => {
+    const existing = new Map([["l3-source-ahrefs-com", { id: "t1", done: true, resolved: true }]]);
+    const done = allTasks(false, existing).find((t) => t.id === "t1")!;
+    expect(done.locked).toBe(true);
+    expect(done.key).toBe("l3-source-ahrefs-com");
+    expect(done.title).not.toMatch(/^Locked /);
+  });
+
+  it("refreshLadderTaskContent never writes locked specs back to the DB", async () => {
+    const existing = new Map([["l3-source-ahrefs-com", { id: "t1", done: true, resolved: true }]]);
+    const ladder = buildLadder(richCtx(), existing, 0, false);
+    let writes = 0;
+    const db = { from: () => ({ update: () => ({ eq: async () => { writes++; return {}; } }) }) };
+    const changed = await refreshLadderTaskContent(db as never, ladder, [
+      // Resolved locked task whose stored title drifted from the spec: without
+      // the guard this would be rewritten.
+      { id: "t1", ladder_key: "l3-source-ahrefs-com", title: "an old title", meta: "m", impact: "low" },
+      // Stale seeded row for an unresolved locked task: its real key no longer
+      // matches any spec (keys are redacted), so it must be ignored too.
+      { id: "t2", ladder_key: "l3-source-semrush-com", title: "an old title", meta: "m", impact: "low" },
+    ]);
+    expect(changed).toBe(0);
+    expect(writes).toBe(0);
   });
 });
