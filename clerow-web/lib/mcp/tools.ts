@@ -709,17 +709,16 @@ export function registerTools(server: McpServer) {
 
       // Run the actual scan AFTER responding — the work takes ~1–2 minutes, which
       // outlives most MCP clients' request timeouts (the old inline version made
-      // timed-out-but-succeeded scans look retryable). Same steps as before:
-      // (1) refresh the cheap site audit (re-crawls the grounding data), then
+      // timed-out-but-succeeded scans look retryable). Same steps as the
+      // dashboard full-scan route:
+      // (1) re-crawl the site audit AND re-run the AI page-grade (regrade merges
+      //     the l2-* content checks, so an MCP-triggered scan also turns generic
+      //     Level-2 tasks page-specific — previously only the dashboard did), then
       // (2) scan the top prompts across all engines (shared scanTopPrompts), then
       // (3) synthesize each scan so the multi-model verdict feeds the briefs.
       after(async () => {
         try {
-          try {
-            await refreshSiteAudit(admin, brand.id, brand.url);
-          } catch {
-            // best-effort — the prior audit stays.
-          }
+          await regradeContentChecks(admin, brand); // never throws; best-effort
           const scanIds = await scanTopPrompts(admin, brand.id, engines);
           for (const id of scanIds) {
             try {
