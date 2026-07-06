@@ -72,12 +72,20 @@ describe("buildEmail hook and CTA", () => {
   });
 
   it.each([
-    { language: "no" as const, cost: "dere går glipp av potensielle kunder hver uke" },
-    { language: "en" as const, cost: "potential customers you're losing every week" },
-  ])("follows the hook with the what-it-costs-you line ($language)", ({ language, cost }) => {
+    { language: "no" as const, cost: "de hører aldri om dere" },
+    { language: "en" as const, cost: "those buyers never hear about you" },
+  ])("closes the problem paragraph with the what-it-costs-you clause ($language)", ({ language, cost }) => {
     for (const mentionedCount of [0, 2]) {
       const { body } = buildEmail({ ...base, language, mentionedCount });
-      expect(body.split("\n\n")[2]).toContain(cost);
+      expect(body.split("\n\n")[1]).toContain(cost);
+    }
+  });
+
+  it("carries no discount PS in the first touch", () => {
+    for (const language of ["no", "en"] as const) {
+      const { body } = buildEmail({ ...base, language });
+      expect(body).not.toContain("PS:");
+      expect(body.split("\n\n").at(-1)).toBe("John");
     }
   });
 
@@ -100,14 +108,14 @@ describe("buildEmail site tip", () => {
     tip: "En FAQ-side som svarer på vanlige kjøperspørsmål ville hjulpet AI-synligheten.",
   };
 
-  it("inserts the grounded paragraph right after the cost line (no)", () => {
+  it("inserts the grounded paragraph right after the problem paragraph (no)", () => {
     const { body } = buildEmail({ ...base, siteTip: tip });
     expect(body).toContain(
       "Jeg tok en titt på nord-flow.no – dere bygger skreddersydd programvare for små bedrifter. " +
         "En FAQ-side som svarer på vanlige kjøperspørsmål ville hjulpet AI-synligheten.",
     );
     const paragraphs = body.split("\n\n");
-    expect(paragraphs[3]).toMatch(/^Jeg tok en titt på nord-flow\.no/);
+    expect(paragraphs[2]).toMatch(/^Jeg tok en titt på nord-flow\.no/);
   });
 
   it("inserts the grounded paragraph in English", () => {
