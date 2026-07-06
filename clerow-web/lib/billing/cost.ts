@@ -8,7 +8,7 @@ import type { EngineId } from "../engines";
 
 // Cost of one answer query (web-search-grounded) per engine.
 const ANSWER_COST: Record<EngineId, number> = {
-  chatgpt: 0.03, // gpt-5.4 (low reasoning effort) + web_search
+  chatgpt: 0.05, // gpt-5.4 (medium reasoning effort, ≤4k output) + web_search
   claude: 0.035, // claude-sonnet-4-5 + web search
   gemini: 0.02, // + google_search grounding
   perplexity: 0.012, // sonar

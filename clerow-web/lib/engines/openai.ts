@@ -62,34 +62,48 @@ export const OpenAIEngine: AIEngine = {
   },
 
   async query(prompt: string, signal?: AbortSignal): Promise<EngineAnswer> {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        instructions: SYSTEM,
-        input: prompt,
-        tools: [{ type: "web_search" }],
-        // Force a browse so the answer reflects ChatGPT-with-search (what a real
-        // user sees), not a stale training-data guess.
-        tool_choice: { type: "web_search" },
-        // Cost guards: naming the leading options needs no deep reasoning, and
-        // reasoning tokens bill as output. Cap includes reasoning tokens.
-        reasoning: { effort: "low" },
-        max_output_tokens: 1200,
-      }),
-      signal,
-    });
+    const call = async (maxOutputTokens: number) => {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          instructions: SYSTEM,
+          input: prompt,
+          tools: [{ type: "web_search" }],
+          // Force a browse so the answer reflects ChatGPT-with-search (what a real
+          // user sees), not a stale training-data guess.
+          tool_choice: { type: "web_search" },
+          // Medium = the API default and the closest match to the consumer app's
+          // answer depth. "low" produced generic top-3 picks that diverged from
+          // what ChatGPT actually recommends, which breaks the product's core
+          // promise — visibility standings users can verify themselves.
+          reasoning: { effort: "medium" },
+          // Cost ceiling only (reasoning bills as output at $15/M). Must leave
+          // room for reasoning + full prose: at 1200 the visible answer was
+          // truncated after ~80 tokens and the ranking was built from a cut-off
+          // top-3 list.
+          max_output_tokens: maxOutputTokens,
+        }),
+        signal,
+      });
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`OpenAI API error ${res.status}: ${text.slice(0, 500)}`);
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`OpenAI API error ${res.status}: ${text.slice(0, 500)}`);
+      }
+      return res.json();
+    };
+
+    let data = await call(4000);
+    // Never build a ranking from a silently cut-off answer: one retry with more
+    // room, then take whatever we have (partial beats failing the scan).
+    if (data?.status === "incomplete" && data?.incomplete_details?.reason === "max_output_tokens") {
+      data = await call(8000);
     }
-
-    const data = await res.json();
     return { text: extractText(data), citations: extractCitations(data) };
   },
 };
