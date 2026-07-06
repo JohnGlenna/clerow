@@ -1,4 +1,4 @@
-import type { AIEngine, EngineAnswer } from "./types";
+import type { AIEngine, EngineAnswer, QueryOpts } from "./types";
 
 // ChatGPT via the OpenAI Responses API with the built-in web_search tool, so the
 // answer reflects what ChatGPT actually recommends with browsing on — not a
@@ -61,8 +61,8 @@ export const OpenAIEngine: AIEngine = {
     return !!process.env.OPENAI_API_KEY;
   },
 
-  async query(prompt: string, signal?: AbortSignal): Promise<EngineAnswer> {
-    const call = async (maxOutputTokens: number) => {
+  async query(prompt: string, signal?: AbortSignal, opts?: QueryOpts): Promise<EngineAnswer> {
+    const call = async (maxOutputTokens: number, tuned: boolean) => {
       const res = await fetch(API_URL, {
         method: "POST",
         headers: {
@@ -87,6 +87,14 @@ export const OpenAIEngine: AIEngine = {
           // truncated after ~80 tokens and the ranking was built from a cut-off
           // top-3 list.
           max_output_tokens: maxOutputTokens,
+          ...(tuned && {
+            // Same recommendations, less essay padding — fewer output tokens to
+            // generate, so answers land faster (and cheaper) on every scan.
+            text: { verbosity: "low" },
+            // Interactive scans (onboarding reveal) pay 2× token price for the
+            // fast lane; background/cron scans stay on the default tier.
+            ...(opts?.priority && { service_tier: "priority" }),
+          }),
         }),
         signal,
       });
@@ -98,11 +106,16 @@ export const OpenAIEngine: AIEngine = {
       return res.json();
     };
 
-    let data = await call(4000);
+    // If the API ever rejects the latency knobs (400), a scan must not fail
+    // over a tuning flag — retry bare.
+    let data = await call(4000, true).catch((err) => {
+      if (err instanceof Error && err.message.includes("OpenAI API error 400")) return call(4000, false);
+      throw err;
+    });
     // Never build a ranking from a silently cut-off answer: one retry with more
     // room, then take whatever we have (partial beats failing the scan).
     if (data?.status === "incomplete" && data?.incomplete_details?.reason === "max_output_tokens") {
-      data = await call(8000);
+      data = await call(8000, true).catch(() => data);
     }
     return { text: extractText(data), citations: extractCitations(data) };
   },

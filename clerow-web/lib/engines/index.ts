@@ -45,4 +45,4 @@ export function enabledEngines(ids: EngineId[]): EngineId[] {
   return ids.filter((id) => ENGINES[id]?.enabled);
 }
 
-export type { AIEngine, EngineId } from "./types";
+export type { AIEngine, EngineId, QueryOpts } from "./types";

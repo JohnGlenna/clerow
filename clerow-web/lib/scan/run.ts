@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getEngine, enabledEngines, ENGINES, FREE_ENGINES, PAID_ENGINES, type EngineId } from "../engines";
+import { getEngine, enabledEngines, ENGINES, FREE_ENGINES, PAID_ENGINES, type EngineId, type QueryOpts } from "../engines";
 import { discoverPrompts } from "./discover";
 import { detectRanking, discoverCompetitors, mergeDiscoveredBrands } from "./detect";
 import type { ScanEvent } from "./events";
@@ -69,6 +69,8 @@ async function persistEngineResult(
   // Optional hook to transform the detected brands before persisting (the free
   // scan uses it to merge in engine-discovered competitors). No-op when omitted.
   enrichBrands?: (brands: RankedBrand[]) => Promise<RankedBrand[]>,
+  // Per-call engine options (the free scan asks for the low-latency tier).
+  queryOpts?: QueryOpts,
 ) {
   const engine = getEngine(engineId);
   // Emit per-engine progress as we go. Under the concurrent Promise.allSettled in
@@ -78,7 +80,7 @@ async function persistEngineResult(
 
   try {
     emit("querying");
-    const answer = await engine.query(prompt.text, signal);
+    const answer = await engine.query(prompt.text, signal, queryOpts);
     emit("detecting");
     let detection = await detectRanking(answer.text, profile, signal);
     if (enrichBrands) {
@@ -158,7 +160,8 @@ export async function runFreeScan(
     // query — the free scan's wall-clock is max(query, discover), not the sum,
     // which matters inside the route's maxDuration.
     const engine = getEngine(engineId);
-    const discovering = discoverCompetitors(primary.text, profile, (p, s) => engine.query(p, s));
+    // The user is watching this scan live — both queries take the fast lane.
+    const discovering = discoverCompetitors(primary.text, profile, (p, s) => engine.query(p, s, { priority: true }));
     const { detection, label, citations } = await persistEngineResult(
       db,
       scan.id,
@@ -168,6 +171,7 @@ export async function runFreeScan(
       undefined,
       onEvent,
       async (brands) => mergeDiscoveredBrands(brands, await discovering),
+      { priority: true },
     );
 
     await seedTeaserTasks(db, brandId, profile, primary.text, detection.you.mentioned, detection.brands, citations);
