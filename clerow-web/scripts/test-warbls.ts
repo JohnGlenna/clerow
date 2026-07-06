@@ -66,7 +66,8 @@ async function main() {
 
   // ---- 3. FIRST SCAN — free reveal (Perplexity, one primary prompt) ----
   h("3. FIRST SCAN  (free tier → Perplexity only, 1 prompt)");
-  const free = await runFreeScan(admin, brand.id);
+  const { result: free, appendCompetitors } = await runFreeScan(admin, brand.id);
+  await appendCompetitors(admin);
   console.log("engine:", free.engine);
   console.log("prompt:", free.prompt);
   console.log("you   :", JSON.stringify(free.you));

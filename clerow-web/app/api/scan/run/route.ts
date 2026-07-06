@@ -59,15 +59,19 @@ export async function POST(req: Request) {
   // Failures arrive in-band as a final {type:"error"} event (HTTP 200).
   return new Response(
     streamScan(async (emit) => {
-      const result = await runFreeScan(supabase, brandId, emit);
-      // Summarize the free scan in the background so the dashboard shows "what the
-      // AI thinks" + the best move (lands on the next load). Best-effort.
+      const { result, appendCompetitors } = await runFreeScan(supabase, brandId, emit);
+      // After the reveal is on screen: pad the ranking with the engine's own
+      // "top 8" list (0% rows, lands on the dashboard), then summarize the scan
+      // so it shows "what the AI thinks" + the best move. Best-effort.
       after(async () => {
+        let admin;
         try {
-          await synthesizeAndStore(createAdminClient(), result.scanId);
+          admin = createAdminClient();
         } catch {
-          // service role not configured — synthesis simply stays null.
+          return; // service role not configured — enrichment/synthesis stay null.
         }
+        await appendCompetitors(admin).catch(() => {});
+        await synthesizeAndStore(admin, result.scanId).catch(() => {});
       });
       emit({ type: "done", result });
     }),

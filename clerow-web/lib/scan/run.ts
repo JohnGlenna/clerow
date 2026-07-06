@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEngine, enabledEngines, ENGINES, FREE_ENGINES, PAID_ENGINES, type EngineId, type QueryOpts } from "../engines";
 import { discoverPrompts } from "./discover";
-import { detectRanking, discoverCompetitors, mergeDiscoveredBrands } from "./detect";
+import { detectRanking, discoverCompetitors, norm } from "./detect";
 import type { ScanEvent } from "./events";
 import { costForEngines, roundUsd } from "../billing/cost";
 import { assertBudget, planFromSub } from "../billing/limits";
@@ -66,9 +66,6 @@ async function persistEngineResult(
   engineId: EngineId,
   signal?: AbortSignal,
   onEvent?: (e: ScanEvent) => void,
-  // Optional hook to transform the detected brands before persisting (the free
-  // scan uses it to merge in engine-discovered competitors). No-op when omitted.
-  enrichBrands?: (brands: RankedBrand[]) => Promise<RankedBrand[]>,
   // Per-call engine options (the free scan asks for the low-latency tier).
   queryOpts?: QueryOpts,
 ) {
@@ -82,10 +79,7 @@ async function persistEngineResult(
     emit("querying");
     const answer = await engine.query(prompt.text, signal, queryOpts);
     emit("detecting");
-    let detection = await detectRanking(answer.text, profile, signal);
-    if (enrichBrands) {
-      detection = { ...detection, brands: await enrichBrands(detection.brands) };
-    }
+    const detection = await detectRanking(answer.text, profile, signal);
 
     const { data: result, error: re } = await db
       .from("scan_results")
@@ -117,7 +111,7 @@ async function persistEngineResult(
     if (rbe) throw new Error(`Failed to save result brands: ${rbe.message}`);
 
     emit("done", { position: detection.you.position, visibility: detection.you.visibility });
-    return { engine: engineId, label: engine.label, detection, citations: answer.citations };
+    return { engine: engineId, label: engine.label, detection, citations: answer.citations, resultId: result.id };
   } catch (err) {
     emit("failed", { error: err instanceof Error ? err.message : String(err) });
     throw err;
@@ -127,11 +121,16 @@ async function persistEngineResult(
 // Run the free scan: pick the primary prompt, query one engine, detect the
 // ranking, persist everything. Fails loudly — on any error the scan row is
 // marked 'error' and no half-written success is left behind.
+//
+// The reveal blocks only on the primary query. The engine's "top 8 you'd
+// recommend" expansion — 0% filler rows that pad the competitive set — is
+// returned as `appendCompetitors` for the caller to run AFTER responding
+// (the route uses next/server `after`), so it never adds to the user's wait.
 export async function runFreeScan(
   db: DB,
   brandId: string,
   onEvent?: (e: ScanEvent) => void,
-): Promise<RunResponse> {
+): Promise<{ result: RunResponse; appendCompetitors: (bg: DB) => Promise<void> }> {
   // First configured free engine (ChatGPT preferred; Perplexity fallback).
   const engineId = FREE_ENGINES.find((id) => getEngine(id).enabled) ?? FREE_ENGINES[FREE_ENGINES.length - 1];
 
@@ -139,8 +138,10 @@ export async function runFreeScan(
   const primary = prompts.find((p) => p.is_primary) ?? prompts[0];
   if (!primary) throw new Error("No prompt available to scan");
 
-  // Surface the single engine as "queued" up front so its row appears immediately.
-  onEvent?.({ type: "engine", engine: engineId, label: getEngine(engineId).label, status: "queued" });
+  // Surface the single engine as "queued" up front so its row appears
+  // immediately. Carries promptId so the UI folds it into the same row as the
+  // later querying/detecting events instead of rendering a stale twin.
+  onEvent?.({ type: "engine", engine: engineId, label: getEngine(engineId).label, status: "queued", promptId: primary.id });
 
   const { data: scan, error: se } = await db
     .from("scans")
@@ -151,18 +152,8 @@ export async function runFreeScan(
 
   try {
     const profile = toProfile(brand);
-    // Enrich the (often sparse) buyer-prompt ranking with the engine's own list
-    // of recommended alternatives, so the reveal shows a real competitive set
-    // instead of just the one brand the answer happened to name. Best-effort:
-    // discoverCompetitors swallows its own errors and returns [] on failure.
-    // Adds one extra engine + detection call to the once-per-brand free scan.
-    // It only needs the prompt text, so it runs concurrently with the primary
-    // query — the free scan's wall-clock is max(query, discover), not the sum,
-    // which matters inside the route's maxDuration.
-    const engine = getEngine(engineId);
-    // The user is watching this scan live — both queries take the fast lane.
-    const discovering = discoverCompetitors(primary.text, profile, (p, s) => engine.query(p, s, { priority: true }));
-    const { detection, label, citations } = await persistEngineResult(
+    // The user is watching this scan live — the query takes the fast lane.
+    const { detection, label, citations, resultId } = await persistEngineResult(
       db,
       scan.id,
       profile,
@@ -170,7 +161,6 @@ export async function runFreeScan(
       engineId,
       undefined,
       onEvent,
-      async (brands) => mergeDiscoveredBrands(brands, await discovering),
       { priority: true },
     );
 
@@ -181,13 +171,49 @@ export async function runFreeScan(
       .update({ status: "done", est_cost: roundUsd(costForEngines([engineId])), finished_at: new Date().toISOString() })
       .eq("id", scan.id);
 
+    // Deferred enrichment: ask the engine for the longer list of brands it
+    // would recommend and append the new ones as 0% rows below the ranking
+    // (they weren't recommended for the buyer prompt itself, only when asked
+    // to list more). Best-effort — discoverCompetitors swallows its errors.
+    const appendCompetitors = async (bg: DB) => {
+      const engine = getEngine(engineId);
+      const discovered = await discoverCompetitors(primary.text, profile, (p, s) => engine.query(p, s));
+      const seen = new Set(detection.brands.map((b) => norm(b.name)));
+      const fresh = discovered.filter((b) => {
+        const key = norm(b.name);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (!fresh.length) return;
+      // 0% rows always sort below the recommended ones, so appending ranks
+      // after the existing max leaves the persisted reveal rows untouched.
+      let rank = Math.max(0, ...detection.brands.map((b) => b.rank));
+      const { error } = await bg.from("result_brands").insert(
+        fresh.map((b) => ({
+          scan_result_id: resultId,
+          rank: ++rank,
+          name: b.name,
+          domain: b.domain,
+          is_you: false,
+          visibility: 0,
+          sentiment: b.sentiment,
+          position: null,
+        })),
+      );
+      if (error) throw new Error(`Failed to append competitors: ${error.message}`);
+    };
+
     return {
-      scanId: scan.id,
-      engine: label,
-      prompt: primary.text,
-      brands: detection.brands,
-      you: detection.you,
-      citations,
+      result: {
+        scanId: scan.id,
+        engine: label,
+        prompt: primary.text,
+        brands: detection.brands,
+        you: detection.you,
+        citations,
+      },
+      appendCompetitors,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -79,8 +79,10 @@ export async function detectRanking(
           "it recommends. Return every distinct brand/product named, ranked by how prominently it is " +
           "recommended (most prominent first). For each, give: a 'visibility' score 0–100 reflecting its " +
           "share of the recommendation (the scores across all brands should roughly sum to 100), a " +
-          "'sentiment' (pos/neut/neg), and an approximate 'position' (1 = recommended first/most strongly; " +
-          "null if only mentioned in passing). Set isYou=true ONLY for the user's brand. " +
+          "'sentiment' (pos/neut/neg), and 'position' = the order in which the answer presents its " +
+          "recommendations: the first brand it recommends is 1, the second is 2, the third is 3, and so " +
+          "on — never give two brands the same position (null if only mentioned in passing). " +
+          "Set isYou=true ONLY for the user's brand. " +
           "If the user's brand is NOT recommended in the answer, do not invent it — just omit it. " +
           "Only include brands the answer text explicitly names; never infer a brand from the " +
           "question, the user's identity, or your own knowledge. " +
@@ -141,6 +143,16 @@ export async function detectRanking(
   brands.sort((a, b) => b.visibility - a.visibility || (a.position ?? 99) - (b.position ?? 99));
   brands.forEach((b, i) => (b.rank = i + 1));
 
+  // Despite the instruction, the judge sometimes stamps every prominent brand
+  // position=1 (observed: a 3-brand answer rendered as 1/1/1). Positions must
+  // be an ordering — if any recommended brands share one, renumber them all by
+  // prominence order instead of trusting a self-contradictory judgment.
+  const recommended = brands.filter((b) => b.visibility > 0);
+  const positions = recommended.map((b) => b.position).filter((p) => p != null);
+  if (new Set(positions).size < positions.length) {
+    recommended.forEach((b, i) => (b.position = i + 1));
+  }
+
   // Ensure the user's brand always appears (the design shows a "Your brand" row
   // even at 0% — that's the whole hook).
   let youRow = brands.find((b) => b.isYou);
@@ -194,22 +206,4 @@ export async function discoverCompetitors(
   } catch {
     return [];
   }
-}
-
-// Merge extra (0%) discovered competitors into a detected ranking: skip any whose
-// name already appears (incl. the user's own row), append the rest, then re-sort
-// by visibility (recommended brands stay on top, 0% competitors below) and
-// re-number ranks. The user's row keeps its real visibility/rank.
-export function mergeDiscoveredBrands(base: RankedBrand[], extra: RankedBrand[]): RankedBrand[] {
-  const seen = new Set(base.map((b) => norm(b.name)));
-  const merged = [...base];
-  for (const e of extra) {
-    const key = norm(e.name);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    merged.push({ ...e, isYou: false });
-  }
-  merged.sort((a, b) => b.visibility - a.visibility || (a.position ?? 99) - (b.position ?? 99));
-  merged.forEach((b, i) => (b.rank = i + 1));
-  return merged;
 }

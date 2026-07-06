@@ -73,7 +73,11 @@ export const OpenAIEngine: AIEngine = {
           model: MODEL,
           instructions: SYSTEM,
           input: prompt,
-          tools: [{ type: "web_search" }],
+          // Low search_context_size: less retrieved text to reason over per
+          // search — a large latency lever at no ranking cost for "name the
+          // leading options" queries. (Dropped with the other knobs on the
+          // bare retry if the API rejects it.)
+          tools: [tuned ? { type: "web_search", search_context_size: "low" } : { type: "web_search" }],
           // Force a browse so the answer reflects ChatGPT-with-search (what a real
           // user sees), not a stale training-data guess.
           tool_choice: { type: "web_search" },
@@ -91,6 +95,10 @@ export const OpenAIEngine: AIEngine = {
             // Same recommendations, less essay padding — fewer output tokens to
             // generate, so answers land faster (and cheaper) on every scan.
             text: { verbosity: "low" },
+            // Bound the browsing session: unbounded medium-effort browsing ran
+            // ~100s per query (multi-site pricing digs). 3 quick searches over a
+            // small context matches the consumer app's 2–4 search behavior.
+            max_tool_calls: 3,
             // Interactive scans (onboarding reveal) pay 2× token price for the
             // fast lane; background/cron scans stay on the default tier.
             ...(opts?.priority && { service_tier: "priority" }),
