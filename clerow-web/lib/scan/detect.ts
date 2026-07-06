@@ -61,6 +61,25 @@ export function norm(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// Canonical grouping key for cross-engine competitor aggregation. Different
+// engines name the same product differently — "Scrunch" vs "Scrunch AI",
+// "Writesonic GEO" vs "Writesonic", "SEMrush GEO (AI Toolkit)" vs "Semrush",
+// "SE Ranking / SE Visible" vs "SE Ranking (AI Overviews Tracker)" — and
+// without a resolved domain each variant became its own leaderboard row.
+// Strips parenthetical qualifiers, "/"-alternatives, and generic trailing
+// tokens; single-word names are never trimmed ("AthenaHQ" stays itself).
+const GENERIC_TAIL = new Set(["ai", "io", "app", "hq", "geo", "seo", "tool", "tools", "toolkit", "platform", "software", "suite"]);
+export function canonicalBrandKey(s: string): string {
+  const words = s
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ")
+    .split("/")[0]
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  while (words.length > 1 && GENERIC_TAIL.has(words[words.length - 1])) words.pop();
+  return words.join("") || norm(s);
+}
+
 export async function detectRanking(
   answer: string,
   brand: BrandProfile,

@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../supabase/database.types";
 import { auditSite, type SiteAudit } from "./site";
+import { CRITERIA } from "../scan/pageGrade";
 
 const DEFAULT_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // re-audit at most weekly
 
@@ -19,6 +20,18 @@ export function parseAudit(raw: unknown): SiteAudit | null {
 
 export async function refreshSiteAudit(db: Db, brandId: string, url: string): Promise<SiteAudit> {
   const audit = await auditSite(url);
+  // The cheap crawl only produces the technical checks. The AI page-grader's
+  // content checks (l2-*) are merged in by the full scan — carry them over from
+  // the stored audit so a free refresh doesn't silently drop them (dropping
+  // them degraded the Level-2 ladder back to generic tasks until the next full
+  // scan re-graded the page).
+  const { data: row } = await db.from("brands").select("site_audit").eq("id", brandId).maybeSingle();
+  const prev = parseAudit(row?.site_audit);
+  if (prev) {
+    const fresh = new Set(audit.checks.map((c) => c.id));
+    const graded = prev.checks.filter((c) => c.id in CRITERIA && !fresh.has(c.id));
+    if (graded.length) audit.checks = [...audit.checks, ...graded];
+  }
   await db
     .from("brands")
     .update({ site_audit: audit as unknown as Json, site_audited_at: audit.fetchedAt })

@@ -64,6 +64,38 @@ describe("aggregateCompetitors", () => {
     expect(out.find((c) => c.isYou)?.enginesCount).toBe(0);
   });
 
+  it("merges domain-less name variants of the same product across engines", () => {
+    const out = aggregateCompetitors(
+      [
+        row({ scan_result_id: "r1", name: "Scrunch AI", visibility: 40 }),
+        row({ scan_result_id: "r2", name: "Scrunch", visibility: 20 }),
+        row({ scan_result_id: "r1", name: "SEMrush GEO (AI Toolkit)", visibility: 30 }),
+        row({ scan_result_id: "r2", name: "Semrush", visibility: 50 }),
+        row({ scan_result_id: "r1", name: "SE Ranking / SE Visible", visibility: 10 }),
+        row({ scan_result_id: "r2", name: "SE Ranking (AI Overviews Tracker)", visibility: 10 }),
+      ],
+      engines,
+      2,
+    );
+    expect(out).toHaveLength(3);
+    expect(out.find((c) => c.name === "Scrunch")?.visibility).toBe(30); // (40+20)/2
+    expect(out.find((c) => c.name === "Semrush")?.enginesCount).toBe(2);
+  });
+
+  it("does not over-merge distinct products sharing a word", () => {
+    const out = aggregateCompetitors(
+      [
+        row({ scan_result_id: "r1", name: "Ahrefs Brand Radar", visibility: 30 }),
+        row({ scan_result_id: "r2", name: "Ahrefs", visibility: 30 }),
+        row({ scan_result_id: "r1", name: "AthenaHQ", visibility: 10 }),
+      ],
+      engines,
+      2,
+    );
+    // A named sub-product stays its own row; single-word names never get trimmed.
+    expect(out.map((c) => c.name).sort()).toEqual(["Ahrefs", "Ahrefs Brand Radar", "AthenaHQ"]);
+  });
+
   it("ranks by blended visibility with engine-count tie-break", () => {
     const out = aggregateCompetitors(
       [

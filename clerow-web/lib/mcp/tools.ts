@@ -21,9 +21,11 @@ import { buildContentBrief, buildSiteContext, buildScanInsight, buildVoiceContex
 import { buildOffsiteDraft } from "../content/offsite";
 import { deterministicTaskContent } from "../content/files";
 import { getSubscription, isSubscribed } from "../billing/subscription";
-import { scanTopPrompts, MAX_SCAN_PROMPTS } from "../scan/run";
+import { scanTopPrompts, runPromptScan, MAX_SCAN_PROMPTS } from "../scan/run";
+import { gradeSite, CRITERIA } from "../scan/pageGrade";
 import { synthesizeAndStore } from "../scan/synthesize";
-import { planFromSub, enginesForPlan, assertBudget, budgetStatus, BudgetExceededError } from "../billing/limits";
+import { planFromSub, enginesForPlan, assertBudget, budgetStatus, BudgetExceededError, type BudgetStatus } from "../billing/limits";
+import type { Json } from "../supabase/database.types";
 import { costForEngines } from "../billing/cost";
 import { enabledEngines } from "../engines";
 import type { BrandProfile } from "../types";
@@ -172,6 +174,75 @@ function tierNote(subscribed: boolean) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// budgetStatus.scansLeft counts PER-PROMPT scan units (one prompt × the plan's
+// engines). A full scan spends promptCount of those, so everything the MCP
+// reports as "scansRemaining" is converted to full-scan units here — the number
+// an agent actually cares about ("how many more times can I run_full_scan").
+function fullScansRemaining(budget: BudgetStatus, promptCount: number): number {
+  const fullCost = budget.scanCost * Math.max(1, promptCount);
+  return fullCost > 0 ? Math.floor(budget.remaining / fullCost) : 0;
+}
+
+// How many prompts the next full scan will cover (primary first, then volume) —
+// shared by run_full_scan's budget guard and get_visibility's scansRemaining.
+async function scanPromptCount(admin: Db, brandId: string): Promise<number> {
+  const { count } = await admin
+    .from("prompts")
+    .select("id", { count: "exact", head: true })
+    .eq("brand_id", brandId);
+  return Math.min(count ?? 0, MAX_SCAN_PROMPTS);
+}
+
+// Plain fetch of a page for cheap completion verification (no crawl machinery).
+async function fetchPage(url: string): Promise<{ status: number; html: string } | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "ClerowBot/1.0 (+https://clerow.com)" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(15000),
+    });
+    const html = await res.text().catch(() => "");
+    return { status: res.status, html };
+  } catch {
+    return null;
+  }
+}
+
+// Re-grade the homepage content checks (l2-*) with the AI page-grader and merge
+// the result into the stored audit — the same merge the full scan does, so an
+// l2 completion can be VERIFIED without spending a scan. `regraded` is false
+// when the grade couldn't run (crawl or LLM failure); callers must treat that
+// as unverifiable, not failed (the preserved checks are stale by definition).
+async function regradeContentChecks(
+  admin: Db,
+  brand: BrandRow,
+): Promise<{ audit: SiteAudit | null; regraded: boolean }> {
+  let audit: SiteAudit | null = null;
+  try {
+    audit = await refreshSiteAudit(admin, brand.id, brand.url);
+  } catch {
+    return { audit: null, regraded: false };
+  }
+  const page = await fetchPage(audit.url);
+  if (!page?.html) return { audit, regraded: false };
+  try {
+    const graded = await gradeSite({
+      brand: brandProfile(brand),
+      html: page.html,
+      images: [],
+      pages: audit.crawl?.pages ?? [],
+    });
+    if (!graded.length) return { audit, regraded: false };
+    const byId = new Map(audit.checks.map((c) => [c.id, c]));
+    for (const g of graded) byId.set(g.id, g);
+    audit = { ...audit, checks: [...byId.values()] };
+    await admin.from("brands").update({ site_audit: audit as unknown as Json }).eq("id", brand.id);
+    return { audit, regraded: true };
+  } catch {
+    return { audit, regraded: false };
+  }
+}
+
 // Find a task in the built ladder by its row id OR its stable ladder key
 // ("audit-robots-ai") — agents find the key friendlier than a UUID.
 function findLadderTask(ladder: Ladder, ref: string): { level: number; task: LadderTask } | null {
@@ -233,6 +304,9 @@ export function registerTools(server: McpServer) {
       const { admin, brand, sub, subscribed } = r.ctx;
       const [s, scan] = await Promise.all([loadBrandSnapshot(admin, r.ctx.brandId), scanStatus(admin, brand)]);
       const budget = subscribed ? await budgetStatus(admin, r.ctx.userId, planFromSub(sub), new Date()) : null;
+      // Reported in FULL-scan units (top prompts × all models) — the unit
+      // run_full_scan spends — not the internal per-prompt budget unit.
+      const promptCount = budget ? await scanPromptCount(admin, r.ctx.brandId) : 0;
 
       // Scan-over-scan story (only once an engine has been scanned twice):
       // delta/headline = the brand's own standings; changes = market/source moves.
@@ -260,7 +334,7 @@ export function registerTools(server: McpServer) {
         competitors: s.competitors.map((c) => ({ name: c.name, rank: c.rank, visibility: c.visibility, isYou: c.isYou })),
         citedDomains: s.citedDomains,
         primaryPrompt: s.primaryPromptText,
-        ...(budget ? { scansRemaining: budget.scansLeft } : {}),
+        ...(budget ? { scansRemaining: fullScansRemaining(budget, promptCount) } : {}),
       });
     }),
   );
@@ -305,7 +379,7 @@ export function registerTools(server: McpServer) {
   const AUDIT_REFRESH_MIN_MS = 5 * 60 * 1000;
   server.tool(
     "get_site_audit",
-    "Audit the brand's own website for technical/on-page GEO gaps: crawlability, robots.txt for AI crawlers, llms.txt, HTTPS, title, H1, meta description, structured data. Returns each check with a concrete fix plus the observed HTTP status. Pass refresh:true to re-crawl the live site right now (free, no scan budget; rate-limited to once per 5 minutes) — use it to verify a fix you just deployed without spending a premium scan.",
+    "Audit the brand's own website for technical/on-page GEO gaps: crawlability, robots.txt for AI crawlers, llms.txt, HTTPS, title, H1, meta description, structured data — plus, once a full scan has run, the AI-graded content checks (answer-first opening, buyer-question headings, E-E-A-T, freshness), which are preserved across refreshes. Returns each check with a concrete fix plus the observed HTTP status. Pass refresh:true to re-crawl the live site right now (free, no scan budget; rate-limited to once per 5 minutes) — use it to verify a technical fix you just deployed without spending a premium scan. (Content checks re-grade automatically when you complete_task an l2-* task.)",
     {
       refresh: z
         .boolean()
@@ -443,7 +517,7 @@ export function registerTools(server: McpServer) {
   // --- ACT: mark a task done (keeps the streak / earns XP) ---
   server.tool(
     "complete_task",
-    "Mark a task done after the agent has shipped it. Stamps completion so it keeps the user's Clerow streak and awards XP. For audit-backed tasks (key starting with \"audit-\") Clerow VERIFIES first: it re-crawls the live site (free) and refuses completion with the observed evidence if the check still fails — fix and retry, or pass force:true when the fix is deployed but a cache/CDN hasn't propagated yet. Covers your available tasks (free: Level 1 + the Level 2 taster; Premium: the full climb).",
+    "Mark a task done after the agent has shipped it. Stamps completion so it keeps the user's Clerow streak and awards XP. Clerow VERIFIES first where it can: audit-backed tasks (key \"audit-*\") re-crawl the live site; on-page content tasks (key \"l2-*\") re-run the AI page-grade against the live homepage; page-shipping tasks (key \"l4-*\") fetch the task's target URL and check it's live (and, for a comparison page, that it names the rival). A failing verification refuses completion with the observed evidence — fix and retry, or pass force:true when the fix is deployed but a cache/CDN hasn't propagated yet. Covers your available tasks (free: Level 1 + the Level 2 taster; Premium: the full climb).",
     {
       taskId: z.string().describe('A task id from list_tasks, or its stable key (e.g. "audit-robots-ai")'),
       force: z
@@ -478,15 +552,28 @@ export function registerTools(server: McpServer) {
       if (locked) return higherLevel(level);
       if (!rowId) return fail("Task not found for this brand.");
 
-      // Verify-on-complete: an audit-backed task can be checked against reality —
-      // re-crawl the live site (free HTTP fetches, always fresh: completion is
-      // exactly when freshness matters) and look at the matching check. A failing
-      // check BLOCKS completion (with the observed evidence) unless force:true;
-      // an unknown check or a failed crawl counts as unverifiable, not failed, so
-      // a mid-deploy site can't deadlock the agent.
+      // Verify-on-complete, wherever reality can be checked. A failing check
+      // BLOCKS completion (with the observed evidence) unless force:true; an
+      // unknown check, failed crawl, or failed grade counts as unverifiable,
+      // not failed, so a mid-deploy site can't deadlock the agent.
+      //   audit-* — re-crawl the live site and read the matching technical check.
+      //   l2-*    — re-run the AI page-grade against the live homepage (one LLM
+      //             call, no scan budget) and read the matching content check.
+      //   l4-*    — fetch the task's target URL: it must be live, and a
+      //             comparison page must actually name the rival.
       let verified: boolean | null = null;
       let evidence: Record<string, unknown> | null = null;
+      let verifiable = false;
+      const blocked = (label: string, detail: string) =>
+        json({
+          ok: false,
+          verified: false,
+          evidence,
+          message: `Not completed — Clerow checked the live site just now and "${label}" still fails: ${detail} Fix it and call complete_task again, or pass force:true if the fix is deployed and you're waiting on cache/CDN propagation.`,
+        });
+
       if (key.startsWith("audit-")) {
+        verifiable = true;
         let audit: SiteAudit | null = null;
         try {
           audit = await refreshSiteAudit(admin, brand.id, brand.url);
@@ -504,20 +591,54 @@ export function registerTools(server: McpServer) {
             ...(e?.bodySnippet ? { bodySnippet: e.bodySnippet } : {}),
           };
           verified = check.status === "pass";
+          if (!verified && !force) return blocked(check.label, check.detail);
+        }
+      } else if (key in CRITERIA) {
+        // On-page content task: re-grade the live homepage. Only a FRESH grade
+        // verifies — a preserved (stale) check proves nothing about the fix.
+        verifiable = true;
+        const { audit, regraded } = await regradeContentChecks(admin, brand);
+        const check = regraded ? audit?.checks.find((c) => c.id === key) : null;
+        if (check) {
+          evidence = { checkId: check.id, status: check.status, detail: check.detail, graded: "live homepage, just now" };
+          verified = check.status === "pass";
+          if (!verified && !force) return blocked(check.label, check.detail);
+        }
+      } else if (key.startsWith("l4-") && match?.targetUrl) {
+        // Page-shipping task: the target page must be live; a comparison page
+        // must also name the rival it claims to compare against.
+        verifiable = true;
+        const page = await fetchPage(match.targetUrl);
+        if (page) {
+          const live = page.status >= 200 && page.status < 300;
+          // "Publish a comparison page: <company> vs <rival>" — rival from the title.
+          const rival = key.startsWith("l4-compare-") ? (match.title.split(" vs ").pop()?.trim() ?? null) : null;
+          const namesRival = rival ? page.html.toLowerCase().includes(rival.toLowerCase()) : true;
+          verified = live && namesRival;
+          evidence = {
+            targetUrl: match.targetUrl,
+            httpStatus: page.status,
+            ...(rival ? { rival, rivalNamedOnPage: namesRival } : {}),
+          };
           if (!verified && !force) {
-            return json({
-              ok: false,
-              verified: false,
-              evidence,
-              message: `Not completed — Clerow re-crawled the live site just now and the "${check.label}" check still ${check.status === "warn" ? "warns" : "fails"}: ${check.detail} Fix it and call complete_task again, or pass force:true if the fix is deployed and you're waiting on cache/CDN propagation.`,
-            });
+            return blocked(
+              match.title,
+              !live
+                ? `${match.targetUrl} returned HTTP ${page.status} — the page isn't live yet.`
+                : `${match.targetUrl} is live but never mentions "${rival}" — a comparison page must name the rival.`,
+            );
           }
         }
       }
 
+      // Sync the awarded XP with the CURRENT ladder spec — a re-scan may have
+      // upgraded the task's impact after the row was seeded, and list_tasks
+      // shows the spec's XP, so completing must award that same number.
+      const patch: { done: true; completed_at: string; xp?: number } = { done: true, completed_at: new Date().toISOString() };
+      if (match?.xp != null) patch.xp = match.xp;
       const { data, error } = await admin
         .from("tasks")
-        .update({ done: true, completed_at: new Date().toISOString() })
+        .update(patch)
         .eq("id", rowId)
         .eq("brand_id", brand.id)
         .select("id, title, xp, done")
@@ -530,9 +651,9 @@ export function registerTools(server: McpServer) {
           ? `Completed "${data.title}" (+${data.xp} XP) — verified against the live site: the check now passes. Streak kept for today.`
           : verified === false
             ? `Completed "${data.title}" (+${data.xp} XP) with force — the live check still fails. Re-verify later with get_site_audit refresh:true. Streak kept for today.`
-            : key.startsWith("audit-")
-              ? `Completed "${data.title}" (+${data.xp} XP). Couldn't verify against the live site right now (crawl unavailable) — taking your word for it. Streak kept for today.`
-              : `Completed "${data.title}" (+${data.xp} XP). (Self-reported — this task type isn't crawl-verifiable.) Streak kept for today.`;
+            : verifiable
+              ? `Completed "${data.title}" (+${data.xp} XP). Couldn't verify against the live site right now — taking your word for it. Streak kept for today.`
+              : `Completed "${data.title}" (+${data.xp} XP). (Self-reported — this task type happens off-site, so Clerow can't crawl-verify it.) Streak kept for today.`;
       return json({ ok: true, verified, ...(evidence ? { evidence } : {}), task: data, message });
     }),
   );
@@ -540,7 +661,7 @@ export function registerTools(server: McpServer) {
   // --- ACT: run the full multi-model scan (Premium; budget-limited) ---
   server.tool(
     "run_full_scan",
-    "Start the full Clerow scan across ALL AI models (ChatGPT, Claude, Perplexity, Gemini, Grok) for the brand's top buyer questions. PREMIUM ONLY — it uses one of the subscription's monthly scans (hard budget cap). Returns IMMEDIATELY with status 'started'; the scan runs in the background for ~1–2 minutes. Poll get_visibility: when scan.inProgress flips false and scannedAt updates, the fresh standings + multi-model verdict are in. Do NOT call run_full_scan again while one is running — a retry is rejected and would otherwise double-spend the budget. To read existing standings WITHOUT spending a scan, use get_visibility.",
+    "Start the full Clerow scan across ALL AI models (ChatGPT, Claude, Perplexity, Gemini, Grok) for the brand's top buyer questions (up to 3 prompts × 5 models). PREMIUM ONLY — it spends one full scan of the subscription's monthly budget (scansRemaining is reported in full-scan units). Returns IMMEDIATELY with status 'started'; the scan runs in the background for ~1–2 minutes. Poll get_visibility: when scan.inProgress flips false and scannedAt updates, the fresh standings + multi-model verdict are in. Do NOT call run_full_scan again while one is running — a retry is rejected and would otherwise double-spend the budget. TIMING: engines need ~1–2 weeks to re-crawl freshly shipped fixes, so re-scanning right after shipping mostly measures noise — verify fixes with get_site_audit refresh:true (free) or complete_task's built-in checks instead, use run_probe for a cheap early signal after a few days, and run the full scan once the engines have had time to re-crawl. To read existing standings WITHOUT spending a scan, use get_visibility.",
     logged("run_full_scan", async (extra) => {
       const r = await resolveCtx(extra.authInfo);
       if (!r.ok) return r.result;
@@ -568,9 +689,10 @@ export function registerTools(server: McpServer) {
       if (promptCount === 0) return fail("No prompts to scan yet. Run your first scan in the Clerow dashboard.");
 
       // Budget guard (the money cap) — refuse cleanly before spending anything.
+      const fullScanCost = costForEngines(engines) * promptCount;
       let budget;
       try {
-        budget = await assertBudget(admin, userId, plan, costForEngines(engines) * promptCount, new Date());
+        budget = await assertBudget(admin, userId, plan, fullScanCost, new Date());
       } catch (err) {
         if (err instanceof BudgetExceededError) {
           return text("You're out of full scans for this month on your plan — they reset next billing cycle, or upgrade in the dashboard for more.");
@@ -616,10 +738,68 @@ export function registerTools(server: McpServer) {
         status: "started",
         scanning: { models: engines.length, prompts: promptCount },
         estimatedSeconds: 90,
-        scansRemaining: Math.max(0, budget.scansLeft - 1),
+        // Full-scan units, already net of the scan just started.
+        scansRemaining: Math.max(0, Math.floor((budget.remaining - fullScanCost) / Math.max(fullScanCost, 1e-6))),
         message:
           "Full multi-model scan started in the background (~1–2 min). Poll get_visibility — when scan.inProgress is false and scannedAt has updated, the fresh standings, cited sources, and multi-model verdict are in (list_tasks and get_task_content reflect them too). Do NOT call run_full_scan again; a retry while this runs is rejected.",
       });
+    }),
+  );
+
+  // --- ACT: cheap single-prompt early-signal probe (Premium) ---
+  server.tool(
+    "run_probe",
+    "Run a cheap early-signal probe: the brand's PRIMARY buyer prompt on Perplexity only — the search-grounded engine that picks up freshly shipped pages fastest. Use it a few days after shipping fixes for an early read at a fraction of a full scan's budget. It updates only Perplexity's standings, NOT the multi-model verdict — for the real measurement run run_full_scan ~1–2 weeks after shipping, once all engines have re-crawled. PREMIUM ONLY; blocks ~20–40s and returns the probe result directly.",
+    logged("run_probe", async (extra) => {
+      const r = await resolveCtx(extra.authInfo);
+      if (!r.ok) return r.result;
+      const { admin, brand, subscribed } = r.ctx;
+      if (!subscribed) {
+        return text(
+          "The probe is a Clerow Premium feature. The free MCP can still run the site audit (get_site_audit) and read your current standings (get_visibility). Upgrade in the Clerow dashboard to probe from here.",
+        );
+      }
+      const engines = enabledEngines(["perplexity"]);
+      if (engines.length === 0) return fail("Perplexity isn't configured on the server.");
+
+      const { data: prompts } = await admin
+        .from("prompts")
+        .select("id, text")
+        .eq("brand_id", brand.id)
+        .order("is_primary", { ascending: false })
+        .order("volume", { ascending: false })
+        .limit(1);
+      const prompt = prompts?.[0];
+      if (!prompt) return fail("No prompts to scan yet. Run your first scan in the Clerow dashboard.");
+
+      // Same claim as the full scan so a probe can't race one (or vice versa).
+      if (!(await claimScan(admin, brand.id))) {
+        return text("A scan is already running for this brand — poll get_visibility and probe after it finishes.");
+      }
+      try {
+        // runPromptScan asserts the (tiny) single-engine budget itself.
+        const result = await runPromptScan(admin, brand.id, prompt.id, engines);
+        const o = result.outcomes[0];
+        const mentioned = !!o?.ok && (o.visibility > 0 || o.position != null);
+        return json({
+          ok: true,
+          engine: "Perplexity",
+          prompt: result.prompt,
+          mentioned,
+          visibility: o?.ok ? o.visibility : null,
+          position: o?.ok ? o.position : null,
+          message: mentioned
+            ? `Perplexity now names ${brand.company} for "${result.prompt}" (visibility ${o!.ok ? o!.visibility : 0}%${o!.ok && o!.position != null ? `, position ${o!.position}` : ""}). Early signal only — the other engines lag; run run_full_scan after ~1–2 weeks for the real multi-model measurement.`
+            : `Perplexity doesn't name ${brand.company} for "${result.prompt}" yet. That's normal days after shipping — engines re-crawl on their own schedule. Keep shipping the remaining tasks and re-probe in a few days.`,
+        });
+      } catch (err) {
+        if (err instanceof BudgetExceededError) {
+          return text("You're out of scan budget for this month on your plan — it resets next billing cycle, or upgrade in the dashboard for more.");
+        }
+        return fail(`Probe failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        await releaseScan(admin, brand.id);
+      }
     }),
   );
 }

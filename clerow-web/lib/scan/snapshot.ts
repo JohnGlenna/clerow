@@ -9,7 +9,7 @@ import type { DashboardCompetitor, ScanSynthesis } from "../types";
 import { ENGINES, ENGINE_META, PAID_ENGINES, type EngineId } from "../engines";
 import { overallScore } from "../score";
 import { domainsFrom, hostOf } from "./domains";
-import { norm } from "./detect";
+import { canonicalBrandKey } from "./detect";
 
 type DB = SupabaseClient<Database>;
 
@@ -267,7 +267,8 @@ export function aggregateCompetitors(
 ): DashboardCompetitor[] {
   type Agg = { names: string[]; domain: string | null; isYou: boolean; vis: number[]; positions: number[]; sentiment: BrandSentiment; engines: Set<string> };
   const groups = new Map<string, Agg>();
-  // norm(name) → group key, so a domain-less "Suno" row joins suno.com's group.
+  // canonical name key → group key, so a domain-less "Suno" row joins suno.com's
+  // group and name variants ("Scrunch" / "Scrunch AI") share one group.
   const keyByName = new Map<string, string>();
   const normDomain = (d: string | null) => (d ? d.trim().toLowerCase().replace(/^www\./, "") : null);
 
@@ -275,7 +276,7 @@ export function aggregateCompetitors(
   const ordered = [...rows].sort((a, b) => Number(!a.domain) - Number(!b.domain));
   for (const row of ordered) {
     const dom = normDomain(row.domain);
-    const nameKey = norm(row.name);
+    const nameKey = canonicalBrandKey(row.name);
     const key = dom ? `d:${dom}` : (keyByName.get(nameKey) ?? `n:${nameKey}`);
     const agg = groups.get(key) ?? {
       names: [],

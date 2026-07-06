@@ -27,6 +27,55 @@ const ctx = (checks: SiteCheck[]): LadderContext => ({
 const levelTasks = (c: LadderContext, level: number) =>
   buildLadder(c, new Map()).levels.find((l) => l.level === level)!.tasks;
 
+describe("target-page resolution", () => {
+  const page = (url: string) => ({ url, title: null, description: null, text: "" });
+  const crawl = (pages: string[]) => ({ robotsTxt: null, sitemapUrls: [], home: page("https://acme.com/"), pages: pages.map(page) });
+
+  it("targets the rival-specific compare page, never a different rival's vs-page", () => {
+    const c: LadderContext = {
+      ...ctx([]),
+      audit: { ...audit([]), crawl: crawl(["https://acme.com/compare/acme-vs-profound"]) },
+      primaryPrompt: { text: "best geo tools", intent: "solution" },
+      competitorsAhead: ["LLMOmetrics", "Profound"],
+    };
+    const tasks = levelTasks(c, 4);
+    // The existing Profound vs-page belongs to the Profound task only…
+    expect(tasks.find((t) => t.key === "l4-compare-profound")?.targetUrl).toBe("https://acme.com/compare/acme-vs-profound");
+    // …while the LLMOmetrics task suggests creating its own page.
+    const llmo = tasks.find((t) => t.key === "l4-compare-llmometrics")!;
+    expect(llmo.targetUrl).toBe("https://acme.com/compare/acme-vs-llmometrics");
+    expect(llmo.targetIsNew).toBe(true);
+  });
+
+  it("targets the audited homepage for graded l2 checks (the page the grader read)", () => {
+    const c: LadderContext = {
+      ...ctx([check("l2-eeat", "fail", "Add sourced stats")]),
+      primaryPrompt: { text: "best geo tools", intent: "solution" },
+    };
+    // Even with a crawled inner page that better matches the prompt…
+    c.audit = { ...c.audit!, crawl: crawl(["https://acme.com/best-geo-tools"]) };
+    expect(levelTasks(c, 2).find((t) => t.key === "l2-eeat")?.targetUrl).toBe("https://acme.com/");
+  });
+});
+
+describe("XP stays in sync with the spec", () => {
+  it("refreshLadderTaskContent rewrites a row whose xp drifted from its spec", async () => {
+    // The graded l2-eeat check carries a "high" (60 XP) fix; the seeded row
+    // still holds the generic-era 35 XP even though title/meta/impact match.
+    const highFix: SiteCheckFix = { title: "Add sourced stats", detail: "d", minutes: 30, impact: "high", xp: 60, steps: [] };
+    const graded: SiteCheck = { id: "l2-eeat", label: "E-E-A-T signals", status: "fail", detail: "found", fix: highFix };
+    const ladder = buildLadder(ctx([graded]), new Map([["l2-eeat", { id: "t1", done: false, resolved: false }]]));
+    const t = ladder.levels.find((l) => l.level === 2)!.tasks.find((x) => x.key === "l2-eeat")!;
+    const updates: Record<string, unknown>[] = [];
+    const db = { from: () => ({ update: (u: Record<string, unknown>) => ({ eq: async () => { updates.push(u); return {}; } }) }) };
+    const changed = await refreshLadderTaskContent(db as never, ladder, [
+      { id: "t1", ladder_key: "l2-eeat", title: t.title, meta: t.meta, impact: t.impact, xp: 35 },
+    ]);
+    expect(changed).toBe(1);
+    expect(updates[0].xp).toBe(60);
+  });
+});
+
 describe("buildLadder wiring for the new checks", () => {
   it("turns a failing schema-honesty check into a Level-2 task", () => {
     const tasks = levelTasks(ctx([check("schema-honesty", "warn", "Back up your review schema — or remove it")]), 2);

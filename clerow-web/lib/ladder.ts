@@ -448,6 +448,10 @@ function resolveTargetUrl(key: string, ctx: LadderContext): { url: string; creat
     return origin && comp ? { url: `${origin}/compare/${slug(ctx.company)}-vs-${slug(comp)}`, create: true } : null;
   }
   if (key.startsWith("l2-")) {
+    // The AI page-grader reads the HOMEPAGE — when this task came from a graded
+    // check, that's the page the finding is about. Only the generic fallback
+    // specs (no graded check yet) target the best-matching content page.
+    if (ctx.audit?.checks.some((c) => c.id === key)) return home ? { url: home } : null;
     const best = bestContentPage(ctx);
     return best ? { url: best } : null;
   }
@@ -460,14 +464,22 @@ function resolveTargetUrl(key: string, ctx: LadderContext): { url: string; creat
     return domain ? { url: `https://${domain}` } : null;
   }
 
-  // Level-4 cornerstones: an existing vs-page if there is one, else a suggested
-  // slug for the page to create.
+  // Level-4 cornerstones: an existing vs-page ABOUT THIS RIVAL if there is one,
+  // else a suggested slug for the page to create. Any-vs-page matching would
+  // aim the task (and its content brief) at the wrong competitor's URL.
   if (key.startsWith("l4-compare-")) {
-    const existing = existingComparePage(ctx);
-    if (existing) return { url: existing };
     const suffix = key.slice("l4-compare-".length);
     const comp = ctx.competitorsAhead.find((c) => slug(c) === suffix);
-    return origin && comp ? { url: `${origin}/compare/${slug(ctx.company)}-vs-${slug(comp)}`, create: true } : null;
+    const compSlug = comp ? slug(comp) : suffix;
+    const stem = compSlug.split("-")[0];
+    const aboutRival = (u: string) => {
+      const lower = u.toLowerCase();
+      return COMPARE_PAGE_RE.test(u) && (lower.includes(compSlug) || (stem.length >= 4 && lower.includes(stem)));
+    };
+    const crawl = ctx.audit?.crawl;
+    const existing = crawl?.pages.find((p) => aboutRival(p.url))?.url ?? crawl?.sitemapUrls.find(aboutRival) ?? null;
+    if (existing) return { url: existing };
+    return origin && comp ? { url: `${origin}/compare/${slug(ctx.company)}-vs-${compSlug}`, create: true } : null;
   }
   if (key.startsWith("l4-prompt-")) {
     const suffix = key.slice("l4-prompt-".length);
@@ -639,7 +651,7 @@ export async function ensureLadderTasks(
 export async function refreshLadderTaskContent(
   db: DB,
   ladder: Ladder,
-  rows: { id: string; ladder_key: string | null; title: string; meta: string; impact: string }[],
+  rows: { id: string; ladder_key: string | null; title: string; meta: string; impact: string; xp?: number }[],
 ): Promise<number> {
   const specByKey = new Map<string, LadderTask>();
   for (const l of ladder.levels) for (const t of l.tasks) specByKey.set(t.key, t);
@@ -650,12 +662,15 @@ export async function refreshLadderTaskContent(
     // Never write a locked spec back: a churned subscriber's seeded rows would
     // otherwise get their real titles overwritten with redaction placeholders.
     if (!t || t.locked) return false;
-    return t.title !== r.title || t.meta !== r.meta || t.impact !== r.impact;
+    // xp rides along with impact: a re-scan that upgrades a task's impact must
+    // also upgrade the XP the row awards, or list_tasks (spec xp) and
+    // complete_task (row xp) drift apart.
+    return t.title !== r.title || t.meta !== r.meta || t.impact !== r.impact || (r.xp !== undefined && t.xp !== r.xp);
   });
   await Promise.all(
     changed.map((r) => {
       const t = specByKey.get(r.ladder_key as string)!;
-      return db.from("tasks").update({ title: t.title, meta: t.meta, impact: t.impact }).eq("id", r.id);
+      return db.from("tasks").update({ title: t.title, meta: t.meta, impact: t.impact, xp: t.xp }).eq("id", r.id);
     }),
   );
   return changed.length;
