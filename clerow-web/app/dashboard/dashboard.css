@@ -580,6 +580,7 @@
 .ld-root .cnx-try { display: flex; flex-direction: column; gap: 10px; }
 .ld-root .cnx-try-item { display: flex; gap: 12px; align-items: center; background: var(--surface); border: 2px solid var(--line); border-radius: 13px; padding: 13px 16px; font-size: 14px; font-weight: 700; }
 .ld-root .cnx-try-item .q { font-size: 16px; }
+.ld-root .cnx-try-item .cnx-copy { margin-left: auto; flex: none; }
 
 .ld-root .cnx-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .ld-root .cnx-tool { background: var(--surface); border: 2px solid var(--line); border-radius: 16px; padding: 18px; }

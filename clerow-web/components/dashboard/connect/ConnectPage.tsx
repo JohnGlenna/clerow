@@ -159,12 +159,18 @@ export function ConnectPage() {
         </CnxStep>
         <CnxStep n={3} t="Start shipping">
           Ask your agent for your top Level 1 task, let it write the fix into your repo, then have it mark the
-          task done to keep your streak.
+          task done to keep your streak. Or skip straight to autopilot — just say{" "}
+          <b>“Use the Clerow MCP and go through all my tasks.”</b>
         </CnxStep>
       </ol>
 
       <h2 className="lp-sec">Ask Claude things like</h2>
       <div className="cnx-try">
+        <div className="cnx-try-item">
+          <span className="q">⚡</span>
+          <span>“Use the Clerow MCP and go through all my tasks.”</span>
+          <CnxCopy value="Use the Clerow MCP and go through all my tasks." />
+        </div>
         {[
           "Where am I losing to competitors across ChatGPT, Claude, Perplexity, Gemini and Grok?",
           "What’s my highest-impact task — and ship it for me from the Clerow brief.",

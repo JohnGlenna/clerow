@@ -2,6 +2,7 @@ import React from "react";
 import { MascotClerow } from "../Mascot";
 import { AiIcon } from "../ui/AiIcon";
 import { StartButton, SignInButton } from "./Cta";
+import { CopyChip } from "./CopyChip";
 import { FAQS } from "@/lib/seo/faq";
 
 // Clerow Welcome — Duolingo-style landing, ported from the v2 design
@@ -62,17 +63,45 @@ function Hero() {
   );
 }
 
-function Row({ rev, title, children, art }: { rev?: boolean; title: string; children: React.ReactNode; art: React.ReactNode }) {
+function Row({ rev, title, children, art, extra }: { rev?: boolean; title: string; children: React.ReactNode; art: React.ReactNode; extra?: React.ReactNode }) {
   return (
     <section className={`row ${rev ? "rev" : ""}`}>
       <div className="shell in">
         <div>
           <h2>{title}</h2>
           <p>{children}</p>
+          {extra}
         </div>
         <div className="art">{art}</div>
       </div>
     </section>
+  );
+}
+
+// The 2-step MCP mini-guide under "Or let your AI do it." — the whole pitch is
+// that autopilot takes one paste and one sentence, so show exactly that.
+function McpSteps() {
+  return (
+    <div className="mcp-steps">
+      <div className="mcp-step">
+        <span className="mcp-step-n">1</span>
+        <div>
+          <b>Connect once</b> — add Clerow as a connector in Claude, ChatGPT, Cursor or Claude Code, then
+          approve in your browser. No API keys.
+          <CopyChip value="https://clerow.com/api/mcp" />
+        </div>
+      </div>
+      <div className="mcp-step">
+        <span className="mcp-step-n">2</span>
+        <div>
+          <b>Then just say</b>
+          <CopyChip
+            value="Use the Clerow MCP and go through all my tasks."
+            label={'"Use the Clerow MCP and go through all my tasks."'}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -330,8 +359,8 @@ export function WelcomePage() {
       <Row rev title="Fix it like a game." art={<IllPath />}>
         Every gap becomes one small, ranked quest. Clear quick wins first, earn XP and streaks, and watch your visibility climb week over week.
       </Row>
-      <Row title="Or let your AI do it." art={<IllTerm />}>
-        Connect <span className="lk">Clerow MCP</span> to Claude Code, Cursor or any agent. It ships the fixes for you — then Clerow re-checks all 5 models to prove it worked.
+      <Row title="Or let your AI do it." art={<IllTerm />} extra={<McpSteps />}>
+        Connect <a className="lk" href="/connect">Clerow MCP</a> to Claude Code, Cursor or any agent. It ships the fixes for you — then Clerow re-checks all 5 models to prove it worked.
       </Row>
       <Results />
       <AppSection />
