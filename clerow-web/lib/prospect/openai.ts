@@ -1,7 +1,9 @@
 // The Prospect Scanner's ONLY model client: OpenAI Chat Completions on
-// gpt-5.4-mini with medium reasoning effort, raw fetch (no SDK), no web-search
+// gpt-5.4-mini with low reasoning effort, raw fetch (no SDK), no web-search
 // tool. This is a high-volume internal prospecting tool — every scan must stay
 // well under $0.01, so keep it on the mini tier and don't add other providers.
+// None of the pipeline's calls (classify a homepage, list brands, write 150
+// words) needs more than low effort, and reasoning tokens bill as output.
 //
 // Reasoning-model notes: temperature is not configurable (API rejects it), and
 // max_completion_tokens includes the hidden reasoning tokens — budgets below
@@ -9,7 +11,7 @@
 
 const API_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = process.env.PROSPECT_MODEL || "gpt-5.4-mini";
-const REASONING_EFFORT = "medium";
+const REASONING_EFFORT = "low";
 
 function apiKey(): string {
   const key = process.env.OPENAI_API_KEY;

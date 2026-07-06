@@ -9,9 +9,12 @@ export function gmailConfigured(): boolean {
   return !!process.env.GMAIL_USER && !!process.env.GMAIL_APP_PASSWORD;
 }
 
-/** Max outreach sends per rolling 24h — protect the domain's sender reputation. */
+/** Max outreach sends per rolling 24h — protect the domain's sender reputation.
+ *  Raised 30 → 50 (2026-07); keep raises gradual and watch bounces/spam
+ *  replies — one Workspace mailbox doing cold outreach should stay well under
+ *  ~100/day. Env-tunable (PROSPECT_DAILY_SEND_CAP) without a deploy. */
 export function dailySendCap(): number {
-  return Number(process.env.PROSPECT_DAILY_SEND_CAP) || 30;
+  return Number(process.env.PROSPECT_DAILY_SEND_CAP) || 50;
 }
 
 export async function sendOutreachEmail(opts: {

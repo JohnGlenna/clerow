@@ -1,10 +1,14 @@
-// Buyer-intent prompt generation grounded in the prospect's real homepage
-// (one cheap JSON-mode call), plus the pure override parser for the manual
-// textarea. No category label — the model infers the market from what the
-// site actually says (falling back to brand + domain when it's unreadable).
+// Buyer-intent prompt generation grounded in the prospect's real homepage,
+// plus the pure override parser for the manual textarea. No category label —
+// the model infers the market from what the site actually says (falling back
+// to brand + domain when it's unreadable). When the homepage was crawled, the
+// same call also returns the grounded {observation, tip} (see sitePeek.ts for
+// the style contract) — the two share the identical input, so merging them
+// saves a whole model call per scan.
 
 import { chatCompletion } from "./openai";
-import type { Lang, SitePeek } from "./types";
+import { TIP_RULES, parseTip } from "./sitePeek";
+import type { Lang, SitePeek, SiteTip } from "./types";
 
 export const PROMPT_COUNT = 6;
 
@@ -16,6 +20,21 @@ const SCHEMA = {
       prompts: { type: "array", items: { type: "string" } },
     },
     required: ["prompts"],
+    additionalProperties: false,
+  },
+};
+
+// With a crawled homepage the call also produces the observation + tip.
+const SCHEMA_WITH_TIP = {
+  name: "buyer_prompts_and_tip",
+  schema: {
+    type: "object",
+    properties: {
+      prompts: { type: "array", items: { type: "string" } },
+      observation: { type: "string" },
+      tip: { type: "string" },
+    },
+    required: ["prompts", "observation", "tip"],
     additionalProperties: false,
   },
 };
@@ -35,11 +54,17 @@ export type PromptSiteContext = {
   site: Omit<SitePeek, "tip"> | null;
 };
 
+export type PromptsAndTip = {
+  prompts: string[];
+  /** Grounded observation + GEO tip; null when the homepage wasn't crawled or the fields came back empty. */
+  tip: SiteTip | null;
+};
+
 export async function generateBuyerPrompts(
   ctx: PromptSiteContext,
   language: Lang,
   signal?: AbortSignal,
-): Promise<string[]> {
+): Promise<PromptsAndTip> {
   const langLabel = language === "no" ? "Norwegian (bokmål)" : "English";
   const user = [
     `Prospect company: ${ctx.brand}`,
@@ -63,25 +88,28 @@ export async function generateBuyerPrompts(
       '"recommend an X for <situation>", "how do I choose an X". Match the specificity of what the ' +
       "site actually offers — not a broader industry it merely belongs to. Include the city/region " +
       "only when the site shows they serve a local market. Never include a specific company name. " +
+      (ctx.site ? `Also produce, in ${langLabel}: ${TIP_RULES} ` : "") +
       "Return JSON only.",
     user,
-    jsonSchema: SCHEMA,
-    maxTokens: 1500,
+    jsonSchema: ctx.site ? SCHEMA_WITH_TIP : SCHEMA,
+    maxTokens: 2000,
     signal,
   });
 
   let prompts: string[] = [];
+  let tip: SiteTip | null = null;
   try {
     const parsed = JSON.parse(raw) as { prompts?: unknown };
     prompts = (Array.isArray(parsed.prompts) ? parsed.prompts : [])
       .filter((p): p is string => typeof p === "string")
       .map((p) => p.trim())
       .filter(Boolean);
+    if (ctx.site) tip = parseTip(parsed);
   } catch {
     throw new Error("Prompt generation returned invalid JSON");
   }
   if (prompts.length < PROMPT_COUNT) {
     throw new Error(`Prompt generation returned ${prompts.length} prompts, expected ${PROMPT_COUNT}`);
   }
-  return prompts.slice(0, PROMPT_COUNT);
+  return { prompts: prompts.slice(0, PROMPT_COUNT), tip };
 }
