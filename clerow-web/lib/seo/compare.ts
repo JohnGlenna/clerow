@@ -4,7 +4,7 @@
 // and public/llms.txt. Competitor cells are kept qualitative and based on public
 // positioning as of the date below — no invented prices or numbers.
 
-export const COMPARE_UPDATED = "June 2026";
+export const COMPARE_UPDATED = "July 2026";
 
 export type CompareRow = { feature: string; clerow: string; rival: string };
 
@@ -78,6 +78,33 @@ export const COMPARE_PAGES: ComparePage[] = [
       "Teams whose main need is ongoing monitoring of brand mentions, prompts, and sentiment across AI search.",
     verdict:
       "Choose Clerow if you want the fixes done, not just the metrics tracked. Choose Otterly.AI if you primarily need lightweight, ongoing AI-search monitoring.",
+  },
+  {
+    slug: "clerow-vs-llmometrics",
+    rival: "LLMOmetrics",
+    rivalIs:
+      "an AI-visibility tracking platform (rebranded as GEO Metrics) that monitors brand prompts, citations, and sentiment across a wide set of AI models, sold on tiered subscriptions.",
+    metaTitle: "Clerow vs LLMOmetrics (2026): AI Visibility Tools Compared",
+    metaDescription:
+      "Clerow vs LLMOmetrics (now GEO Metrics) compared for 2026. Clerow is a $29/mo GEO tool that turns AI-visibility gaps into daily fixes an agent can ship; LLMOmetrics is a monitoring-first tracker. See the feature table.",
+    intro:
+      "Clerow and LLMOmetrics (which now goes by GEO Metrics) are both AI-visibility (GEO/AEO) tools that track whether AI answer engines recommend your brand. The difference is what happens after the tracking: LLMOmetrics is monitoring-first — prompt tracking, citation analysis, sentiment, and recommendations across a wide set of models — while Clerow turns each gap into a ranked daily task with generated, ready-to-ship fixes, and an MCP agent (Claude Code, Cursor) that can ship them for you. Clerow is $29/mo flat and self-serve; LLMOmetrics is sold on tiered subscription plans.",
+    rows: [
+      { feature: "Pricing", clerow: CLEROW_PRICE, rival: "Tiered subscription plans" },
+      { feature: "Engines tracked", clerow: "ChatGPT, Claude, Perplexity, Gemini, Grok (all 5)", rival: "Wide model coverage incl. Copilot, DeepSeek & AI Overviews" },
+      { feature: "Primary job", clerow: "Find gaps → fix them (action)", rival: "Track prompts, citations & sentiment (monitoring)" },
+      { feature: "Turns gaps into tasks", clerow: "Yes — ranked daily quests with XP & streaks", rival: "Recommendations; execution is manual" },
+      { feature: "Agent autopilot (MCP)", clerow: "Yes — Claude Code / Cursor ship fixes via MCP", rival: "Not a core feature" },
+      { feature: "Generates ready-to-ship content", clerow: "Yes — robots.txt, llms.txt, FAQ & comparison drafts", rival: "Content insights, not shipped files" },
+      { feature: "Habit / gamification layer", clerow: "Yes — streaks, points, daily tasks", rival: "No" },
+      { feature: "Best fit", clerow: "Founders & small teams who want to act", rival: "Teams who want broad-model monitoring dashboards" },
+    ],
+    clerowBestFor:
+      "Founders and small marketing teams who want the gaps closed, not just charted — with the work broken into daily fixes and an AI agent that can ship them hands-free.",
+    rivalBestFor:
+      "Teams that want to monitor prompts, citations, and sentiment across the broadest possible set of AI models — including Copilot, DeepSeek, and Google AI Overviews — with dashboards and reporting.",
+    verdict:
+      "Pick Clerow if you want an affordable tool that gets the fixes shipped and measures the climb across the 5 major answer engines. Pick LLMOmetrics (GEO Metrics) if your main need is wide-coverage monitoring and reporting.",
   },
 ];
 

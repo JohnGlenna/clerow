@@ -122,11 +122,14 @@ function IllTerm() {
   );
 }
 
+const GARTNER_URL =
+  "https://www.gartner.com/en/newsroom/press-releases/2024-02-19-gartner-predicts-search-engine-volume-will-drop-25-percent-by-2026-due-to-ai-chatbots-and-other-virtual-agents";
+
 function StatsBand() {
   const stats: [string, string][] = [
-    ["60%", "of buyers ask AI before they Google"],
+    ["−25%", "classic search volume by 2026 (Gartner)"],
     ["5", "AI engines Clerow tracks for you"],
-    ["2–6 wks", "to climb after shipping your fixes"],
+    ["2–6 wks", "to climb after shipping your fixes*"],
   ];
   return (
     <section className="stats-band">
@@ -134,6 +137,44 @@ function StatsBand() {
         {stats.map(([n, l], i) => (
           <div key={i} className="stat"><div className="n">{n}</div><div className="l">{l}</div></div>
         ))}
+      </div>
+      <p className="note">
+        Data current as of July 2026 · Search prediction:{" "}
+        <a href={GARTNER_URL} target="_blank" rel="noopener noreferrer">Gartner, Feb 2024</a>{" "}
+        · *2–6 weeks is what we observe across Clerow re-scans, because AI engines need to re-crawl the web.
+      </p>
+    </section>
+  );
+}
+
+function HowItWorks() {
+  const pick = (q: string) => FAQS.find((f) => f.q === q);
+  const qas = [
+    pick("How much does Clerow cost?"),
+    pick("Who is Clerow best for?"),
+    pick("How long until my AI visibility improves?"),
+  ].filter((f): f is NonNullable<typeof f> => Boolean(f));
+  return (
+    <section className="whofor" id="how-it-works">
+      <div className="shell">
+        <div className="wf-head">
+          <h2>How does Clerow work?</h2>
+          <p style={{ maxWidth: 640, margin: "12px auto 0", color: "var(--ink-2)", fontWeight: 600, lineHeight: 1.55 }}>
+            Three steps: <b>scan</b> — paste your URL and Clerow queries all 5 AI answer engines with the
+            questions your buyers ask; <b>reveal</b> — see exactly which prompts recommend a competitor
+            instead of you and which sources the engines cite; <b>ship</b> — clear one small, ranked fix a
+            day (or let an AI agent ship it through Clerow MCP), then re-scan to prove it worked.
+          </p>
+          <p style={{ maxWidth: 640, margin: "10px auto 0", color: "var(--ink-3)", fontWeight: 600, fontSize: 13.5 }}>
+            How we test: Clerow fires live prompts at ChatGPT, Claude, Perplexity, Gemini, and Grok and
+            records every brand and competitor mention in the real answers — no estimates.
+          </p>
+        </div>
+        <div className="wf-grid">
+          {qas.map((f) => (
+            <div key={f.q} className="wf-card"><h3>{f.q}</h3><p>{f.a}</p></div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -282,6 +323,7 @@ export function WelcomePage() {
       <Nav />
       <Hero />
       <StatsBand />
+      <HowItWorks />
       <Row title="Scan every AI at once." art={<IllScan />}>
         Paste your URL and Clerow checks all 5 engines — not just one. See exactly which prompts you show up in and which ones your rivals own.
       </Row>
@@ -302,12 +344,14 @@ export function WelcomePage() {
           <div className="brand"><MascotClerow size={28} /> Clerow</div>
           <nav className="foot-links">
             <a href="/best-geo-tools-2026">Best GEO tools 2026</a>
+            <a href="/blog/geo-vs-seo">GEO vs SEO</a>
             <a href="/compare/clerow-vs-profound">Clerow vs Profound</a>
             <a href="/compare/clerow-vs-otterly">Clerow vs Otterly.AI</a>
+            <a href="/compare/clerow-vs-llmometrics">Clerow vs LLMOmetrics</a>
             <a href="/pricing">Pricing</a>
             <a href="/faq">FAQ</a>
           </nav>
-          <p>© 2026 Clerow · Get recommended by ChatGPT, Claude, Gemini, Grok &amp; Perplexity · Kristiansand 🇳🇴</p>
+          <p>© 2026 Clerow · Built by founder John Glenna · Get recommended by ChatGPT, Claude, Gemini, Grok &amp; Perplexity · Kristiansand 🇳🇴</p>
         </div>
       </footer>
     </div>

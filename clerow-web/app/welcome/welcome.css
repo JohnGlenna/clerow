@@ -110,6 +110,8 @@
 .wl-root .stats-band .stat { text-align: center; }
 .wl-root .stats-band .n { font-weight: 900; font-size: clamp(30px,3.4vw,40px); color: var(--blue); letter-spacing: -.02em; line-height: 1; }
 .wl-root .stats-band .l { font-size: 13.5px; color: var(--ink-2); font-weight: 700; margin-top: 6px; white-space: nowrap; }
+.wl-root .stats-band .note { text-align: center; font-size: 12px; color: var(--ink-3); font-weight: 600; margin: 16px auto 0; max-width: 720px; padding: 0 20px; }
+.wl-root .stats-band .note a { color: inherit; text-decoration: underline; }
 .wl-root .whofor { padding: 90px 0; }
 .wl-root .wf-head { text-align: center; max-width: 640px; margin: 0 auto 44px; }
 .wl-root .wf-head h2 { font-weight: 900; font-size: clamp(28px,3.4vw,42px); letter-spacing: -.02em; margin: 0; color: var(--ink); }

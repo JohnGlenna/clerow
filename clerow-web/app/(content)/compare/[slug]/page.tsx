@@ -35,7 +35,7 @@ export default async function ComparePage({ params }: { params: Promise<{ slug: 
     "@type": "TechArticle",
     headline: `${SITE_NAME} vs ${page.rival}`,
     description: page.metaDescription,
-    dateModified: "2026-06-09",
+    dateModified: "2026-07-06",
     author: { "@type": "Organization", name: SITE_NAME },
     publisher: { "@type": "Organization", name: SITE_NAME },
     mainEntityOfPage: abs(`/compare/${page.slug}`),

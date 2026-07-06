@@ -16,8 +16,11 @@ Clerow queries the questions a real buyer would ask an AI assistant (e.g. "best 
 - https://clerow.com/pricing : Plans and pricing — $29/month, free first scan.
 - https://clerow.com/faq : Answers to common questions about Clerow, GEO/AEO, and the 5 engines tracked.
 - https://clerow.com/best-geo-tools-2026 : Roundup of the best GEO / AI-visibility tools in 2026.
+- https://clerow.com/blog/geo-vs-seo : GEO vs SEO — what's the difference and how to start with GEO.
+- https://clerow.com/blog/how-to-optimize-website-for-chatgpt-perplexity-gemini : 7-step guide to optimizing a website for AI answer engines.
 - https://clerow.com/compare/clerow-vs-profound : Honest comparison of Clerow and Profound.
 - https://clerow.com/compare/clerow-vs-otterly : Honest comparison of Clerow and Otterly.AI.
+- https://clerow.com/compare/clerow-vs-llmometrics : Honest comparison of Clerow and LLMOmetrics (GEO Metrics).
 
 ## Facts
 

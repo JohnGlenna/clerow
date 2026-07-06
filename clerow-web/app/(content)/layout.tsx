@@ -18,8 +18,11 @@ export default function ContentLayout({ children }: { children: React.ReactNode 
       <footer className="content-foot">
         <nav>
           <Link href="/best-geo-tools-2026">Best GEO tools 2026</Link>
+          <Link href="/blog/geo-vs-seo">GEO vs SEO</Link>
+          <Link href="/blog/how-to-optimize-website-for-chatgpt-perplexity-gemini">Optimize for AI search</Link>
           <Link href="/compare/clerow-vs-profound">Clerow vs Profound</Link>
           <Link href="/compare/clerow-vs-otterly">Clerow vs Otterly.AI</Link>
+          <Link href="/compare/clerow-vs-llmometrics">Clerow vs LLMOmetrics</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/faq">FAQ</Link>
         </nav>

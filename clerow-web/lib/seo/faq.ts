@@ -26,6 +26,10 @@ export const FAQS: Faq[] = [
     a: "Clerow is $29 per month, self-serve, and you can cancel anytime. Your first scan (one engine) and all Level 1 foundation fixes are free.",
   },
   {
+    q: "Who is Clerow best for?",
+    a: "Clerow is best for founders, small marketing teams, and agencies who want to act on their AI visibility, not just report it. If you mainly need enterprise-scale analytics and have budget for a sales-led contract, an enterprise platform like Profound may fit better.",
+  },
+  {
     q: "How long until my AI visibility improves?",
     a: "Most brands see movement within 2–6 weeks after shipping their fixes, because AI engines need to re-crawl the web. Clerow re-scans all 5 engines so you can measure the change and keep your streak going.",
   },
