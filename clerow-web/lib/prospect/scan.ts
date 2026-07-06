@@ -111,7 +111,6 @@ export async function runProspectScan(
       topCompetitorMentions: agg.topCompetitorMentions,
       competitors: agg.competitors,
       samplePrompt: prompts[0],
-      siteTip: sitePeek?.tip ?? null,
     });
 
   return {

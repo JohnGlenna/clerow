@@ -1,7 +1,10 @@
 // Pure cold-email copy builder. Templates are fixed product copy — edit here,
 // not in the UI. Zero-mention prospects get the "new company" angle instead.
+//
+// Shape (settled after several rounds): ultra-short, every paragraph exactly
+// one sentence — people skim cold email; one idea per line.
 
-import type { CompetitorCount, EmailCopy, Lang, SiteTip } from "./types";
+import type { CompetitorCount, EmailCopy, Lang } from "./types";
 
 const SIGNATURE = "John";
 
@@ -24,24 +27,19 @@ export type EmailInput = {
   competitors: CompetitorCount[];
   /** The example prompt quoted in the email (the first buyer prompt). */
   samplePrompt: string;
-  /** Homepage-grounded observation + tip; omitted from the email when null. */
-  siteTip?: SiteTip | null;
 };
 
-// One sentence with exactly one terminal period, however the LLM punctuated it.
-function sentence(s: string): string {
-  return `${s.trim().replace(/[.\s]+$/, "")}.`;
-}
-
-// The "we actually read your site" paragraph; empty array when there is no tip
-// so the email gracefully falls back to the non-grounded copy.
-function siteTipParagraph(i: EmailInput): string[] {
-  if (!i.siteTip) return [];
-  const observation = sentence(i.siteTip.observation);
-  const tip = sentence(i.siteTip.tip);
+// The "who wins instead" line; empty array when the scan found no competitors.
+function winnersParagraph(i: EmailInput): string[] {
+  const names = i.competitors.slice(0, 3).map((c) => c.name);
+  if (!names.length) return [];
+  const list =
+    names.length > 1
+      ? `${names.slice(0, -1).join(", ")} ${i.language === "no" ? "og" : "and"} ${names.at(-1)}`
+      : names[0];
   return i.language === "no"
-    ? [`Jeg tok en titt på ${i.displayName} – ${observation} ${tip}`]
-    : [`I took a look at ${i.displayName} — ${observation} ${tip}`];
+    ? [`Navnene ChatGPT anbefaler i stedet: ${list}.`]
+    : [`The names ChatGPT recommends instead: ${list}.`];
 }
 
 export function buildEmail(input: EmailInput): EmailCopy {
@@ -50,10 +48,8 @@ export function buildEmail(input: EmailInput): EmailCopy {
 }
 
 function standardEmail(i: EmailInput): EmailCopy {
-  const others = i.totalPrompts - 1;
   const top = i.topCompetitor;
   const x = i.mentionedCount;
-  const y = i.topCompetitorMentions;
 
   if (i.language === "no") {
     const subject = top
@@ -61,11 +57,11 @@ function standardEmail(i: EmailInput): EmailCopy {
       : `ChatGPT nevner ${i.displayName} i bare ${x} av ${i.totalPrompts} svar`;
     const body = [
       "Hei,",
-      `Jeg sjekket hvordan AI svarer kjøpere i markedet deres og spurte ChatGPT «${i.samplePrompt}» (pluss ${others} lignende spørsmål) – ${i.displayName} dukket opp i bare ${x} av ${i.totalPrompts} svar.` +
-        (top ? ` ${top} ble anbefalt i ${y} av dem.` : "") +
-        ` Stadig flere kjøpere spør AI i stedet for å google, og de hører aldri om dere.`,
-      ...siteTipParagraph(i),
-      `Jeg bygde Clerow for å fikse akkurat dette. Skann nettsiden deres nå på ${CLEROW_URL} – på et par minutter ser du nøyaktig hvor ${i.displayName} mangler og hva dere bør fikse først.`,
+      `Beklager å måtte si det: jeg spurte ChatGPT «${i.samplePrompt}» – ${i.displayName} dukket opp i bare ${x} av ${i.totalPrompts} svar.`,
+      ...winnersParagraph(i),
+      `Stadig flere spør AI i stedet for Google – det er potensielle kunder som aldri hører om dere.`,
+      `Jeg bygde Clerow for å fikse akkurat dette.`,
+      `Skann nettsiden deres på ${CLEROW_URL} – to minutter, så ser du hva dere bør fikse først.`,
       SIGNATURE,
     ].join("\n\n");
     return { subject, body };
@@ -76,30 +72,26 @@ function standardEmail(i: EmailInput): EmailCopy {
     : `ChatGPT mentions ${i.displayName} in only ${x} of ${i.totalPrompts} answers`;
   const body = [
     "Hi,",
-    `I was checking how AI answers buyers in your market and asked ChatGPT "${i.samplePrompt}" (plus ${others} similar questions) — ${i.displayName} came up in only ${x} of ${i.totalPrompts} answers.` +
-      (top ? ` ${top} was recommended in ${y} of them.` : "") +
-      ` More and more buyers ask AI instead of Google, and those buyers never hear about you.`,
-    ...siteTipParagraph(i),
-    `I built Clerow to fix exactly this. Scan your website now at ${CLEROW_URL} — in a couple of minutes you'll see exactly where ${i.displayName} is missing and what to fix first.`,
+    `Sorry to be the one to tell you: I asked ChatGPT "${i.samplePrompt}" — ${i.displayName} came up in only ${x} of ${i.totalPrompts} answers.`,
+    ...winnersParagraph(i),
+    `More and more people ask AI instead of Google — that's potential customers who never hear about you.`,
+    `I built Clerow to fix exactly this.`,
+    `Scan your site at ${CLEROW_URL} — two minutes and you'll see what to fix first.`,
     SIGNATURE,
   ].join("\n\n");
   return { subject, body };
 }
 
 function zeroMentionEmail(i: EmailInput): EmailCopy {
-  const others = i.totalPrompts - 1;
-  const owners = i.competitors.slice(0, 3).map((c) => c.name);
-  const ownerList = owners.join(", ");
-
   if (i.language === "no") {
     const subject = `ChatGPT vet ikke at ${i.displayName} finnes ennå`;
     const body = [
       "Hei,",
-      `Jeg sjekket hvordan AI svarer kjøpere i markedet deres og spurte ChatGPT «${i.samplePrompt}» (pluss ${others} lignende spørsmål) – ${i.displayName} dukket ikke opp i et eneste svar.` +
-        (owners.length ? ` Navnene som gikk igjen var ${ownerList}.` : "") +
-        ` Stadig flere kjøpere spør AI i stedet for å google, og de hører aldri om dere.`,
-      ...siteTipParagraph(i),
-      `Den gode nyheten: dette er fiksbart, og jeg bygde Clerow for å gjøre akkurat det. Skann nettsiden deres nå på ${CLEROW_URL} – på et par minutter ser du nøyaktig hvor ${i.displayName} mangler og hva dere bør fikse først.`,
+      `Beklager å måtte si det: jeg spurte ChatGPT «${i.samplePrompt}» – ${i.displayName} dukket ikke opp i det hele tatt.`,
+      ...winnersParagraph(i),
+      `Stadig flere spør AI i stedet for Google – det er potensielle kunder som aldri hører om dere.`,
+      `Jeg bygde Clerow for å fikse akkurat dette.`,
+      `Skann nettsiden deres på ${CLEROW_URL} – to minutter, så ser du hva dere bør fikse først.`,
       SIGNATURE,
     ].join("\n\n");
     return { subject, body };
@@ -108,11 +100,11 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
   const subject = `ChatGPT doesn't know ${i.displayName} exists yet`;
   const body = [
     "Hi,",
-    `I was checking how AI answers buyers in your market and asked ChatGPT "${i.samplePrompt}" (plus ${others} similar questions) — ${i.displayName} didn't come up in a single answer.` +
-      (owners.length ? ` The names that kept coming up were ${ownerList}.` : "") +
-      ` More and more buyers ask AI instead of Google, and those buyers never hear about you.`,
-    ...siteTipParagraph(i),
-    `The good news: this is fixable, and I built Clerow to do exactly that. Scan your website now at ${CLEROW_URL} — in a couple of minutes you'll see exactly where ${i.displayName} is missing and what to fix first.`,
+    `Sorry to be the one to tell you: I asked ChatGPT "${i.samplePrompt}" — ${i.displayName} never came up.`,
+    ...winnersParagraph(i),
+    `More and more people ask AI instead of Google — that's potential customers who never hear about you.`,
+    `I built Clerow to fix exactly this.`,
+    `Scan your site at ${CLEROW_URL} — two minutes and you'll see what to fix first.`,
     SIGNATURE,
   ].join("\n\n");
   return { subject, body };

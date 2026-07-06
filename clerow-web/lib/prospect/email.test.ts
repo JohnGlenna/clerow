@@ -55,43 +55,55 @@ describe("buildEmail clerow link", () => {
 });
 
 describe("buildEmail hook and CTA", () => {
-  it("opens with the I-checked story grounded in the scan data (zero-mention, no)", () => {
+  it("opens with the sorry hook grounded in the scan data (zero-mention, no)", () => {
     const { body } = buildEmail(base);
     const paragraphs = body.split("\n\n");
-    expect(paragraphs[1]).toMatch(/^Jeg sjekket hvordan AI svarer kjøpere i markedet deres og spurte ChatGPT/);
+    expect(paragraphs[1]).toMatch(/^Beklager å måtte si det: jeg spurte ChatGPT/);
     expect(paragraphs[1]).toContain("«Hvilke dataprogrammeringstjenester i Oslo er best?»");
-    expect(paragraphs[1]).toContain("Bouvet, Knowit, Bekk");
+    expect(paragraphs[2]).toBe("Navnene ChatGPT anbefaler i stedet: Bouvet, Knowit og Bekk.");
   });
 
-  it("opens with the I-checked story and real numbers (standard, en)", () => {
+  it("opens with the sorry hook and real numbers (standard, en)", () => {
     const { body } = buildEmail({ ...base, language: "en", mentionedCount: 2 });
     const paragraphs = body.split("\n\n");
-    expect(paragraphs[1]).toMatch(/^I was checking how AI answers buyers in your market and asked ChatGPT/);
+    expect(paragraphs[1]).toMatch(/^Sorry to be the one to tell you: I asked ChatGPT/);
     expect(paragraphs[1]).toContain("came up in only 2 of 6 answers");
-    expect(paragraphs[1]).toContain("Bouvet was recommended in 4 of them.");
+    expect(paragraphs[2]).toBe("The names ChatGPT recommends instead: Bouvet, Knowit and Bekk.");
   });
 
   it.each([
-    { language: "no" as const, cost: "de hører aldri om dere" },
-    { language: "en" as const, cost: "those buyers never hear about you" },
-  ])("closes the problem paragraph with the what-it-costs-you clause ($language)", ({ language, cost }) => {
+    { language: "no" as const, cost: "potensielle kunder som aldri hører om dere" },
+    { language: "en" as const, cost: "potential customers who never hear about you" },
+  ])("follows the winners line with the what-it-costs-you line ($language)", ({ language, cost }) => {
     for (const mentionedCount of [0, 2]) {
       const { body } = buildEmail({ ...base, language, mentionedCount });
-      expect(body.split("\n\n")[1]).toContain(cost);
+      expect(body.split("\n\n")[3]).toContain(cost);
     }
   });
 
-  it("carries no discount PS in the first touch", () => {
+  it("keeps the one-sentence-per-line shape and skips the winners line without competitors", () => {
+    for (const language of ["no", "en"] as const) {
+      // greeting, hook, winners, cost, turn, CTA, signature
+      expect(buildEmail({ ...base, language }).body.split("\n\n")).toHaveLength(7);
+      expect(
+        buildEmail({ ...base, language, competitors: [] }).body.split("\n\n"),
+      ).toHaveLength(6);
+    }
+  });
+
+  it("never says buyers/kjøpere and carries no discount PS", () => {
     for (const language of ["no", "en"] as const) {
       const { body } = buildEmail({ ...base, language });
+      expect(body.toLowerCase()).not.toContain("buyer");
+      expect(body.toLowerCase()).not.toContain("kjøper");
       expect(body).not.toContain("PS:");
       expect(body.split("\n\n").at(-1)).toBe("John");
     }
   });
 
   it.each([
-    { language: "no" as const, cta: "Skann nettsiden deres nå på https://clerow.com/" },
-    { language: "en" as const, cta: "Scan your website now at https://clerow.com/" },
+    { language: "no" as const, cta: "Skann nettsiden deres på https://clerow.com/" },
+    { language: "en" as const, cta: "Scan your site at https://clerow.com/" },
   ])("ends every variant with the scan-now CTA ($language)", ({ language, cta }) => {
     for (const mentionedCount of [0, 2]) {
       const { body } = buildEmail({ ...base, language, mentionedCount });
@@ -99,45 +111,5 @@ describe("buildEmail hook and CTA", () => {
       // The URL lives in the CTA and appears exactly once.
       expect(body.match(/https:\/\/clerow\.com\//g)).toHaveLength(1);
     }
-  });
-});
-
-describe("buildEmail site tip", () => {
-  const tip = {
-    observation: "dere bygger skreddersydd programvare for små bedrifter",
-    tip: "En FAQ-side som svarer på vanlige kjøperspørsmål ville hjulpet AI-synligheten.",
-  };
-
-  it("inserts the grounded paragraph right after the problem paragraph (no)", () => {
-    const { body } = buildEmail({ ...base, siteTip: tip });
-    expect(body).toContain(
-      "Jeg tok en titt på nord-flow.no – dere bygger skreddersydd programvare for små bedrifter. " +
-        "En FAQ-side som svarer på vanlige kjøperspørsmål ville hjulpet AI-synligheten.",
-    );
-    const paragraphs = body.split("\n\n");
-    expect(paragraphs[2]).toMatch(/^Jeg tok en titt på nord-flow\.no/);
-  });
-
-  it("inserts the grounded paragraph in English", () => {
-    const { body } = buildEmail({
-      ...base,
-      language: "en",
-      mentionedCount: 2,
-      siteTip: { observation: "you build custom software for small teams", tip: "Add an FAQ answering buyer questions." },
-    });
-    expect(body).toContain("I took a look at nord-flow.no — you build custom software for small teams.");
-  });
-
-  it("normalizes stray terminal punctuation from the LLM", () => {
-    const { body } = buildEmail({
-      ...base,
-      siteTip: { observation: "dere bygger programvare.. ", tip: "Legg til en FAQ-side" },
-    });
-    expect(body).toContain("dere bygger programvare. Legg til en FAQ-side.");
-  });
-
-  it("falls back to the exact baseline copy without a tip", () => {
-    expect(buildEmail({ ...base, siteTip: null })).toEqual(buildEmail(base));
-    expect(buildEmail(base).body).not.toContain("tok en titt");
   });
 });

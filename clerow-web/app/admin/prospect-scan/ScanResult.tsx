@@ -131,15 +131,13 @@ export function ScanResult({
                 {scan.sitePeek.tip.observation} <b>{scan.sitePeek.tip.tip}</b>
               </p>
             ) : (
-              <p className="ps-peek-warn">
-                Homepage was read, but no tip was generated — email has no site reference.
-              </p>
+              <p className="ps-peek-warn">Homepage was read, but no tip was generated.</p>
             )}
           </>
         ) : (
           <p className="ps-peek-warn">
-            Couldn&apos;t read their website — the email has no site reference. Check the domain or
-            force a rescan.
+            Couldn&apos;t read their website — the LLM-written email has no homepage grounding.
+            Check the domain or force a rescan.
           </p>
         )}
       </div>
