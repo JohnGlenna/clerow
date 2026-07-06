@@ -55,20 +55,30 @@ describe("buildEmail clerow link", () => {
 });
 
 describe("buildEmail hook and CTA", () => {
-  it("opens with the bad-news hook grounded in the scan data (zero-mention, no)", () => {
+  it("opens with the I-checked story grounded in the scan data (zero-mention, no)", () => {
     const { body } = buildEmail(base);
     const paragraphs = body.split("\n\n");
-    expect(paragraphs[1]).toMatch(/^Beklager å måtte si det: jeg spurte ChatGPT/);
+    expect(paragraphs[1]).toMatch(/^Jeg sjekket hvordan AI svarer kjøpere i markedet deres og spurte ChatGPT/);
     expect(paragraphs[1]).toContain("«Hvilke dataprogrammeringstjenester i Oslo er best?»");
     expect(paragraphs[1]).toContain("Bouvet, Knowit, Bekk");
   });
 
-  it("opens with the heads-up hook and real numbers (standard, en)", () => {
+  it("opens with the I-checked story and real numbers (standard, en)", () => {
     const { body } = buildEmail({ ...base, language: "en", mentionedCount: 2 });
     const paragraphs = body.split("\n\n");
-    expect(paragraphs[1]).toMatch(/^Sorry to be the one to tell you: I asked ChatGPT/);
+    expect(paragraphs[1]).toMatch(/^I was checking how AI answers buyers in your market and asked ChatGPT/);
     expect(paragraphs[1]).toContain("came up in only 2 of 6 answers");
-    expect(paragraphs[1]).toContain("Bouvet was recommended in 4.");
+    expect(paragraphs[1]).toContain("Bouvet was recommended in 4 of them.");
+  });
+
+  it.each([
+    { language: "no" as const, cost: "dere går glipp av potensielle kunder hver uke" },
+    { language: "en" as const, cost: "potential customers you're losing every week" },
+  ])("follows the hook with the what-it-costs-you line ($language)", ({ language, cost }) => {
+    for (const mentionedCount of [0, 2]) {
+      const { body } = buildEmail({ ...base, language, mentionedCount });
+      expect(body.split("\n\n")[2]).toContain(cost);
+    }
   });
 
   it.each([
@@ -90,14 +100,14 @@ describe("buildEmail site tip", () => {
     tip: "En FAQ-side som svarer på vanlige kjøperspørsmål ville hjulpet AI-synligheten.",
   };
 
-  it("inserts the grounded paragraph right after the gap statement (no)", () => {
+  it("inserts the grounded paragraph right after the cost line (no)", () => {
     const { body } = buildEmail({ ...base, siteTip: tip });
     expect(body).toContain(
       "Jeg tok en titt på nord-flow.no – dere bygger skreddersydd programvare for små bedrifter. " +
         "En FAQ-side som svarer på vanlige kjøperspørsmål ville hjulpet AI-synligheten.",
     );
     const paragraphs = body.split("\n\n");
-    expect(paragraphs[2]).toMatch(/^Jeg tok en titt på nord-flow\.no/);
+    expect(paragraphs[3]).toMatch(/^Jeg tok en titt på nord-flow\.no/);
   });
 
   it("inserts the grounded paragraph in English", () => {

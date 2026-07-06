@@ -60,11 +60,11 @@ function standardEmail(i: EmailInput): EmailCopy {
       : `ChatGPT nevner ${i.displayName} i bare ${x} av ${i.totalPrompts} svar`;
     const body = [
       "Hei,",
-      `Beklager å måtte si det: jeg spurte ChatGPT «${i.samplePrompt}» og ${others} andre spørsmål ekte kjøpere stiller i markedet deres – ${i.displayName} dukket opp i bare ${x} av ${i.totalPrompts} svar.` +
-        (top ? ` ${top} ble anbefalt i ${y}.` : ""),
+      `Jeg sjekket hvordan AI svarer kjøpere i markedet deres og spurte ChatGPT «${i.samplePrompt}» (pluss ${others} lignende spørsmål) – ${i.displayName} dukket opp i bare ${x} av ${i.totalPrompts} svar.` +
+        (top ? ` ${top} ble anbefalt i ${y} av dem.` : ""),
+      `Stadig flere kjøpere spør AI i stedet for å google, og de hører aldri om dere – dere går glipp av potensielle kunder hver uke.`,
       ...siteTipParagraph(i),
-      `Stadig flere kunder spør AI i stedet for å google. Clerow sporer synligheten deres på tvers av 5 AI-modeller – ChatGPT, Claude, Perplexity, Gemini og Grok – og gir konkrete daglige oppgaver som gjør de svarene om til gratis, organiske besøkende.`,
-      `Skann nettsiden deres nå på ${CLEROW_URL} – på et par minutter ser du nøyaktig hvor ${i.displayName} mangler og hva dere bør fikse først.`,
+      `Jeg bygde Clerow for akkurat dette: den sjekker synligheten deres i ChatGPT, Claude, Perplexity, Gemini og Grok, og gir dere én konkret ting å fikse hver dag. Skann nettsiden deres nå på ${CLEROW_URL} – på et par minutter ser du nøyaktig hvor ${i.displayName} mangler og hva dere bør fikse først.`,
       SIGNATURE,
       DISCOUNT_NO,
     ].join("\n\n");
@@ -76,11 +76,11 @@ function standardEmail(i: EmailInput): EmailCopy {
     : `ChatGPT mentions ${i.displayName} in only ${x} of ${i.totalPrompts} answers`;
   const body = [
     "Hi,",
-    `Sorry to be the one to tell you: I asked ChatGPT "${i.samplePrompt}" and ${others} more questions real buyers ask in your market — ${i.displayName} came up in only ${x} of ${i.totalPrompts} answers.` +
-      (top ? ` ${top} was recommended in ${y}.` : ""),
+    `I was checking how AI answers buyers in your market and asked ChatGPT "${i.samplePrompt}" (plus ${others} similar questions) — ${i.displayName} came up in only ${x} of ${i.totalPrompts} answers.` +
+      (top ? ` ${top} was recommended in ${y} of them.` : ""),
+    `More and more buyers ask AI instead of Google, and those buyers never hear about you — that's potential customers you're losing every week.`,
     ...siteTipParagraph(i),
-    `More and more buyers ask AI instead of Google. Clerow tracks your visibility across 5 AI models — ChatGPT, Claude, Perplexity, Gemini and Grok — and gives you concrete daily tasks that turn those answers into free, organic visitors.`,
-    `Scan your website now at ${CLEROW_URL} — in a couple of minutes you'll see exactly where ${i.displayName} is missing and what to fix first.`,
+    `I built Clerow for exactly this: it checks your visibility across ChatGPT, Claude, Perplexity, Gemini and Grok, and gives you one concrete thing to fix each day. Scan your website now at ${CLEROW_URL} — in a couple of minutes you'll see exactly where ${i.displayName} is missing and what to fix first.`,
     SIGNATURE,
     DISCOUNT_EN,
   ].join("\n\n");
@@ -96,13 +96,13 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
     const subject = `ChatGPT vet ikke at ${i.displayName} finnes ennå`;
     const body = [
       "Hei,",
-      `Beklager å måtte si det: jeg spurte ChatGPT «${i.samplePrompt}» og ${others} andre spørsmål ekte kjøpere stiller i markedet deres – ${i.displayName} dukket ikke opp i et eneste svar.` +
+      `Jeg sjekket hvordan AI svarer kjøpere i markedet deres og spurte ChatGPT «${i.samplePrompt}» (pluss ${others} lignende spørsmål) – ${i.displayName} dukket ikke opp i et eneste svar.` +
         (owners.length
-          ? ` Akkurat nå er det ${ownerList} som eier de svarene, og kundene som spør hører aldri om dere.`
-          : " Akkurat nå er det andre aktører som eier de svarene, og kundene som spør hører aldri om dere."),
+          ? ` Navnene som gikk igjen var ${ownerList}.`
+          : ""),
+      `Stadig flere kjøpere spør AI i stedet for å google, og de hører aldri om dere – dere går glipp av potensielle kunder hver uke.`,
       ...siteTipParagraph(i),
-      `Den gode nyheten: dette er fiksbart på noen uker, ikke år. Clerow sporer synligheten deres på tvers av 5 AI-modeller – ChatGPT, Claude, Perplexity, Gemini og Grok – og gir konkrete daglige oppgaver som gjør de svarene om til gratis, organiske besøkende.`,
-      `Skann nettsiden deres nå på ${CLEROW_URL} – på et par minutter ser du nøyaktig hvor ${i.displayName} mangler og hva dere bør fikse først.`,
+      `Den gode nyheten: dette er fiksbart på noen uker, ikke år. Jeg bygde Clerow for akkurat dette: den sjekker synligheten deres i ChatGPT, Claude, Perplexity, Gemini og Grok, og gir dere én konkret ting å fikse hver dag. Skann nettsiden deres nå på ${CLEROW_URL} – på et par minutter ser du nøyaktig hvor ${i.displayName} mangler og hva dere bør fikse først.`,
       SIGNATURE,
       DISCOUNT_NO,
     ].join("\n\n");
@@ -112,13 +112,11 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
   const subject = `ChatGPT doesn't know ${i.displayName} exists yet`;
   const body = [
     "Hi,",
-    `Sorry to be the one to tell you: I asked ChatGPT "${i.samplePrompt}" and ${others} more questions real buyers ask in your market — ${i.displayName} didn't come up in a single answer.` +
-      (owners.length
-        ? ` Right now ${ownerList} own those answers, and the buyers asking never hear about you.`
-        : " Right now other players own those answers, and the buyers asking never hear about you."),
+    `I was checking how AI answers buyers in your market and asked ChatGPT "${i.samplePrompt}" (plus ${others} similar questions) — ${i.displayName} didn't come up in a single answer.` +
+      (owners.length ? ` The names that kept coming up were ${ownerList}.` : ""),
+    `More and more buyers ask AI instead of Google, and those buyers never hear about you — that's potential customers you're losing every week.`,
     ...siteTipParagraph(i),
-    `The good news: this is fixable in weeks, not years. Clerow tracks your visibility across 5 AI models — ChatGPT, Claude, Perplexity, Gemini and Grok — and gives you concrete daily tasks that turn those answers into free, organic visitors.`,
-    `Scan your website now at ${CLEROW_URL} — in a couple of minutes you'll see exactly where ${i.displayName} is missing and what to fix first.`,
+    `The good news: this is fixable in weeks, not years. I built Clerow for exactly this: it checks your visibility across ChatGPT, Claude, Perplexity, Gemini and Grok, and gives you one concrete thing to fix each day. Scan your website now at ${CLEROW_URL} — in a couple of minutes you'll see exactly where ${i.displayName} is missing and what to fix first.`,
     SIGNATURE,
     DISCOUNT_EN,
   ].join("\n\n");
