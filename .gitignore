@@ -55,3 +55,4 @@ coverage/
 # own geo-seo-expert skill, which is real (not a junction).
 /.claude/skills/*
 !/.claude/skills/geo-seo-expert/
+.vercel

@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "mcp__stripe__stripe_api_execute",
-      "Bash(npx vercel *)"
+      "Bash(npx vercel *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit=$?\")",
+      "WebSearch",
+      "mcp__supabase__execute_sql",
+      "mcp__clerow__get_visibility"
     ]
   },
   "enabledMcpjsonServers": [
