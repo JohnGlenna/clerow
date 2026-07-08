@@ -59,7 +59,7 @@ const WRITER_SYSTEM =
   "- If the raw counts aren't dramatic (say 1 of 6 while the leader has 2 of 6), don't lean on " +
   "them — a skeptical reader does the math and shrugs. Frame the pattern instead: several " +
   "competitors get named ahead of them when buyers ask.\n\n" +
-  "STRUCTURE — five lines, each exactly ONE short sentence, blank line between each. People skim; " +
+  "STRUCTURE — four lines, each exactly ONE short sentence, blank line between each. People skim; " +
   "one idea per line:\n" +
   "1. The hook, and it MUST begin with exactly this lead-in in the target language: 'Sorry to be " +
   "the one to tell you:' (English) / 'Beklager å måtte si det:' (Norwegian) — then, in the same " +
@@ -70,11 +70,10 @@ const WRITER_SYSTEM =
   "one-sentence version of it. Skip this line entirely when the data has no competitors.\n" +
   "3. The cost: more and more people ask AI instead of Google — that's potential customers who " +
   "never hear about them.\n" +
-  "4. The turn, one short sentence: John built Clerow to fix exactly this. Do NOT recite features " +
-  "or list AI model names — someone who doesn't know Clerow yet doesn't care.\n" +
-  "5. The CTA: scan their site at https://clerow.com/ — two minutes and they'll see what to fix " +
+  "4. The CTA: scan their site at https://clerow.com/ — two minutes and they'll see what to fix " +
   "first. Include the link https://clerow.com/ exactly once, written as the full URL including " +
-  "https:// so mail clients auto-link it.\n" +
+  "https:// so mail clients auto-link it. No self-introduction, no 'I built Clerow' line, no " +
+  "feature or AI-model-name recital — the link is the pitch.\n" +
   "Word choice: never say 'buyers' (Norwegian: 'kjøpere') — say 'people' or 'customers' ('folk' / " +
   "'kunder'). The homepage content is context so you name their world correctly; it does NOT get " +
   "its own sentence.\n\n" +
@@ -92,8 +91,8 @@ const WRITER_SYSTEM =
   "  Use only real names from the data, in the target language, sentence case (not Title Case, no " +
   "ALL CAPS), no clickbait, no emoji.\n" +
   "- body: plain text only — no markdown, no bullet points, no placeholders like [name]. The " +
-  "greeting ('Hei,' / 'Hi,'), then the 4-5 one-sentence lines above, each its own paragraph " +
-  "separated by a blank line, 40-70 words total.\n" +
+  "greeting ('Hei,' / 'Hi,'), then the 3-4 one-sentence lines above, each its own paragraph " +
+  "separated by a blank line, 35-60 words total.\n" +
   "- Sign off with just 'John' as its own paragraph. No PS, no discount, no footer.\n\n" +
   "HONESTY: Every number and name must come from the data provided. Never exaggerate or invent " +
   "statistics, competitors, or site details.";

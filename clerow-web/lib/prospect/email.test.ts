@@ -83,11 +83,20 @@ describe("buildEmail hook and CTA", () => {
 
   it("keeps the one-sentence-per-line shape and skips the winners line without competitors", () => {
     for (const language of ["no", "en"] as const) {
-      // greeting, hook, winners, cost, turn, CTA, signature
-      expect(buildEmail({ ...base, language }).body.split("\n\n")).toHaveLength(7);
+      // greeting, hook, winners, cost, CTA, signature
+      expect(buildEmail({ ...base, language }).body.split("\n\n")).toHaveLength(6);
       expect(
         buildEmail({ ...base, language, competitors: [] }).body.split("\n\n"),
-      ).toHaveLength(6);
+      ).toHaveLength(5);
+    }
+  });
+
+  it("carries no I-built-Clerow self-introduction", () => {
+    for (const language of ["no", "en"] as const) {
+      for (const mentionedCount of [0, 2]) {
+        const { body } = buildEmail({ ...base, language, mentionedCount });
+        expect(body).not.toMatch(/bygde Clerow|built Clerow/i);
+      }
     }
   });
 

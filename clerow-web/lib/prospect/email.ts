@@ -60,7 +60,6 @@ function standardEmail(i: EmailInput): EmailCopy {
       `Beklager å måtte si det: jeg spurte ChatGPT «${i.samplePrompt}» – ${i.displayName} dukket opp i bare ${x} av ${i.totalPrompts} svar.`,
       ...winnersParagraph(i),
       `Stadig flere spør AI i stedet for Google – det er potensielle kunder som aldri hører om dere.`,
-      `Jeg bygde Clerow for å fikse akkurat dette.`,
       `Skann nettsiden deres på ${CLEROW_URL} – to minutter, så ser du hva dere bør fikse først.`,
       SIGNATURE,
     ].join("\n\n");
@@ -75,7 +74,6 @@ function standardEmail(i: EmailInput): EmailCopy {
     `Sorry to be the one to tell you: I asked ChatGPT "${i.samplePrompt}" — ${i.displayName} came up in only ${x} of ${i.totalPrompts} answers.`,
     ...winnersParagraph(i),
     `More and more people ask AI instead of Google — that's potential customers who never hear about you.`,
-    `I built Clerow to fix exactly this.`,
     `Scan your site at ${CLEROW_URL} — two minutes and you'll see what to fix first.`,
     SIGNATURE,
   ].join("\n\n");
@@ -90,7 +88,6 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
       `Beklager å måtte si det: jeg spurte ChatGPT «${i.samplePrompt}» – ${i.displayName} dukket ikke opp i det hele tatt.`,
       ...winnersParagraph(i),
       `Stadig flere spør AI i stedet for Google – det er potensielle kunder som aldri hører om dere.`,
-      `Jeg bygde Clerow for å fikse akkurat dette.`,
       `Skann nettsiden deres på ${CLEROW_URL} – to minutter, så ser du hva dere bør fikse først.`,
       SIGNATURE,
     ].join("\n\n");
@@ -103,7 +100,6 @@ function zeroMentionEmail(i: EmailInput): EmailCopy {
     `Sorry to be the one to tell you: I asked ChatGPT "${i.samplePrompt}" — ${i.displayName} never came up.`,
     ...winnersParagraph(i),
     `More and more people ask AI instead of Google — that's potential customers who never hear about you.`,
-    `I built Clerow to fix exactly this.`,
     `Scan your site at ${CLEROW_URL} — two minutes and you'll see what to fix first.`,
     SIGNATURE,
   ].join("\n\n");
