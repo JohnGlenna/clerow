@@ -1,18 +1,18 @@
 // One-click send from the Outbox tab: ships the (possibly edited) draft
-// through the founder's Gmail and promotes the lead to 'emailed'. A rolling
-// 24h send cap protects the sending domain's reputation.
+// through the founder's Gmail and promotes the lead to 'emailed'. Cap check,
+// SMTP send and status flip live in lib/prospect/sendLead (shared with the
+// auto-send drip cron); this route only does auth, validation and HTTP.
 
 import { NextResponse } from "next/server";
 
 import { isAdminEmail } from "@/lib/adminGate";
-import { dailySendCap, gmailConfigured, sendOutreachEmail } from "@/lib/prospect/mailer";
+import { gmailConfigured } from "@/lib/prospect/mailer";
+import { EMAIL_RE, sendToLead } from "@/lib/prospect/sendLead";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
@@ -51,37 +51,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (leadError) return NextResponse.json({ error: leadError.message }, { status: 500 });
   if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
 
-  const cap = dailySendCap();
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count: sentToday } = await admin
-    .from("leads")
-    .select("id", { count: "exact", head: true })
-    .gte("emailed_at", since);
-  if ((sentToday ?? 0) >= cap) {
-    return NextResponse.json(
-      { error: `Daily send cap reached (${cap} per 24h) — protects your sender reputation` },
-      { status: 429 },
-    );
+  const result = await sendToLead(admin, { leadId: id, to, subject, body: text });
+  if (!result.ok) {
+    if (result.reason === "cap-reached") {
+      return NextResponse.json({ error: result.message }, { status: 429 });
+    }
+    return NextResponse.json({ error: `Send failed: ${result.message}` }, { status: 502 });
   }
 
-  try {
-    await sendOutreachEmail({ to, subject, body: text });
-  } catch (e) {
-    return NextResponse.json(
-      { error: `Send failed: ${e instanceof Error ? e.message : "unknown error"}` },
-      { status: 502 },
-    );
-  }
-
-  await admin
-    .from("leads")
-    .update({
-      status: "emailed",
-      email: to,
-      emailed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
-
-  return NextResponse.json({ ok: true, sentToday: (sentToday ?? 0) + 1, cap });
+  return NextResponse.json({ ok: true, sentToday: result.sentToday, cap: result.cap });
 }

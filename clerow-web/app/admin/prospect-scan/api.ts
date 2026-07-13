@@ -141,6 +141,24 @@ export async function setAutopilot(enabled: boolean): Promise<{ enabled: boolean
   return (await res.json()) as { enabled: boolean };
 }
 
+// --- Auto-send kill switch (the outreach drip cron) --------------------------
+
+export async function fetchAutosend(): Promise<{ enabled: boolean }> {
+  const res = await fetch("/api/admin/autosend");
+  if (!res.ok) throw await asError(res);
+  return (await res.json()) as { enabled: boolean };
+}
+
+export async function setAutosend(enabled: boolean): Promise<{ enabled: boolean }> {
+  const res = await fetch("/api/admin/autosend", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) throw await asError(res);
+  return (await res.json()) as { enabled: boolean };
+}
+
 // --- Full report (multi-model prospect report + shareable link) ------------
 
 export type ProspectReportRow = {

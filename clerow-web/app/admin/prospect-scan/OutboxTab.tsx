@@ -11,11 +11,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { ScanHandoff } from "./DiscoverTab";
 import {
   fetchAutopilot,
+  fetchAutosend,
   fetchOutbox,
   patchLeadStatus,
   runPipeline,
   sendLeadEmail,
   setAutopilot,
+  setAutosend,
   type OutboxResponse,
   type OutboxRow,
   type PipelineSummary,
@@ -30,6 +32,9 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
   // null = unknown (still loading); the kill switch that gates both scan crons.
   const [autopilot, setAutopilotState] = useState<boolean | null>(null);
   const [autopilotBusy, setAutopilotBusy] = useState(false);
+  // Same pattern for the auto-send drip cron (separate switch from scanning).
+  const [autosend, setAutosendState] = useState<boolean | null>(null);
+  const [autosendBusy, setAutosendBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -48,6 +53,9 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
     void fetchAutopilot()
       .then((a) => setAutopilotState(a.enabled))
       .catch(() => setAutopilotState(null));
+    void fetchAutosend()
+      .then((a) => setAutosendState(a.enabled))
+      .catch(() => setAutosendState(null));
   }, [refresh]);
 
   const toggleAutopilot = async () => {
@@ -59,6 +67,18 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
       setPipelineMsg(e instanceof Error ? e.message : "Could not change automated scanning");
     } finally {
       setAutopilotBusy(false);
+    }
+  };
+
+  const toggleAutosend = async () => {
+    setAutosendBusy(true);
+    try {
+      const next = await setAutosend(!(autosend ?? false));
+      setAutosendState(next.enabled);
+    } catch (e) {
+      setPipelineMsg(e instanceof Error ? e.message : "Could not change auto-send");
+    } finally {
+      setAutosendBusy(false);
     }
   };
 
@@ -119,7 +139,23 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
             ? "Automated scanning…"
             : `Automated scanning: ${autopilot ? "ON" : "OFF"}`}
         </button>
+        <button
+          className={`ps-btn ${autosend ? "ps-btn-primary" : "ps-btn-ghost"}`}
+          onClick={() => void toggleAutosend()}
+          disabled={autosend === null || autosendBusy}
+          title="Auto-sends the oldest ready draft every 10 min, weekdays ~09–17 Oslo time, up to the daily cap"
+        >
+          {autosend === null ? "Auto-send…" : `Auto-send: ${autosend ? "ON" : "OFF"}`}
+        </button>
       </div>
+
+      {autosend === true && (
+        <div className="ps-hint">
+          Auto-send is <b>ON</b> — the drip cron sends the <b>oldest</b> ready draft every 10 minutes
+          (weekdays ~09–17), unreviewed. Edit or Skip anything below you don’t want going out as-is;
+          fresh drafts wait at the back of the queue.
+        </div>
+      )}
 
       {autopilot === false && (
         <div className="ps-hint">
