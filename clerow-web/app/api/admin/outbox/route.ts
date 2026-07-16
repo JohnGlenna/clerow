@@ -1,12 +1,15 @@
 // The Outbox feed: every lead the pipeline (or a manual scan) left at status
 // 'scanned', joined with its newest scan's draft email — everything the tab
-// needs to review and one-click send.
+// needs to review and one-click send. Also returns the drip follow-up queue
+// (same builder the cron sends from, so the preview IS the outgoing mail).
 
 import { NextResponse } from "next/server";
 
 import { isAdminEmail } from "@/lib/adminGate";
+import { listFollowups } from "@/lib/prospect/followups";
 import { dailySendCap, gmailConfigured } from "@/lib/prospect/mailer";
 import { unpackEmail } from "@/lib/prospect/persist";
+import { sentInLast24h } from "@/lib/prospect/sendLead";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -88,15 +91,16 @@ export async function GET() {
     });
   }
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const [{ count: sentToday }, { count: queued }] = await Promise.all([
-    admin.from("leads").select("id", { count: "exact", head: true }).gte("emailed_at", since),
+  const [sentToday, { count: queued }, followups] = await Promise.all([
+    sentInLast24h(admin),
     admin.from("leads").select("id", { count: "exact", head: true }).eq("status", "new"),
+    listFollowups(admin, { dueOnly: false }),
   ]);
 
   return NextResponse.json({
     rows,
-    sentToday: sentToday ?? 0,
+    followups,
+    sentToday,
     cap: dailySendCap(),
     queued: queued ?? 0,
     sendConfigured: gmailConfigured(),

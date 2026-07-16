@@ -90,10 +90,13 @@ export type Database = {
           email: string | null
           emailed_at: string | null
           id: string
+          last_emailed_at: string | null
           meta: Json
           name: string
           phone: string | null
           reject_reason: string | null
+          sequence_step: number
+          smtp_message_id: string | null
           source: string
           status: string
           updated_at: string
@@ -105,10 +108,13 @@ export type Database = {
           email?: string | null
           emailed_at?: string | null
           id?: string
+          last_emailed_at?: string | null
           meta?: Json
           name: string
           phone?: string | null
           reject_reason?: string | null
+          sequence_step?: number
+          smtp_message_id?: string | null
           source: string
           status?: string
           updated_at?: string
@@ -120,10 +126,13 @@ export type Database = {
           email?: string | null
           emailed_at?: string | null
           id?: string
+          last_emailed_at?: string | null
           meta?: Json
           name?: string
           phone?: string | null
           reject_reason?: string | null
+          sequence_step?: number
+          smtp_message_id?: string | null
           source?: string
           status?: string
           updated_at?: string
@@ -131,6 +140,47 @@ export type Database = {
           website_key?: string
         }
         Relationships: []
+      }
+      outreach_sends: {
+        Row: {
+          body: string
+          id: string
+          lead_id: string
+          message_id: string | null
+          sent_at: string
+          step: number
+          subject: string
+          to_email: string
+        }
+        Insert: {
+          body: string
+          id?: string
+          lead_id: string
+          message_id?: string | null
+          sent_at?: string
+          step: number
+          subject: string
+          to_email: string
+        }
+        Update: {
+          body?: string
+          id?: string
+          lead_id?: string
+          message_id?: string | null
+          sent_at?: string
+          step?: number
+          subject?: string
+          to_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_sends_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cancellation_feedback: {
         Row: {

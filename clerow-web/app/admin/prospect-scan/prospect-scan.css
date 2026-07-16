@@ -468,3 +468,86 @@
   font-size: 12.5px;
   padding: 14px 0 4px;
 }
+
+/* Drip follow-ups (Outbox) + Sent log rows */
+.ps-fu-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--surface-2);
+}
+.ps-fu-row:first-of-type {
+  border-top: none;
+}
+.ps-fu-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ps-fu-when {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.ps-fu-when.due {
+  color: var(--blue);
+  font-weight: 700;
+}
+.ps-fu-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+}
+.ps-fu-actions .ps-btn {
+  padding: 5px 11px;
+  font-size: 12.5px;
+}
+.ps-fu-preview {
+  margin-top: 10px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.ps-fu-subject {
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.ps-fu-body {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+/* Sent tab rows: whole line is the expand toggle */
+.ps-sent-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+.ps-sent-line:hover b {
+  color: var(--blue);
+}
+.ps-sent-date {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  min-width: 92px;
+}
+.ps-sent-subject {
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 120px;
+}

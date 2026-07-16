@@ -18,6 +18,8 @@ import {
   sendLeadEmail,
   setAutopilot,
   setAutosend,
+  stopLeadSequence,
+  type FollowupRow,
   type OutboxResponse,
   type OutboxRow,
   type PipelineSummary,
@@ -120,6 +122,9 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
         <span className="ps-badge ps-badge-emailed">
           sent 24h <b>{data ? `${data.sentToday}/${data.cap}` : "–"}</b>
         </span>
+        <span className="ps-badge ps-badge-emailed">
+          follow-ups due <b>{data ? data.followups.filter((f) => f.due).length : "–"}</b>
+        </span>
         <span className="ps-badge ps-badge-new">
           queued <b>{data?.queued ?? "–"}</b>
         </span>
@@ -151,9 +156,10 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
 
       {autosend === true && (
         <div className="ps-hint">
-          Auto-send is <b>ON</b> — the drip cron sends the <b>oldest</b> ready draft every 10 minutes
-          (weekdays ~09–17), unreviewed. Edit or Skip anything below you don’t want going out as-is;
-          fresh drafts wait at the back of the queue.
+          Auto-send is <b>ON</b> — every 10 minutes (weekdays ~09–17) the drip cron sends up to 5
+          emails: due follow-ups first, then the <b>oldest</b> ready drafts, unreviewed, up to the
+          daily cap. Edit or Skip any draft below you don’t want going out as-is; use “Stop sequence”
+          under Follow-ups to cancel a lead’s emails 2–3.
         </div>
       )}
 
@@ -192,6 +198,97 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
           onGone={removeRow}
         />
       ))}
+
+      {data && (
+        <FollowupsCard
+          followups={data.followups}
+          onStopped={(leadId) =>
+            setData((d) => d && { ...d, followups: d.followups.filter((f) => f.leadId !== leadId) })
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+// --- Follow-ups (drip emails 2–3) -------------------------------------------
+
+function FollowupsCard({
+  followups,
+  onStopped,
+}: {
+  followups: FollowupRow[];
+  onStopped: (leadId: string) => void;
+}) {
+  return (
+    <div className="lp-card ps-panel">
+      <h2>Follow-ups</h2>
+      <p className="ps-comps">
+        Automatic drip: email 2 goes out 3 days after the first email, email 3 two days later —
+        fixed templates, sent as replies in the same thread. What you see here is exactly what will
+        be sent. Setting a lead to replied/customer/rejected also stops its sequence.
+      </p>
+      {followups.length === 0 ? (
+        <p className="ps-comps">No follow-ups scheduled — they appear here as first emails go out.</p>
+      ) : (
+        followups.map((f) => <FollowupRowView key={`${f.leadId}-${f.step}`} f={f} onStopped={onStopped} />)
+      )}
+    </div>
+  );
+}
+
+function FollowupRowView({ f, onStopped }: { f: FollowupRow; onStopped: (leadId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const stop = async () => {
+    setStopping(true);
+    setErr(null);
+    try {
+      await stopLeadSequence(f.leadId);
+      onStopped(f.leadId);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not stop sequence");
+      setStopping(false);
+    }
+  };
+
+  const when = f.due
+    ? "due now — goes out with the next cron tick"
+    : `sends ${new Date(f.dueAt).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} ≈09:00`;
+
+  return (
+    <div className="ps-fu-row">
+      <div className="ps-fu-head">
+        <b>{f.name}</b>
+        <a
+          className="ps-comps"
+          href={f.website.startsWith("http") ? f.website : `https://${f.website}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {f.websiteKey}
+        </a>
+        <span className="ps-badge ps-badge-emailed">email {f.step} of 3</span>
+        <span className="ps-comps">{f.email}</span>
+        <span className={`ps-fu-when ${f.due ? "due" : ""}`}>{when}</span>
+        <span className="ps-fu-actions">
+          <button className="ps-btn ps-btn-ghost" onClick={() => setOpen((o) => !o)}>
+            {open ? "Hide email" : "View email"}
+          </button>
+          <button className="ps-btn ps-btn-ghost" onClick={() => void stop()} disabled={stopping}>
+            {stopping ? "Stopping…" : "Stop sequence"}
+          </button>
+        </span>
+      </div>
+      {err && <div className="ps-error">{err}</div>}
+      {open && (
+        <div className="ps-fu-preview">
+          <div className="ps-fu-subject">{f.subject}</div>
+          <pre className="ps-fu-body">{f.body}</pre>
+        </div>
+      )}
     </div>
   );
 }

@@ -90,8 +90,26 @@ export type OutboxRow = {
   scanCreatedAt: string;
 };
 
+/** A scheduled drip follow-up (email 2 or 3). subject/body are the EXACT
+ *  strings the cron will send — the preview can't drift from reality. */
+export type FollowupRow = {
+  leadId: string;
+  name: string;
+  website: string;
+  websiteKey: string;
+  email: string;
+  step: 2 | 3;
+  dueAt: string;
+  due: boolean;
+  language: Lang;
+  subject: string;
+  body: string;
+  inReplyTo: string | null;
+};
+
 export type OutboxResponse = {
   rows: OutboxRow[];
+  followups: FollowupRow[];
   sentToday: number;
   cap: number;
   queued: number;
@@ -102,6 +120,44 @@ export async function fetchOutbox(): Promise<OutboxResponse> {
   const res = await fetch("/api/admin/outbox");
   if (!res.ok) throw await asError(res);
   return (await res.json()) as OutboxResponse;
+}
+
+export async function stopLeadSequence(id: string): Promise<void> {
+  const res = await fetch(`/api/admin/leads/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stopSequence: true }),
+  });
+  if (!res.ok) throw await asError(res);
+}
+
+// --- Sent history (outreach_sends log) ---------------------------------------
+
+export type SentRow = {
+  id: string;
+  leadId: string;
+  name: string;
+  website: string;
+  websiteKey: string;
+  leadStatus: string;
+  toEmail: string;
+  step: number;
+  subject: string;
+  body: string;
+  sentAt: string;
+};
+
+export type SentResponse = {
+  rows: SentRow[];
+  total: number;
+  sentToday: number;
+  cap: number;
+};
+
+export async function fetchSent(): Promise<SentResponse> {
+  const res = await fetch("/api/admin/sent");
+  if (!res.ok) throw await asError(res);
+  return (await res.json()) as SentResponse;
 }
 
 export type PipelineSummary = {

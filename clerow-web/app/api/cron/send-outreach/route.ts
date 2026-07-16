@@ -1,15 +1,24 @@
-// Auto-send drip: sends ONE ready outreach draft per invocation, so pacing
-// comes entirely from the cron schedule (vercel.json: every 10 min, weekdays
-// ~09:00–17:00 Oslo time ≈ 48 ticks/day, under the 50/24h cap in mailer.ts).
-// Picks the OLDEST 'scanned' lead first — fresh drafts sit at the back of the
-// queue, so there is always a review window in the Outbox to edit or Skip a
-// draft before the drip reaches it. Gated by the founder's auto-send switch
-// (Admin → Outbox), which is OFF by default and separate from auto-scans.
+// Auto-send drip: sends up to MAX_PER_TICK outreach emails per invocation
+// (vercel.json: every 10 min, weekdays ~09:00–17:00 Oslo ≈ 48 ticks/day,
+// 48 × 5 = 240 capacity under the 200/24h cap in mailer.ts — the cap is the
+// real limit, re-checked atomically per send).
+//
+// Each lead gets a 3-email sequence, all through this cron:
+//   email 1  the reviewed LLM draft (oldest 'scanned' lead first — fresh
+//            drafts sit at the back, so there is always a review window in
+//            the Outbox to edit or Skip before the drip reaches them)
+//   email 2  +3 days — fixed template (email.ts followupEmail), threaded reply
+//   email 3  +2 more days — fixed template, threaded reply
+// Due follow-ups send BEFORE new first-touches. Flipping a lead to
+// replied/customer/rejected stops its sequence; step 3 is terminal.
+//
+// Gated by the founder's auto-send switch (Admin → Outbox), OFF by default.
 // Invoked by Vercel Cron (Authorization: Bearer <CRON_SECRET>); also runnable
-// manually with the same header. `?dryRun=1` reports what would be sent.
+// manually with the same header. `?dryRun=1` reports the batch it would send.
 
 import { NextResponse } from "next/server";
 
+import { listFollowups } from "@/lib/prospect/followups";
 import { dailySendCap, gmailConfigured } from "@/lib/prospect/mailer";
 import { unpackEmail } from "@/lib/prospect/persist";
 import { EMAIL_RE, sendToLead, sentInLast24h } from "@/lib/prospect/sendLead";
@@ -20,10 +29,24 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// How many queue-front leads to consider per tick. Leads with an unusable
+// Sends per cron tick. 48 ticks/day × 5 ≥ the 200/day cap, so a fully loaded
+// queue can actually reach the cap while each tick stays a small burst.
+const MAX_PER_TICK = 5;
+
+// How many queue-front first-touch leads to consider. Leads with an unusable
 // draft or address are skipped (left for manual review), not rejected — a
 // small window keeps one bad lead from stalling the whole drip.
-const CANDIDATES = 5;
+const CANDIDATES = 8;
+
+type Sendable = {
+  leadId: string;
+  name: string;
+  to: string;
+  subject: string;
+  body: string;
+  step: 1 | 2 | 3;
+  inReplyTo?: string;
+};
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -57,78 +80,114 @@ export async function GET(req: Request) {
   if (sentToday >= cap) {
     return NextResponse.json({ skipped: true, reason: "daily send cap reached", sentToday, cap });
   }
+  const budget = Math.min(MAX_PER_TICK, cap - sentToday);
 
-  const { data: leads, error: leadsError } = await admin
-    .from("leads")
-    .select("id, name, website_key, email")
-    .eq("status", "scanned")
-    .not("email", "is", null)
-    .order("updated_at", { ascending: true })
-    .limit(CANDIDATES);
-  if (leadsError) return NextResponse.json({ error: leadsError.message }, { status: 500 });
-  if (!leads?.length) {
-    return NextResponse.json({ skipped: true, reason: "no leads ready to send", sentToday, cap });
-  }
-
-  // Newest scan per domain (same join the Outbox uses).
-  const { data: scans, error: scansError } = await admin
-    .from("prospect_scans")
-    .select("website_key, email_copy, created_at")
-    .in("website_key", leads.map((l) => l.website_key))
-    .order("created_at", { ascending: false });
-  if (scansError) return NextResponse.json({ error: scansError.message }, { status: 500 });
-  const copyByKey = new Map<string, string | null>();
-  for (const s of scans ?? []) {
-    if (!copyByKey.has(s.website_key)) copyByKey.set(s.website_key, s.email_copy);
-  }
-
-  // First candidate with a valid address AND a complete draft wins. No human
-  // reviews these sends, so anything questionable stays in the Outbox instead.
   const skipped: { leadId: string; name: string; reason: string }[] = [];
-  for (const lead of leads) {
-    const to = (lead.email ?? "").trim();
-    if (!EMAIL_RE.test(to)) {
-      skipped.push({ leadId: lead.id, name: lead.name, reason: "invalid recipient address" });
+  const batch: Sendable[] = [];
+
+  // 1) Due follow-ups first — fixed templates, no review needed (the Outbox
+  //    Follow-ups card previews these exact strings ahead of time).
+  const followups = await listFollowups(admin, { dueOnly: true, limit: budget * 2 });
+  for (const f of followups) {
+    if (batch.length >= budget) break;
+    if (!EMAIL_RE.test(f.email.trim())) {
+      skipped.push({ leadId: f.leadId, name: f.name, reason: "invalid recipient address" });
       continue;
     }
-    const { subject, body } = unpackEmail(copyByKey.get(lead.website_key) ?? null);
-    if (!subject.trim() || !body.trim()) {
-      skipped.push({ leadId: lead.id, name: lead.name, reason: "draft missing or incomplete" });
-      continue;
-    }
-
-    if (dryRun) {
-      return NextResponse.json({
-        dryRun: true,
-        wouldSend: { leadId: lead.id, name: lead.name, to, subject, body },
-        skipped,
-        sentToday,
-        cap,
-      });
-    }
-
-    const result = await sendToLead(admin, { leadId: lead.id, to, subject, body });
-    if (!result.ok) {
-      // Send failure: report and stop — do NOT fall through to the next lead,
-      // or a broken SMTP setup would burn the whole candidate window per tick.
-      return NextResponse.json(
-        { error: `Send failed: ${result.message}`, lead: { leadId: lead.id, name: lead.name }, skipped },
-        { status: result.reason === "cap-reached" ? 429 : 502 },
-      );
-    }
-    return NextResponse.json({
-      sent: { leadId: lead.id, name: lead.name, to, subject },
-      skipped,
-      sentToday: result.sentToday,
-      cap: result.cap,
+    batch.push({
+      leadId: f.leadId,
+      name: f.name,
+      to: f.email.trim(),
+      subject: f.subject,
+      body: f.body,
+      step: f.step,
+      inReplyTo: f.inReplyTo ?? undefined,
     });
   }
 
-  return NextResponse.json({
-    skipped: true,
-    reason: "no sendable drafts in the queue front",
-    details: skipped,
-    sentToday,
-    cap,
-  });
+  // 2) First touches: oldest 'scanned' leads with a valid address AND a
+  //    complete draft. No human reviews these sends, so anything questionable
+  //    stays in the Outbox instead.
+  if (batch.length < budget) {
+    const { data: leads, error: leadsError } = await admin
+      .from("leads")
+      .select("id, name, website_key, email")
+      .eq("status", "scanned")
+      .not("email", "is", null)
+      .order("updated_at", { ascending: true })
+      .limit(CANDIDATES);
+    if (leadsError) return NextResponse.json({ error: leadsError.message }, { status: 500 });
+
+    if (leads?.length) {
+      // Newest scan per domain (same join the Outbox uses).
+      const { data: scans, error: scansError } = await admin
+        .from("prospect_scans")
+        .select("website_key, email_copy, created_at")
+        .in("website_key", leads.map((l) => l.website_key))
+        .order("created_at", { ascending: false });
+      if (scansError) return NextResponse.json({ error: scansError.message }, { status: 500 });
+      const copyByKey = new Map<string, string | null>();
+      for (const s of scans ?? []) {
+        if (!copyByKey.has(s.website_key)) copyByKey.set(s.website_key, s.email_copy);
+      }
+
+      for (const lead of leads) {
+        if (batch.length >= budget) break;
+        const to = (lead.email ?? "").trim();
+        if (!EMAIL_RE.test(to)) {
+          skipped.push({ leadId: lead.id, name: lead.name, reason: "invalid recipient address" });
+          continue;
+        }
+        const { subject, body } = unpackEmail(copyByKey.get(lead.website_key) ?? null);
+        if (!subject.trim() || !body.trim()) {
+          skipped.push({ leadId: lead.id, name: lead.name, reason: "draft missing or incomplete" });
+          continue;
+        }
+        batch.push({ leadId: lead.id, name: lead.name, to, subject, body, step: 1 });
+      }
+    }
+  }
+
+  if (!batch.length) {
+    return NextResponse.json({
+      skipped: true,
+      reason: "nothing sendable (no due follow-ups, no ready drafts)",
+      details: skipped,
+      sentToday,
+      cap,
+    });
+  }
+
+  if (dryRun) {
+    return NextResponse.json({
+      dryRun: true,
+      wouldSend: batch.map(({ leadId, name, to, subject, step }) => ({ leadId, name, to, subject, step })),
+      skipped,
+      sentToday,
+      cap,
+    });
+  }
+
+  const sent: { leadId: string; name: string; to: string; subject: string; step: number }[] = [];
+  let tally = { sentToday, cap };
+  for (const item of batch) {
+    const result = await sendToLead(admin, item);
+    if (!result.ok) {
+      // Send failure: report and stop — do NOT keep going, or a broken SMTP
+      // setup would burn the whole batch (and the queue) in one tick.
+      return NextResponse.json(
+        {
+          error: `Send failed: ${result.message}`,
+          lead: { leadId: item.leadId, name: item.name },
+          sent,
+          skipped,
+        },
+        { status: result.reason === "cap-reached" ? 429 : 502 },
+      );
+    }
+    tally = { sentToday: result.sentToday, cap: result.cap };
+    sent.push({ leadId: item.leadId, name: item.name, to: item.to, subject: item.subject, step: item.step });
+  }
+
+  return NextResponse.json({ sent, skipped, ...tally });
 }

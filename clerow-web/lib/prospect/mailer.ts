@@ -10,18 +10,22 @@ export function gmailConfigured(): boolean {
 }
 
 /** Max outreach sends per rolling 24h — protect the domain's sender reputation.
- *  Raised 30 → 50 (2026-07); keep raises gradual and watch bounces/spam
- *  replies — one Workspace mailbox doing cold outreach should stay well under
- *  ~100/day. Env-tunable (PROSPECT_DAILY_SEND_CAP) without a deploy. */
+ *  Raised 30 → 50 → 200 (2026-07, deliberate call to scale the 3-email drip;
+ *  follow-ups count against the same cap). This is aggressive for one
+ *  Workspace mailbox — watch bounces/spam replies daily and drop the env var
+ *  (PROSPECT_DAILY_SEND_CAP, no deploy needed) at the first sign of trouble. */
 export function dailySendCap(): number {
-  return Number(process.env.PROSPECT_DAILY_SEND_CAP) || 50;
+  return Number(process.env.PROSPECT_DAILY_SEND_CAP) || 200;
 }
 
+/** Sends one plain-text email; returns the SMTP Message-ID (used to thread
+ *  follow-ups). Pass `inReplyTo` (a stored Message-ID) to send as a reply. */
 export async function sendOutreachEmail(opts: {
   to: string;
   subject: string;
   body: string;
-}): Promise<void> {
+  inReplyTo?: string;
+}): Promise<string | null> {
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (!user || !pass) {
@@ -35,10 +39,12 @@ export async function sendOutreachEmail(opts: {
     auth: { user, pass },
   });
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `${process.env.GMAIL_FROM_NAME || "John"} <${user}>`,
     to: opts.to,
     subject: opts.subject,
     text: opts.body,
+    ...(opts.inReplyTo ? { inReplyTo: opts.inReplyTo, references: opts.inReplyTo } : {}),
   });
+  return info.messageId ?? null;
 }

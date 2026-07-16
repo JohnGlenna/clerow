@@ -12,9 +12,51 @@ const SIGNATURE = "John";
 const CLEROW_URL = "https://clerow.com/";
 
 // Early-user launch offer. Deliberately NOT in the first-touch email — a $3
-// offer before they've seen value signals desperation. Kept for follow-ups.
+// offer before they've seen value signals desperation. Used in follow-up #2.
 export const DISCOUNT_NO = "PS: Akkurat nå får tidlige brukere Clerow for bare 30 kr den første måneden.";
 export const DISCOUNT_EN = "PS: Right now early users get Clerow for just 30 NOK (~$3) for the first month.";
+
+/** Fixed drip follow-ups — sent as replies in the same thread, so no subject
+ *  here (the sender uses "Re: <original subject>"). Zero LLM tokens: these are
+ *  the exact strings the cron sends AND the admin UI previews. Step 2 goes out
+ *  +3 days after email 1, step 3 +2 days after step 2. Each one carries a
+ *  one-sentence "what Clerow is" line so it works even if email 1 went unread. */
+export function followupEmail(step: 2 | 3, language: Lang): string {
+  if (step === 2) {
+    return language === "no"
+      ? [
+          "Hei,",
+          "Ville bare løfte denne til toppen av innboksen.",
+          "Clerow viser hvor synlige dere er når folk spør AI som ChatGPT om anbefalinger – og hva dere bør fikse først.",
+          `Skann nettsiden deres på ${CLEROW_URL} – det tar to minutter.`,
+          DISCOUNT_NO,
+          SIGNATURE,
+        ].join("\n\n")
+      : [
+          "Hi,",
+          "Just floating this back to the top of your inbox.",
+          "Clerow shows how visible you are when people ask AI like ChatGPT for recommendations — and what to fix first.",
+          `Scan your site at ${CLEROW_URL} — it takes two minutes.`,
+          DISCOUNT_EN,
+          SIGNATURE,
+        ].join("\n\n");
+  }
+  return language === "no"
+    ? [
+        "Hei,",
+        "Har dere rukket å se mailene mine?",
+        "Kort fortalt: Clerow viser om ChatGPT anbefaler dere eller konkurrentene – og hjelper dere å bli anbefalt.",
+        `Si gjerne fra hvordan vi kan hjelpe – eller ta en titt selv på ${CLEROW_URL}.`,
+        SIGNATURE,
+      ].join("\n\n")
+    : [
+        "Hi,",
+        "Did you get a chance to look at my emails?",
+        "In short: Clerow shows whether ChatGPT recommends you or your competitors — and helps you become the recommendation.",
+        `Let me know how we can help — or take a look yourself at ${CLEROW_URL}.`,
+        SIGNATURE,
+      ].join("\n\n");
+}
 
 export type EmailInput = {
   /** What the email calls the prospect — the bare domain (e.g. "nord-flow.no"), never the ugly registry org name. */
