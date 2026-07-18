@@ -3,9 +3,11 @@
 // Send button (step 1) and the auto-send drip cron (steps 1–3) so cap and
 // status behavior can't drift.
 
+import type { Transporter } from "nodemailer";
+
 import type { createAdminClient } from "@/lib/supabase/admin";
 
-import { dailySendCap, sendOutreachEmail } from "./mailer";
+import { dailySendCap, isSmtpAuthError, sendOutreachEmail } from "./mailer";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -13,7 +15,7 @@ export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export type SendLeadResult =
   | { ok: true; sentToday: number; cap: number }
-  | { ok: false; reason: "cap-reached" | "send-failed"; message: string };
+  | { ok: false; reason: "cap-reached" | "send-failed"; message: string; authFailure?: boolean };
 
 /** Outreach emails sent in the rolling last 24h (the unit the cap counts).
  *  Counts outreach_sends rows, so drip follow-ups use the same budget. */
@@ -37,6 +39,9 @@ export async function sendToLead(
     step?: 1 | 2 | 3;
     /** Message-ID of email 1 — makes follow-ups thread as replies in Gmail. */
     inReplyTo?: string;
+    /** Pooled SMTP connection for batch sends (one login per batch, not per
+     *  email). The caller owns and closes it. */
+    transporter?: Transporter;
   },
 ): Promise<SendLeadResult> {
   const step = opts.step ?? 1;
@@ -52,17 +57,21 @@ export async function sendToLead(
 
   let messageId: string | null = null;
   try {
-    messageId = await sendOutreachEmail({
-      to: opts.to,
-      subject: opts.subject,
-      body: opts.body,
-      inReplyTo: opts.inReplyTo,
-    });
+    messageId = await sendOutreachEmail(
+      {
+        to: opts.to,
+        subject: opts.subject,
+        body: opts.body,
+        inReplyTo: opts.inReplyTo,
+      },
+      opts.transporter,
+    );
   } catch (e) {
     return {
       ok: false,
       reason: "send-failed",
       message: e instanceof Error ? e.message : "unknown error",
+      authFailure: isSmtpAuthError(e),
     };
   }
 

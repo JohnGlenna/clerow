@@ -8,6 +8,12 @@ import type { CompetitorCount, EmailCopy, Lang } from "./types";
 
 const SIGNATURE = "John";
 
+// One-line opt-out for follow-ups: a visible way out turns would-be
+// mark-as-spam clicks (which feed Gmail's sender-reputation locks) into
+// harmless replies. Honoring it stays manual — flip the lead to rejected.
+const OPTOUT_NO = "Si fra om du ikke vil høre mer, så slutter jeg å skrive.";
+const OPTOUT_EN = "If you'd rather not hear from me, just reply and I'll stop.";
+
 // Full URL (not bare "clerow.com") so mail clients render it as a click-able link.
 const CLEROW_URL = "https://clerow.com/";
 
@@ -30,6 +36,7 @@ export function followupEmail(step: 2 | 3, language: Lang): string {
           "Clerow viser hvor synlige dere er når folk spør AI som ChatGPT om anbefalinger – og hva dere bør fikse først.",
           `Skann nettsiden deres på ${CLEROW_URL} – det tar to minutter.`,
           DISCOUNT_NO,
+          OPTOUT_NO,
           SIGNATURE,
         ].join("\n\n")
       : [
@@ -38,6 +45,7 @@ export function followupEmail(step: 2 | 3, language: Lang): string {
           "Clerow shows how visible you are when people ask AI like ChatGPT for recommendations — and what to fix first.",
           `Scan your site at ${CLEROW_URL} — it takes two minutes.`,
           DISCOUNT_EN,
+          OPTOUT_EN,
           SIGNATURE,
         ].join("\n\n");
   }
@@ -47,6 +55,7 @@ export function followupEmail(step: 2 | 3, language: Lang): string {
         "Har dere rukket å se mailene mine?",
         "Kort fortalt: Clerow viser om ChatGPT anbefaler dere eller konkurrentene – og hjelper dere å bli anbefalt.",
         `Si gjerne fra hvordan vi kan hjelpe – eller ta en titt selv på ${CLEROW_URL}.`,
+        OPTOUT_NO,
         SIGNATURE,
       ].join("\n\n")
     : [
@@ -54,6 +63,7 @@ export function followupEmail(step: 2 | 3, language: Lang): string {
         "Did you get a chance to look at my emails?",
         "In short: Clerow shows whether ChatGPT recommends you or your competitors — and helps you become the recommendation.",
         `Let me know how we can help — or take a look yourself at ${CLEROW_URL}.`,
+        OPTOUT_EN,
         SIGNATURE,
       ].join("\n\n");
 }

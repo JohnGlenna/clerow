@@ -551,3 +551,9 @@
   flex: 1;
   min-width: 120px;
 }
+
+/* Self-pause warning (auto-send tripped its circuit breaker) */
+.ps-hint-warn {
+  border: 1px solid var(--red);
+  color: var(--ink);
+}

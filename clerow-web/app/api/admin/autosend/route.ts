@@ -6,7 +6,12 @@
 import { NextResponse } from "next/server";
 
 import { isAdminEmail } from "@/lib/adminGate";
-import { getAutoSendEnabled, setAutoSendEnabled } from "@/lib/settings";
+import {
+  getAutoSendEnabled,
+  getAutoSendPausedReason,
+  setAutoSendEnabled,
+  setAutoSendPausedReason,
+} from "@/lib/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -28,7 +33,11 @@ export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
   const admin = createAdminClient();
-  return NextResponse.json({ enabled: await getAutoSendEnabled(admin) });
+  const [enabled, pausedReason] = await Promise.all([
+    getAutoSendEnabled(admin),
+    getAutoSendPausedReason(admin),
+  ]);
+  return NextResponse.json({ enabled, pausedReason });
 }
 
 export async function POST(req: Request) {
@@ -42,5 +51,7 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
   await setAutoSendEnabled(admin, body.enabled);
-  return NextResponse.json({ enabled: body.enabled });
+  // Turning sending back on means the founder has fixed whatever paused it.
+  if (body.enabled) await setAutoSendPausedReason(admin, null);
+  return NextResponse.json({ enabled: body.enabled, pausedReason: null });
 }

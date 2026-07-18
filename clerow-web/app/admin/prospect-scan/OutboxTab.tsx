@@ -37,6 +37,8 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
   // Same pattern for the auto-send drip cron (separate switch from scanning).
   const [autosend, setAutosendState] = useState<boolean | null>(null);
   const [autosendBusy, setAutosendBusy] = useState(false);
+  // Set when the cron paused itself (e.g. Gmail refused the SMTP login).
+  const [pausedReason, setPausedReason] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -56,7 +58,10 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
       .then((a) => setAutopilotState(a.enabled))
       .catch(() => setAutopilotState(null));
     void fetchAutosend()
-      .then((a) => setAutosendState(a.enabled))
+      .then((a) => {
+        setAutosendState(a.enabled);
+        setPausedReason(a.pausedReason);
+      })
       .catch(() => setAutosendState(null));
   }, [refresh]);
 
@@ -77,6 +82,7 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
     try {
       const next = await setAutosend(!(autosend ?? false));
       setAutosendState(next.enabled);
+      setPausedReason(next.pausedReason);
     } catch (e) {
       setPipelineMsg(e instanceof Error ? e.message : "Could not change auto-send");
     } finally {
@@ -153,6 +159,17 @@ export function OutboxTab({ onScan }: { onScan: (h: ScanHandoff) => void }) {
           {autosend === null ? "Auto-send…" : `Auto-send: ${autosend ? "ON" : "OFF"}`}
         </button>
       </div>
+
+      {pausedReason && (
+        <div className="ps-hint ps-hint-warn">
+          ⚠ <b>Auto-send switched itself OFF:</b> {pausedReason}.
+          <br />
+          To fix: sign in to the Gmail account in a browser and approve the security alert (if still
+          blocked, visit accounts.google.com/DisplayUnlockCaptcha), regenerate the app password and
+          update <code>GMAIL_APP_PASSWORD</code> in Vercel, send one manual test email from a card
+          below — then flip Auto-send back ON, which clears this notice.
+        </div>
+      )}
 
       {autosend === true && (
         <div className="ps-hint">

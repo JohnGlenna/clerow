@@ -199,20 +199,24 @@ export async function setAutopilot(enabled: boolean): Promise<{ enabled: boolean
 
 // --- Auto-send kill switch (the outreach drip cron) --------------------------
 
-export async function fetchAutosend(): Promise<{ enabled: boolean }> {
+/** pausedReason is set when the cron switched auto-send off by itself (e.g.
+ *  Gmail refused the SMTP login); re-enabling clears it. */
+export type AutosendState = { enabled: boolean; pausedReason: string | null };
+
+export async function fetchAutosend(): Promise<AutosendState> {
   const res = await fetch("/api/admin/autosend");
   if (!res.ok) throw await asError(res);
-  return (await res.json()) as { enabled: boolean };
+  return (await res.json()) as AutosendState;
 }
 
-export async function setAutosend(enabled: boolean): Promise<{ enabled: boolean }> {
+export async function setAutosend(enabled: boolean): Promise<AutosendState> {
   const res = await fetch("/api/admin/autosend", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enabled }),
   });
   if (!res.ok) throw await asError(res);
-  return (await res.json()) as { enabled: boolean };
+  return (await res.json()) as AutosendState;
 }
 
 // --- Full report (multi-model prospect report + shareable link) ------------

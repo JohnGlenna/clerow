@@ -1,7 +1,10 @@
 // Auto-send drip: sends up to MAX_PER_TICK outreach emails per invocation
 // (vercel.json: every 10 min, weekdays ~09:00–17:00 Oslo ≈ 48 ticks/day,
-// 48 × 5 = 240 capacity under the 200/24h cap in mailer.ts — the cap is the
-// real limit, re-checked atomically per send).
+// 48 × 2 = 96 capacity over the 80/24h cap in mailer.ts — the cap is the
+// real limit, re-checked atomically per send). All sends in a tick share ONE
+// pooled SMTP connection, and an auth-refused send (Gmail 534 WebLoginRequired,
+// like the 2026-07-17 lock) flips auto-send OFF with a recorded reason instead
+// of retrying a dead login every 10 minutes.
 //
 // Each lead gets a 3-email sequence, all through this cron:
 //   email 1  the reviewed LLM draft (oldest 'scanned' lead first — fresh
@@ -19,19 +22,19 @@
 import { NextResponse } from "next/server";
 
 import { listFollowups } from "@/lib/prospect/followups";
-import { dailySendCap, gmailConfigured } from "@/lib/prospect/mailer";
+import { createOutreachTransporter, dailySendCap, gmailConfigured } from "@/lib/prospect/mailer";
 import { unpackEmail } from "@/lib/prospect/persist";
 import { EMAIL_RE, sendToLead, sentInLast24h } from "@/lib/prospect/sendLead";
-import { getAutoSendEnabled } from "@/lib/settings";
+import { getAutoSendEnabled, setAutoSendEnabled, setAutoSendPausedReason } from "@/lib/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Sends per cron tick. 48 ticks/day × 5 ≥ the 200/day cap, so a fully loaded
-// queue can actually reach the cap while each tick stays a small burst.
-const MAX_PER_TICK = 5;
+// Sends per cron tick. 48 ticks/day × 2 = 96 ≥ the 80/day cap, so a fully
+// loaded queue can still reach the cap while each tick stays a tiny burst.
+const MAX_PER_TICK = 2;
 
 // How many queue-front first-touch leads to consider. Leads with an unusable
 // draft or address are skipped (left for manual review), not rejected — a
@@ -170,23 +173,49 @@ export async function GET(req: Request) {
 
   const sent: { leadId: string; name: string; to: string; subject: string; step: number }[] = [];
   let tally = { sentToday, cap };
-  for (const item of batch) {
-    const result = await sendToLead(admin, item);
-    if (!result.ok) {
-      // Send failure: report and stop — do NOT keep going, or a broken SMTP
-      // setup would burn the whole batch (and the queue) in one tick.
-      return NextResponse.json(
-        {
-          error: `Send failed: ${result.message}`,
-          lead: { leadId: item.leadId, name: item.name },
-          sent,
-          skipped,
-        },
-        { status: result.reason === "cap-reached" ? 429 : 502 },
-      );
+  // One pooled SMTP connection for the whole tick — one login per batch.
+  const transporter = createOutreachTransporter();
+  try {
+    for (const item of batch) {
+      const result = await sendToLead(admin, { ...item, transporter });
+      if (!result.ok) {
+        // Auth refused (534/535, e.g. WebLoginRequired): the login is dead
+        // until a human unlocks the account in a browser. Switch auto-send
+        // OFF and record why, instead of failing 48 more logins today.
+        if (result.reason === "send-failed" && result.authFailure) {
+          await setAutoSendEnabled(admin, false);
+          await setAutoSendPausedReason(
+            admin,
+            `${new Date().toISOString().slice(0, 10)}: Gmail refused the SMTP login (${result.message.slice(0, 140)}) — sign in via a web browser, then re-enable auto-send`,
+          );
+          return NextResponse.json(
+            {
+              error: `Send failed (auth) — auto-send has been switched OFF: ${result.message}`,
+              autoSendDisabled: true,
+              lead: { leadId: item.leadId, name: item.name },
+              sent,
+              skipped,
+            },
+            { status: 502 },
+          );
+        }
+        // Other send failure: report and stop — do NOT keep going, or a broken
+        // SMTP setup would burn the whole batch (and the queue) in one tick.
+        return NextResponse.json(
+          {
+            error: `Send failed: ${result.message}`,
+            lead: { leadId: item.leadId, name: item.name },
+            sent,
+            skipped,
+          },
+          { status: result.reason === "cap-reached" ? 429 : 502 },
+        );
+      }
+      tally = { sentToday: result.sentToday, cap: result.cap };
+      sent.push({ leadId: item.leadId, name: item.name, to: item.to, subject: item.subject, step: item.step });
     }
-    tally = { sentToday: result.sentToday, cap: result.cap };
-    sent.push({ leadId: item.leadId, name: item.name, to: item.to, subject: item.subject, step: item.step });
+  } finally {
+    transporter.close();
   }
 
   return NextResponse.json({ sent, skipped, ...tally });
