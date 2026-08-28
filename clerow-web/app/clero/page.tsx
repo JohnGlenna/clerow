@@ -131,8 +131,8 @@ export default function CleroHome() {
 
         <blockquote className="clero-quote">
           <p>
-            &ldquo;Day 34. The savings counter is the only reason I didn&rsquo;t buy a pack
-            Friday.&rdquo;
+            &ldquo;I thought I could never quit my addiction, but the features in this app helped me a
+            lot.&rdquo;
           </p>
           <cite>Early tester</cite>
         </blockquote>
