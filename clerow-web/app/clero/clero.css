@@ -1,0 +1,340 @@
+/* Clero app pages (/clero, /clero/privacy, /clero/terms).
+   Fully self-contained dark theme — nothing here leaks outside `.clero`. */
+
+.clero {
+  --c-navy: #0b1024;
+  --c-navy-2: #141b3a;
+  --c-cream: #f3ebdd;
+  --c-grey: #a9b0c7;
+  --c-grey-2: #7c839c;
+  --c-mint: #7fe3c3;
+  --c-coral: #ff7a6b;
+  --c-line: rgba(243, 235, 221, 0.12);
+  --c-display: var(--clero-display), "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --c-body: var(--clero-body), Inter, ui-sans-serif, system-ui, sans-serif;
+
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(ellipse 70% 50% at 50% 0%, var(--c-navy-2) 0%, var(--c-navy) 70%),
+    var(--c-navy);
+  color: var(--c-grey);
+  font-family: var(--c-body);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.clero main {
+  flex: 1;
+}
+
+.clero a {
+  color: inherit;
+  text-decoration: none;
+}
+.clero a:hover {
+  color: var(--c-cream);
+}
+
+.clero h1,
+.clero h2 {
+  font-family: var(--c-display);
+  color: var(--c-cream);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.clero strong {
+  color: var(--c-cream);
+  font-weight: 600;
+}
+
+/* ---------- Hero ---------- */
+
+.clero-hero {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 96px 24px 64px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 48px;
+  align-items: center;
+  min-height: min(82vh, 820px);
+}
+
+.clero-hero h1 {
+  font-size: clamp(40px, 5.4vw, 62px);
+  line-height: 1.04;
+  font-weight: 700;
+}
+
+.clero-hero .clero-sub {
+  margin: 24px 0 0;
+  max-width: 560px;
+  font-size: 19px;
+}
+
+.clero-hero .clero-small {
+  margin: 16px 0 0;
+  font-size: 15px;
+  color: var(--c-grey-2);
+}
+
+.clero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 36px;
+}
+
+.clero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 16px 0 12px;
+  border-radius: 9px;
+  background: #000;
+  border: 1px solid #5c5c5c;
+  color: #fff;
+  line-height: 1.05;
+  transition: transform 0.15s ease;
+}
+.clero-badge:hover {
+  color: #fff;
+  transform: translateY(-1px);
+}
+.clero-badge img {
+  display: block;
+  height: 52px;
+  width: auto;
+}
+.clero-badge svg {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.clero-badge-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.clero-badge-text small {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.clero-badge-text span {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.clero-badge-soon {
+  position: relative;
+  opacity: 0.55;
+  cursor: default;
+}
+.clero-badge-soon:hover {
+  transform: none;
+}
+.clero-soon-pill {
+  position: absolute;
+  top: -11px;
+  right: -8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--c-mint);
+  color: var(--c-navy);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 1;
+}
+
+/* Review laurel */
+.clero-laurel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 260px) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 56px 0 0;
+  text-align: center;
+}
+.clero-laurel svg {
+  width: 44px;
+  height: 120px;
+  color: var(--c-cream);
+  opacity: 0.85;
+}
+.clero-laurel blockquote {
+  margin: 0;
+}
+.clero-laurel p {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--c-cream);
+}
+.clero-laurel cite {
+  display: block;
+  margin-top: 10px;
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-grey);
+}
+
+.clero-art {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.clero-art::before {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(127, 227, 195, 0.18) 0%, rgba(20, 27, 58, 0.6) 40%, transparent 70%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+.clero-art img {
+  position: relative;
+  width: min(100%, 420px);
+  height: auto;
+  filter: drop-shadow(0 30px 60px rgba(0, 0, 0, 0.45));
+}
+
+/* ---------- Footer ---------- */
+
+.clero-footer {
+  padding: 64px 24px 56px;
+  text-align: center;
+  font-size: 15px;
+}
+.clero-footer .clero-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--c-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--c-cream);
+  letter-spacing: -0.02em;
+}
+.clero-footer .clero-wordmark img {
+  width: 30px;
+  height: 30px;
+}
+.clero-footer .clero-tagline {
+  margin: 14px 0 0;
+}
+.clero-footer .clero-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0 18px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.clero-footer .clero-links li + li::before {
+  content: "|";
+  margin-right: 18px;
+  color: var(--c-line);
+}
+.clero-footer hr {
+  width: min(640px, 100%);
+  margin: 32px auto 22px;
+  border: 0;
+  border-top: 1px solid var(--c-line);
+}
+.clero-footer .clero-copy {
+  margin: 0;
+  color: var(--c-grey-2);
+  font-size: 14px;
+}
+.clero-footer .clero-disclaimer {
+  margin: 14px auto 0;
+  max-width: 640px;
+  color: var(--c-grey-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+/* ---------- Legal pages ---------- */
+
+.clero-legal {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 72px 24px 48px;
+  line-height: 1.7;
+}
+.clero-legal .clero-back {
+  display: inline-block;
+  margin-bottom: 32px;
+  font-size: 14px;
+  color: var(--c-mint);
+}
+.clero-legal h1 {
+  font-size: clamp(34px, 5vw, 46px);
+  line-height: 1.1;
+}
+.clero-legal .clero-updated {
+  margin: 10px 0 28px;
+  font-size: 14px;
+  color: var(--c-grey-2);
+}
+.clero-legal h2 {
+  font-size: 22px;
+  margin: 40px 0 10px;
+}
+.clero-legal p,
+.clero-legal li {
+  margin: 0 0 14px;
+}
+.clero-legal ul,
+.clero-legal ol {
+  padding-left: 22px;
+}
+.clero-legal a {
+  color: var(--c-mint);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 820px) {
+  .clero-hero {
+    grid-template-columns: 1fr;
+    padding: 56px 20px 40px;
+    gap: 36px;
+    min-height: 0;
+  }
+  .clero-art {
+    order: -1;
+  }
+  .clero-art img {
+    width: min(70%, 260px);
+  }
+  .clero-hero .clero-sub {
+    font-size: 17px;
+  }
+  .clero-laurel {
+    grid-template-columns: 1fr;
+    margin-top: 40px;
+  }
+  .clero-laurel svg {
+    display: none;
+  }
+}

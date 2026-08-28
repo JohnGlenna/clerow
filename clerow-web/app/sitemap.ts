@@ -14,6 +14,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/faq", priority: 0.8 },
     { path: "/pricing", priority: 0.8 },
     ...COMPARE_PAGES.map((c) => ({ path: `/compare/${c.slug}`, priority: 0.7 })),
+    // Clero (separate iOS app) pages hosted here until it has its own domain.
+    { path: "/clero", priority: 0.6 },
+    { path: "/clero/privacy", priority: 0.3 },
+    { path: "/clero/terms", priority: 0.3 },
   ];
   return paths.map(({ path, priority }) => ({
     url: `${SITE_URL}${path}`,
