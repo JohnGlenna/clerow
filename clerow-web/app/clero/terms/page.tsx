@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CLERO } from "@/lib/clero";
+import { CleroFooter } from "../Footer";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 
 export default function CleroTerms() {
   return (
+    <>
     <article className="clero-legal">
       <Link href="/clero" className="clero-back">
         ← {CLERO.name}
@@ -104,5 +106,7 @@ export default function CleroTerms() {
         <a href={`mailto:${CLERO.supportEmail}`}>{CLERO.supportEmail}</a>
       </p>
     </article>
+    <CleroFooter />
+    </>
   );
 }

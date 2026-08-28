@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { CLERO } from "@/lib/clero";
+import { CleroFooter } from "./Footer";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/clero" },
@@ -14,28 +15,13 @@ export const metadata: Metadata = {
 const pub = (file: string) => fs.existsSync(path.join(process.cwd(), "public/clero", file));
 const hasAppStoreBadge = pub("app-store-badge.svg");
 const heroBg = ["hero-bg.jpg", "hero-bg.png"].find(pub);
+const bgStyle = heroBg ? { backgroundImage: `url(/clero/${heroBg})` } : undefined;
 
 const FEATURES = [
-  {
-    icon: "🔥",
-    title: "Your streak",
-    body: "Every nicotine-free day adds up. Miss one and Clero helps you get straight back on — no reset shame.",
-  },
-  {
-    icon: "💸",
-    title: "Money you kept",
-    body: "Tell Clero what your habit cost. Watch the savings counter climb in real time, in your currency.",
-  },
-  {
-    icon: "🚀",
-    title: "One-tap rescue",
-    body: "Craving? Hit rescue. A 3-minute guided ride that gets you past the peak, whenever it hits.",
-  },
-  {
-    icon: "💬",
-    title: "Coach Clero",
-    body: "A coach that answers at 11pm. Ask anything, vent, or just check in. No lectures.",
-  },
+  { title: "Streak", body: "Every nicotine-free day counts. Slip, and Clero gets you straight back on." },
+  { title: "Savings", body: "Watch the money you are not spending climb, day by day." },
+  { title: "Rescue", body: "One tap when a craving hits. Three minutes to get past the peak." },
+  { title: "Coach", body: "Clero answers at 11pm. No lectures, no shame." },
 ];
 
 function AppleGlyph() {
@@ -46,7 +32,25 @@ function AppleGlyph() {
   );
 }
 
-function LaurelLeft() {
+function Badge() {
+  return (
+    <a className="clero-badge" href={CLERO.appStoreUrl} aria-label="Download on the App Store">
+      {hasAppStoreBadge ? (
+        <img src="/clero/app-store-badge.svg" alt="Download on the App Store" />
+      ) : (
+        <>
+          <AppleGlyph />
+          <span className="clero-badge-text">
+            <small>Download on the</small>
+            <span>App Store</span>
+          </span>
+        </>
+      )}
+    </a>
+  );
+}
+
+function Laurel() {
   return (
     <svg viewBox="0 0 24 40" fill="currentColor" aria-hidden="true">
       <path d="M12 2c-8 6-11 18-6 36l1-.4C3 20 6 10 12 4z" />
@@ -58,10 +62,7 @@ function LaurelLeft() {
 export default function CleroHome() {
   return (
     <>
-      <section
-        className={`clero-top${heroBg ? " clero-top-bg" : ""}`}
-        style={heroBg ? { backgroundImage: `url(/clero/${heroBg})` } : undefined}
-      >
+      <section className={`clero-top${heroBg ? " clero-top-bg" : ""}`} style={bgStyle}>
         <div className="clero-top-inner">
           <span className="clero-brand">{CLERO.name}</span>
           <h1>
@@ -73,23 +74,9 @@ export default function CleroHome() {
             Vapes, cigarettes, pouches, snus — Clero tracks your streak and the cash you&rsquo;re not spending, and
             gives you a one&#8209;tap rescue when a craving hits.
           </p>
-          <a className="clero-badge" href={CLERO.appStoreUrl} aria-label="Download on the App Store">
-            {hasAppStoreBadge ? (
-              <img src="/clero/app-store-badge.svg" alt="Download on the App Store" />
-            ) : (
-              <>
-                <AppleGlyph />
-                <span className="clero-badge-text">
-                  <small>Download on the</small>
-                  <span>App Store</span>
-                </span>
-              </>
-            )}
-          </a>
+          <Badge />
           <p className="clero-android">Android — coming soon</p>
         </div>
-
-        {/* With a painted background the illustration IS the scene; otherwise the rocket mascot stands in. */}
         {!heroBg && (
           <div className="clero-scene">
             <Image
@@ -114,22 +101,33 @@ export default function CleroHome() {
           <strong>Start today, see the numbers tomorrow.</strong> No lectures, no shame.
         </p>
 
-        <ul className="clero-chips" aria-label="What Clero helps you quit">
-          {["Vapes", "Cigarettes", "Pouches", "Snus"].map((c) => (
-            <li key={c}>{c}</li>
-          ))}
-        </ul>
+        <div className="clero-laurels">
+          <figure className="clero-laurel">
+            <Laurel />
+            <div>
+              <strong>4 habits</strong>
+              <span>Vapes, cigarettes, pouches, snus</span>
+            </div>
+            <span className="clero-laurel-flip">
+              <Laurel />
+            </span>
+          </figure>
+          <figure className="clero-laurel">
+            <Laurel />
+            <div>
+              <strong>1 tap</strong>
+              <span>Rescue when a craving hits</span>
+            </div>
+            <span className="clero-laurel-flip">
+              <Laurel />
+            </span>
+          </figure>
+        </div>
 
-        <figure className="clero-laurel">
-          <LaurelLeft />
-          <blockquote>
-            <p>&ldquo;Day 34. The savings counter is the only reason I didn&rsquo;t buy a pack Friday.&rdquo;</p>
-            <cite>Early tester</cite>
-          </blockquote>
-          <span className="clero-laurel-flip">
-            <LaurelLeft />
-          </span>
-        </figure>
+        <blockquote className="clero-quote">
+          <p>&ldquo;Day 34. The savings counter is the only reason I didn&rsquo;t buy a pack Friday.&rdquo;</p>
+          <cite>Early tester</cite>
+        </blockquote>
       </section>
 
       <section className="clero-features">
@@ -138,30 +136,32 @@ export default function CleroHome() {
           <br />
           the craving hits.
         </h2>
-        <div className="clero-grid">
-          {FEATURES.map((f) => (
-            <article key={f.title} className="clero-card">
-              <span className="clero-card-icon" aria-hidden="true">
-                {f.icon}
-              </span>
-              <h3>{f.title}</h3>
-              <p>{f.body}</p>
-            </article>
-          ))}
+        <p className="clero-features-sub">Track the streak, watch the savings, and get help the second you need it.</p>
+        <div className="clero-features-row">
+          <ul className="clero-list">
+            {FEATURES.map((f) => (
+              <li key={f.title}>
+                <h3>{f.title}</h3>
+                <p>{f.body}</p>
+              </li>
+            ))}
+          </ul>
+          <div className="clero-features-art">
+            <Image src="/clero/hero.png" alt="Clero, a fluffy white coach, riding a rocket" width={320} height={320} />
+          </div>
         </div>
-        <a className="clero-badge clero-badge-center" href={CLERO.appStoreUrl} aria-label="Download on the App Store">
-          {hasAppStoreBadge ? (
-            <img src="/clero/app-store-badge.svg" alt="Download on the App Store" />
-          ) : (
-            <>
-              <AppleGlyph />
-              <span className="clero-badge-text">
-                <small>Download on the</small>
-                <span>App Store</span>
-              </span>
-            </>
-          )}
-        </a>
+      </section>
+
+      <section className={`clero-close${heroBg ? " clero-close-bg" : ""}`} style={bgStyle}>
+        <div className="clero-close-inner">
+          <h2>
+            Enough nicotine.
+            <br />
+            Try Clero.
+          </h2>
+          <Badge />
+        </div>
+        <CleroFooter variant="scene" />
       </section>
     </>
   );

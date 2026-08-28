@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
 import { Bricolage_Grotesque, Inter } from "next/font/google";
 import { CLERO } from "@/lib/clero";
 import "./clero.css";
@@ -43,42 +41,10 @@ export const metadata: Metadata = {
   icons: { icon: "/clero/hero.png", apple: "/clero/hero.png" },
 };
 
-function CleroFooter() {
-  return (
-    <footer className="clero-footer">
-      <Link href="/clero" className="clero-wordmark">
-        <Image src="/clero/hero.png" alt="" width={30} height={30} />
-        {CLERO.name}
-      </Link>
-      <p className="clero-tagline">{CLERO.tagline}</p>
-      <ul className="clero-links">
-        <li>
-          <Link href="/clero/terms">Terms of Use</Link>
-        </li>
-        <li>
-          <Link href="/clero/privacy">Privacy Policy</Link>
-        </li>
-        <li>
-          <a href={`mailto:${CLERO.supportEmail}`}>{CLERO.supportEmail}</a>
-        </li>
-      </ul>
-      <hr />
-      <p className="clero-copy">
-        © 2026 {CLERO.name} · {CLERO.operator}. All rights reserved.
-      </p>
-      <p className="clero-disclaimer">
-        Clero is an educational tool, not a medical device, and does not replace advice from a doctor or a
-        quitline. If you are in crisis, contact your local emergency number.
-      </p>
-    </footer>
-  );
-}
-
 export default function CleroLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`clero ${display.variable} ${body.variable}`}>
       <main>{children}</main>
-      <CleroFooter />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CLERO } from "@/lib/clero";
+import { CleroFooter } from "../Footer";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -12,6 +13,7 @@ const Mail = () => <a href={`mailto:${CLERO.supportEmail}`}>{CLERO.supportEmail}
 
 export default function CleroPrivacy() {
   return (
+    <>
     <article className="clero-legal">
       <Link href="/clero" className="clero-back">
         ← {CLERO.name}
@@ -108,5 +110,7 @@ export default function CleroPrivacy() {
       <h2>Changes</h2>
       <p>We will post any changes here and update the date above. Material changes are announced in the app.</p>
     </article>
+    <CleroFooter />
+    </>
   );
 }
