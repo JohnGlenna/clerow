@@ -171,8 +171,11 @@
   line-height: 1.05;
   transition: transform 0.15s ease;
 }
-.clero-badge:hover {
+.clero .clero-badge,
+.clero .clero-badge:hover {
   color: #fff;
+}
+.clero-badge:hover {
   transform: translateY(-1px);
 }
 .clero-badge img {
@@ -351,6 +354,10 @@
 
 /* ---------- Home: closing scene ---------- */
 
+/* Cream backdrop so the rounded top corners sit on cream, not the navy page. */
+.clero-close-wrap {
+  background: #f7f2e8;
+}
 .clero-close {
   position: relative;
   display: flex;

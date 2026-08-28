@@ -14,7 +14,7 @@ export function CleroFooter({ variant = "plain" }: { variant?: "plain" | "scene"
         </div>
         <div>
           <h4>Support</h4>
-          <a href={`mailto:${CLERO.supportEmail}`}>{CLERO.supportEmail}</a>
+          <a href={`mailto:${CLERO.supportEmail}`}>Support mail</a>
         </div>
         <div>
           <h4>{CLERO.name}</h4>

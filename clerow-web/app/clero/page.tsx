@@ -1,29 +1,32 @@
-import fs from "node:fs";
-import path from "node:path";
-import type { Metadata } from "next";
-import Image from "next/image";
-import { CLERO } from "@/lib/clero";
-import { CleroFooter } from "./Footer";
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Metadata } from 'next';
+import Image from 'next/image';
+import { CLERO } from '@/lib/clero';
+import { CleroFooter } from './Footer';
 
 export const metadata: Metadata = {
-  alternates: { canonical: "/clero" },
+  alternates: { canonical: '/clero' },
 };
 
 // Hand-dropped assets in public/clero/: the official App Store badge and a
 // full-bleed hero background illustration. Both are optional — the page falls
 // back to a plain badge and a gradient sky until they exist.
-const pub = (file: string) => fs.existsSync(path.join(process.cwd(), "public/clero", file));
-const hasAppStoreBadge = pub("app-store-badge.svg");
-const heroBg = ["hero-bg.jpg", "hero-bg.png"].find(pub);
+const pub = (file: string) => fs.existsSync(path.join(process.cwd(), 'public/clero', file));
+const hasAppStoreBadge = pub('app-store-badge.svg');
+const heroBg = ['hero-bg.jpg', 'hero-bg.png'].find(pub);
 const bgStyle = heroBg ? { backgroundImage: `url(/clero/${heroBg})` } : undefined;
-const footBg = ["footer-bg.jpg", "footer-bg.png"].find(pub);
+const footBg = ['footer-bg.jpg', 'footer-bg.png'].find(pub);
 const footStyle = footBg ? { backgroundImage: `url(/clero/${footBg})` } : undefined;
 
 const FEATURES = [
-  { title: "Streak", body: "Every nicotine-free day counts. Slip, and Clero gets you straight back on." },
-  { title: "Savings", body: "Watch the money you are not spending climb, day by day." },
-  { title: "Rescue", body: "One tap when a craving hits. Three minutes to get past the peak." },
-  { title: "Coach", body: "Clero answers at 11pm. No lectures, no shame." },
+  {
+    title: 'Streak',
+    body: 'Every nicotine-free day counts. Slip, and Clero gets you straight back on.',
+  },
+  { title: 'Savings', body: 'Watch the money you are not spending climb, day by day.' },
+  { title: 'Rescue', body: 'One tap when a craving hits. Three minutes to get past the peak.' },
+  { title: 'Coach', body: 'Clero answers at 11pm. No lectures, no shame.' },
 ];
 
 function AppleGlyph() {
@@ -64,7 +67,7 @@ function Laurel() {
 export default function CleroHome() {
   return (
     <>
-      <section className={`clero-top${heroBg ? " clero-top-bg" : ""}`} style={bgStyle}>
+      <section className={`clero-top${heroBg ? ' clero-top-bg' : ''}`} style={bgStyle}>
         <div className="clero-top-inner">
           <span className="clero-brand">{CLERO.name}</span>
           <h1>
@@ -73,8 +76,8 @@ export default function CleroHome() {
             Keep the money.
           </h1>
           <p className="clero-sub">
-            Vapes, cigarettes, pouches, snus — Clero tracks your streak and the cash you&rsquo;re not spending, and
-            gives you a one&#8209;tap rescue when a craving hits.
+            Vapes, cigarettes, pouches, snus — Clero tracks your streak and the cash you&rsquo;re
+            not spending, and gives you a one&#8209;tap rescue when a craving hits.
           </p>
           <Badge />
           <p className="clero-android">Android — coming soon</p>
@@ -95,9 +98,9 @@ export default function CleroHome() {
 
       <section className="clero-story">
         <p>
-          Let&rsquo;s be honest — quitting is not one big decision. It&rsquo;s a hundred small ones, mostly late at
-          night. Clero is built for those moments: a counter that shows what you&rsquo;ve already won, and a coach
-          who picks up when nobody else will.
+          Let&rsquo;s be honest — quitting is not one big decision. It&rsquo;s a hundred small ones,
+          mostly late at night. Clero is built for those moments: a counter that shows what
+          you&rsquo;ve already won, and a coach who picks up when nobody else will.
         </p>
         <p>
           <strong>Start today, see the numbers tomorrow.</strong> No lectures, no shame.
@@ -127,7 +130,10 @@ export default function CleroHome() {
         </div>
 
         <blockquote className="clero-quote">
-          <p>&ldquo;Day 34. The savings counter is the only reason I didn&rsquo;t buy a pack Friday.&rdquo;</p>
+          <p>
+            &ldquo;Day 34. The savings counter is the only reason I didn&rsquo;t buy a pack
+            Friday.&rdquo;
+          </p>
           <cite>Early tester</cite>
         </blockquote>
       </section>
@@ -138,7 +144,9 @@ export default function CleroHome() {
           <br />
           the craving hits.
         </h2>
-        <p className="clero-features-sub">Track the streak, watch the savings, and get help the second you need it.</p>
+        <p className="clero-features-sub">
+          Track the streak, watch the savings, and get help the second you need it.
+        </p>
         <div className="clero-features-row">
           <ul className="clero-list">
             {FEATURES.map((f) => (
@@ -149,22 +157,29 @@ export default function CleroHome() {
             ))}
           </ul>
           <div className="clero-features-art">
-            <Image src="/clero/hero.png" alt="Clero, a fluffy white coach, riding a rocket" width={320} height={320} />
+            <Image
+              src="/clero/hero.png"
+              alt="Clero, a fluffy white coach, riding a rocket"
+              width={320}
+              height={320}
+            />
           </div>
         </div>
       </section>
 
-      <section className={`clero-close${footBg ? " clero-close-bg" : ""}`} style={footStyle}>
-        <div className="clero-close-inner">
-          <h2>
-            Enough nicotine.
-            <br />
-            Try Clero.
-          </h2>
-          <Badge />
-        </div>
-        <CleroFooter variant="scene" />
-      </section>
+      <div className="clero-close-wrap">
+        <section className={`clero-close${footBg ? ' clero-close-bg' : ''}`} style={footStyle}>
+          <div className="clero-close-inner">
+            <h2>
+              Enough nicotine.
+              <br />
+              Try Clero.
+            </h2>
+            <Badge />
+          </div>
+          <CleroFooter variant="scene" />
+        </section>
+      </div>
     </>
   );
 }
