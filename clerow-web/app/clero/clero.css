@@ -356,25 +356,41 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: clamp(640px, 50vw, 992px);
+  min-height: 640px;
   border-radius: 40px 40px 0 0;
   overflow: hidden;
   text-align: center;
   background: linear-gradient(180deg, #0b1024 0%, #1b2a5c 45%, #3f6f9a 78%, #7fe3c3 100%);
 }
+/* Daytime artwork (1776×1104 ≈ 1.6:1): the section matches the ratio so the
+   whole scene shows, and the flat green band at the bottom holds the footer. */
 .clero-close-bg {
-  background-size: cover;
-  background-position: center bottom;
+  /* Image drawn full-width from the top; the section is painted the same
+     green as the band at the foot of the artwork so the footer always sits
+     on solid green, however tall the section gets. */
+  min-height: clamp(720px, 62.5vw, 1104px);
+  background-color: #7dac5e;
+  background-size: 100% auto;
+  background-position: center top;
   background-repeat: no-repeat;
+  color: #24402a;
 }
 .clero-close-inner {
-  padding: 96px 24px 0;
+  padding: 72px 24px 0;
+}
+/* Artwork above the band = 963/1104 of its height = 54.2vw at full width. */
+.clero-close-bg .clero-close-inner {
+  min-height: 54.2vw;
 }
 .clero-close h2 {
   font-size: clamp(38px, 6vw, 76px);
   line-height: 1;
   font-weight: 700;
   text-shadow: 0 6px 30px rgba(11, 16, 36, 0.5);
+}
+.clero-close-bg h2 {
+  color: #0b1024;
+  text-shadow: none;
 }
 .clero-close .clero-badge {
   margin-top: 32px;
@@ -388,8 +404,23 @@
   font-size: 15px;
 }
 .clero-footer-scene {
-  background: linear-gradient(180deg, rgba(11, 16, 36, 0) 0%, rgba(11, 16, 36, 0.7) 35%, rgba(11, 16, 36, 0.9) 100%);
-  padding-top: 140px;
+  padding-top: 36px;
+  padding-bottom: 36px;
+  background: #7dac5e;
+}
+.clero-close-bg .clero-footer h4 {
+  color: #0b1024;
+}
+.clero-close-bg .clero-footer-cols a,
+.clero-close-bg .clero-footer .clero-copy,
+.clero-close-bg .clero-footer .clero-disclaimer {
+  color: #24402a;
+}
+.clero-close-bg .clero-footer-cols a:hover {
+  color: #0b1024;
+}
+.clero-close-bg .clero-footer .clero-copy {
+  margin-top: 28px;
 }
 .clero-footer-cols {
   display: flex;
@@ -513,10 +544,15 @@
   }
   .clero-close {
     border-radius: 28px 28px 0 0;
-    min-height: 640px;
   }
   .clero-close-bg {
-    background-position: 72% bottom;
+    min-height: 0;
+    background-size: auto 420px;
+    background-position: 60% top;
+  }
+  .clero-close-bg .clero-close-inner {
+    padding-top: 48px;
+    min-height: 366px;
   }
   .clero-footer-cols {
     gap: 24px 40px;

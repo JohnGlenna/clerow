@@ -16,6 +16,8 @@ const pub = (file: string) => fs.existsSync(path.join(process.cwd(), "public/cle
 const hasAppStoreBadge = pub("app-store-badge.svg");
 const heroBg = ["hero-bg.jpg", "hero-bg.png"].find(pub);
 const bgStyle = heroBg ? { backgroundImage: `url(/clero/${heroBg})` } : undefined;
+const footBg = ["footer-bg.jpg", "footer-bg.png"].find(pub);
+const footStyle = footBg ? { backgroundImage: `url(/clero/${footBg})` } : undefined;
 
 const FEATURES = [
   { title: "Streak", body: "Every nicotine-free day counts. Slip, and Clero gets you straight back on." },
@@ -152,7 +154,7 @@ export default function CleroHome() {
         </div>
       </section>
 
-      <section className={`clero-close${heroBg ? " clero-close-bg" : ""}`} style={bgStyle}>
+      <section className={`clero-close${footBg ? " clero-close-bg" : ""}`} style={footStyle}>
         <div className="clero-close-inner">
           <h2>
             Enough nicotine.
