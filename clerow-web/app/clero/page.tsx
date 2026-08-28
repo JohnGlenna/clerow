@@ -8,9 +8,35 @@ export const metadata: Metadata = {
   alternates: { canonical: "/clero" },
 };
 
-// The official App Store badge SVG is dropped into public/clero/ by hand; until
-// it exists we render a plain black badge with the same wording.
-const hasAppStoreBadge = fs.existsSync(path.join(process.cwd(), "public/clero/app-store-badge.svg"));
+// Hand-dropped assets in public/clero/: the official App Store badge and a
+// full-bleed hero background illustration. Both are optional — the page falls
+// back to a plain badge and a gradient sky until they exist.
+const pub = (file: string) => fs.existsSync(path.join(process.cwd(), "public/clero", file));
+const hasAppStoreBadge = pub("app-store-badge.svg");
+const hasHeroBg = pub("hero-bg.png");
+
+const FEATURES = [
+  {
+    icon: "🔥",
+    title: "Your streak",
+    body: "Every nicotine-free day adds up. Miss one and Clero helps you get straight back on — no reset shame.",
+  },
+  {
+    icon: "💸",
+    title: "Money you kept",
+    body: "Tell Clero what your habit cost. Watch the savings counter climb in real time, in your currency.",
+  },
+  {
+    icon: "🚀",
+    title: "One-tap rescue",
+    body: "Craving? Hit rescue. A 3-minute guided ride that gets you past the peak, whenever it hits.",
+  },
+  {
+    icon: "💬",
+    title: "Coach Clero",
+    body: "A coach that answers at 11pm. Ask anything, vent, or just check in. No lectures.",
+  },
+];
 
 function AppleGlyph() {
   return (
@@ -20,58 +46,33 @@ function AppleGlyph() {
   );
 }
 
-function PlayGlyph() {
+function LaurelLeft() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 3.5v17l9.5-8.5L4 3.5z" fill="#34a853" />
-      <path d="M4 3.5l9.5 8.5 3-2.7L5.2 3.2A1 1 0 0 0 4 3.5z" fill="#4285f4" />
-      <path d="M4 20.5l9.5-8.5 3 2.7L5.2 20.8A1 1 0 0 1 4 20.5z" fill="#ea4335" />
-      <path d="M16.5 9.3l3.3 1.9c.8.5.8 1.2 0 1.7l-3.3 1.8-3-2.7 3-2.7z" fill="#fbbc04" />
-    </svg>
-  );
-}
-
-function Laurel({ flip = false }: { flip?: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 44 120"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      aria-hidden="true"
-      style={flip ? { transform: "scaleX(-1)" } : undefined}
-    >
-      <path d="M38 6c-22 18-32 48-30 108" />
-      {[16, 30, 44, 58, 72, 86, 100].map((y, i) => {
-        const x = 8 + (i < 3 ? 3 - i : 0) * 4 + Math.max(0, i - 3) * 1.2;
-        return (
-          <g key={y}>
-            <path d={`M${x} ${y} q 12 -8 20 -2 q -10 4 -20 2z`} />
-            <path d={`M${x + 1} ${y + 7} q 14 2 18 12 q -12 -2 -18 -12z`} />
-          </g>
-        );
-      })}
+    <svg viewBox="0 0 24 40" fill="currentColor" aria-hidden="true">
+      <path d="M12 2c-8 6-11 18-6 36l1-.4C3 20 6 10 12 4z" />
+      <path d="M13 6c-4 1-6 4-6 8 3-1 5-4 6-8zM9 14c-4 2-5 6-4 10 3-2 4-6 4-10zM7 23c-3 3-3 7-1 10 2-3 2-7 1-10z" />
     </svg>
   );
 }
 
 export default function CleroHome() {
   return (
-    <section className="clero-hero">
-      <div>
-        <h1>
-          Quit nicotine.
-          <br />
-          Keep the money.
-        </h1>
-        <p className="clero-sub">
-          Vapes, cigarettes, pouches, snus — Clero tracks your streak and the cash you&rsquo;re not spending, and
-          gives you a one&#8209;tap rescue when a craving hits. <strong>Start today, see the numbers tomorrow.</strong>
-        </p>
-        <p className="clero-small">Your coach Clero is there at 11pm when the craving hits. No lectures, no shame.</p>
-
-        <div className="clero-badges">
+    <>
+      <section
+        className={`clero-top${hasHeroBg ? " clero-top-bg" : ""}`}
+        style={hasHeroBg ? { backgroundImage: "url(/clero/hero-bg.png)" } : undefined}
+      >
+        <div className="clero-top-inner">
+          <span className="clero-brand">{CLERO.name}</span>
+          <h1>
+            Quit nicotine.
+            <br />
+            Keep the money.
+          </h1>
+          <p className="clero-sub">
+            Vapes, cigarettes, pouches, snus — Clero tracks your streak and the cash you&rsquo;re not spending, and
+            gives you a one&#8209;tap rescue when a craving hits.
+          </p>
           <a className="clero-badge" href={CLERO.appStoreUrl} aria-label="Download on the App Store">
             {hasAppStoreBadge ? (
               <img src="/clero/app-store-badge.svg" alt="Download on the App Store" />
@@ -85,29 +86,80 @@ export default function CleroHome() {
               </>
             )}
           </a>
-          <div className="clero-badge clero-badge-soon" aria-disabled="true" title="Android — coming soon">
-            <PlayGlyph />
-            <span className="clero-badge-text">
-              <small>Get it on</small>
-              <span>Google Play</span>
-            </span>
-            <span className="clero-soon-pill">Coming soon</span>
-          </div>
+          <p className="clero-android">Android — coming soon</p>
         </div>
 
+        <div className="clero-scene" aria-hidden={hasHeroBg ? true : undefined}>
+          <Image
+            src="/clero/hero.png"
+            alt="Clero, a fluffy white coach, riding a rocket"
+            width={320}
+            height={320}
+            priority
+            className="clero-rocket"
+          />
+        </div>
+      </section>
+
+      <section className="clero-story">
+        <p>
+          Let&rsquo;s be honest — quitting is not one big decision. It&rsquo;s a hundred small ones, mostly late at
+          night. Clero is built for those moments: a counter that shows what you&rsquo;ve already won, and a coach
+          who picks up when nobody else will.
+        </p>
+        <p>
+          <strong>Start today, see the numbers tomorrow.</strong> No lectures, no shame.
+        </p>
+
+        <ul className="clero-chips" aria-label="What Clero helps you quit">
+          {["Vapes", "Cigarettes", "Pouches", "Snus"].map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+
         <figure className="clero-laurel">
-          <Laurel />
+          <LaurelLeft />
           <blockquote>
             <p>&ldquo;Day 34. The savings counter is the only reason I didn&rsquo;t buy a pack Friday.&rdquo;</p>
-            <cite>— Early tester</cite>
+            <cite>Early tester</cite>
           </blockquote>
-          <Laurel flip />
+          <span className="clero-laurel-flip">
+            <LaurelLeft />
+          </span>
         </figure>
-      </div>
+      </section>
 
-      <div className="clero-art">
-        <Image src="/clero/hero.png" alt="Clero coach illustration" width={320} height={320} priority />
-      </div>
-    </section>
+      <section className="clero-features">
+        <h2>
+          Built for the moment
+          <br />
+          the craving hits.
+        </h2>
+        <div className="clero-grid">
+          {FEATURES.map((f) => (
+            <article key={f.title} className="clero-card">
+              <span className="clero-card-icon" aria-hidden="true">
+                {f.icon}
+              </span>
+              <h3>{f.title}</h3>
+              <p>{f.body}</p>
+            </article>
+          ))}
+        </div>
+        <a className="clero-badge clero-badge-center" href={CLERO.appStoreUrl} aria-label="Download on the App Store">
+          {hasAppStoreBadge ? (
+            <img src="/clero/app-store-badge.svg" alt="Download on the App Store" />
+          ) : (
+            <>
+              <AppleGlyph />
+              <span className="clero-badge-text">
+                <small>Download on the</small>
+                <span>App Store</span>
+              </span>
+            </>
+          )}
+        </a>
+      </section>
+    </>
   );
 }
