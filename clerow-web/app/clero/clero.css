@@ -73,9 +73,14 @@
     linear-gradient(180deg, #0b1024 0%, #1b2a5c 45%, #3f6f9a 78%, #7fe3c3 100%);
 }
 .clero-top-bg {
+  /* 2:1 artwork: at ≥1120px wide the hero is exactly 50vw tall so nothing crops. */
+  min-height: clamp(560px, 50vw, 992px);
   background-size: cover;
   background-position: center bottom;
   background-repeat: no-repeat;
+}
+.clero-top-bg .clero-top-inner {
+  padding-top: 48px;
 }
 .clero-top-inner {
   position: relative;
@@ -110,11 +115,15 @@
   margin-top: 28px;
 }
 .clero-android {
+  display: inline-block;
   margin: 14px 0 0;
-  font-size: 13px;
-  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(11, 16, 36, 0.45);
+  font-size: 12px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(243, 235, 221, 0.7);
+  color: rgba(243, 235, 221, 0.9);
 }
 
 .clero-scene {
@@ -417,6 +426,10 @@
 @media (max-width: 820px) {
   .clero-top {
     border-radius: 0 0 28px 28px;
+  }
+  .clero-top-bg {
+    min-height: 88vh;
+    background-position: 72% bottom;
   }
   .clero-top-inner {
     padding-top: 28px;

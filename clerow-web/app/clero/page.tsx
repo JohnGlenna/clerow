@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 // back to a plain badge and a gradient sky until they exist.
 const pub = (file: string) => fs.existsSync(path.join(process.cwd(), "public/clero", file));
 const hasAppStoreBadge = pub("app-store-badge.svg");
-const hasHeroBg = pub("hero-bg.png");
+const heroBg = ["hero-bg.jpg", "hero-bg.png"].find(pub);
 
 const FEATURES = [
   {
@@ -59,8 +59,8 @@ export default function CleroHome() {
   return (
     <>
       <section
-        className={`clero-top${hasHeroBg ? " clero-top-bg" : ""}`}
-        style={hasHeroBg ? { backgroundImage: "url(/clero/hero-bg.png)" } : undefined}
+        className={`clero-top${heroBg ? " clero-top-bg" : ""}`}
+        style={heroBg ? { backgroundImage: `url(/clero/${heroBg})` } : undefined}
       >
         <div className="clero-top-inner">
           <span className="clero-brand">{CLERO.name}</span>
@@ -89,16 +89,19 @@ export default function CleroHome() {
           <p className="clero-android">Android — coming soon</p>
         </div>
 
-        <div className="clero-scene" aria-hidden={hasHeroBg ? true : undefined}>
-          <Image
-            src="/clero/hero.png"
-            alt="Clero, a fluffy white coach, riding a rocket"
-            width={320}
-            height={320}
-            priority
-            className="clero-rocket"
-          />
-        </div>
+        {/* With a painted background the illustration IS the scene; otherwise the rocket mascot stands in. */}
+        {!heroBg && (
+          <div className="clero-scene">
+            <Image
+              src="/clero/hero.png"
+              alt="Clero, a fluffy white coach, riding a rocket"
+              width={320}
+              height={320}
+              priority
+              className="clero-rocket"
+            />
+          </div>
+        )}
       </section>
 
       <section className="clero-story">
